@@ -121,6 +121,26 @@
       box-sizing: border-box;
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
+    .slot-winner-cell {
+      background: linear-gradient(135deg, rgba(180, 83, 9, 0.92) 0%, rgba(245, 158, 11, 0.95) 50%, rgba(217, 119, 6, 0.92) 100%) !important;
+      border: 2px solid #fef08a !important;
+      color: #000 !important;
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.95), inset 0 1px 3px #fff !important;
+      animation: slot-cell-win-pulse 0.7s infinite alternate ease-in-out;
+      z-index: 20;
+    }
+    @keyframes slot-cell-win-pulse {
+      0% { transform: scale(0.97); }
+      100% { transform: scale(1.05); }
+    }
+    .sos-line-animated {
+      stroke-dasharray: 450;
+      stroke-dashoffset: 450;
+      animation: draw-sos-line 0.45s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+    }
+    @keyframes draw-sos-line {
+      to { stroke-dashoffset: 0; }
+    }
     .reel-locked {
       animation: reel-snap-bounce 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
@@ -281,8 +301,26 @@
               <!-- Cam Yansıması Overlay -->
               <div class="slot-glass-reflection absolute inset-0 z-30"></div>
 
-              <!-- Altın / Neon Payline Çizgisi & Oklar -->
-              <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 z-25 flex items-center pointer-events-none">
+              <!-- Dinamik SOS / Çapraz Lazer Çizgisi SVG Katmanı -->
+              <svg id="slotSosLineSvg" class="absolute inset-0 w-full h-full pointer-events-none z-35 overflow-visible">
+                <defs>
+                  <linearGradient id="sosLaserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="50%" stop-color="#fde047" />
+                    <stop offset="100%" stop-color="#ef4444" />
+                  </linearGradient>
+                  <filter id="sosGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+              </svg>
+
+              <!-- Varsayılan Payline Çizgisi (Dönüş Esnasında) -->
+              <div id="slotDefaultPayline" class="absolute inset-x-0 top-1/2 -translate-y-1/2 z-25 flex items-center pointer-events-none transition-opacity duration-300">
                 <span class="text-rose-500 font-black text-xs px-1 select-none drop-shadow">▶</span>
                 <div class="slot-payline flex-1 h-[3px] bg-gradient-to-r from-rose-500 via-amber-300 to-rose-500"></div>
                 <span class="text-rose-500 font-black text-xs px-1 select-none drop-shadow">◀</span>
@@ -488,6 +526,8 @@
     let isPlaying = false;
     let pendingTarget = null;
     let activeIntervals = [];
+    let spinDuration = 6.5; // Varsayılan dönüş süresi (sn)
+    let dopamineLevel = 75; // 0 - 100 arası gerilim ve fakeout seviyesi
 
     // Kart Oyununun Durumu
     let cardsState = 'opened'; // 'opened' | 'gathering' | 'shuffling' | 'closed_ready' | 'revealed'
@@ -848,70 +888,89 @@
       }
     }
 
-    // --- GERÇEK AÇISAL FİZİK MOTORU İLE ÇARKIFELEK (ANGULAR PHYSICS & ELASTIC FLAPPER) ---
+    // --- GELİŞMİŞ ANALİTİK FİZİK & DOPAMİN NEAR-MISS MOTORU İLE ÇARKIFELEK ---
     function spinWheel(targetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
       broadcast({ type: 'spin_start' });
 
       const N = names.length, arc = (2 * Math.PI) / N;
-      const POINTER_ANGLE = 1.5 * Math.PI; // 270 derece (tam tepe)
+      const POINTER_ANGLE = 1.5 * Math.PI; // 270 derece (tam tepe ibresi)
 
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
       if (targetIndex === -1) targetIndex = Math.floor(Math.random() * N);
 
-      // Hedeflenen dilimin tam ortasının tepe noktasına oturması için gereken açı hesabı
-      const turns = 6 + Math.floor(Math.random() * 2); // 6-7 tam tur
-      const desiredInside = (targetIndex + 0.5) * arc;
-      const targetModulo = ((POINTER_ANGLE - desiredInside) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      // Kumandadan gelen süre ve dopamin seviyesi
+      const duration = Math.max(3000, spinDuration * 1000);
+      const isHighDopamine = (dopamineLevel > 60);
+
+      // Hedeflenen dilimin tam merkezinin tepe ibresiyle (POINTER_ANGLE) çakışması için gereken açı
+      const targetCenterAngle = (targetIndex + 0.5) * arc;
+      const targetModulo = ((POINTER_ANGLE - targetCenterAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
       const currentModulo = (wheelRotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+
       let deltaAngle = targetModulo - currentModulo;
-      if (deltaAngle <= 0) deltaAngle += 2 * Math.PI;
-      const totalDelta = turns * (2 * Math.PI) + deltaAngle;
+      if (deltaAngle <= 0.1) deltaAngle += 2 * Math.PI;
 
-      // Gerçek fizik sürtünme katsayısı ve başlangıç açısal hızı (Analitik Balistik Çözüm)
-      const friction = 0.62; // 1/saniye sürtünme frenlemesi
-      let omega = friction * totalDelta; // Başlangıç açısal hızı (rad/s)
-      let currentRot = wheelRotation;
+      // Süreye göre tur sayısı (kısa sürede 4-5 tur, uzun sürede 8-10 tur)
+      const baseTurns = Math.max(4, Math.floor(duration / 1000 * 1.1));
+      const totalDelta = baseTurns * (2 * Math.PI) + deltaAngle;
+      const startRotation = wheelRotation;
 
-      let lastTime = performance.now();
+      const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
-      let lastPegIndex = -1;
-      let flapperDeflection = 0; // Tırnağın anlık fiziksel eğim açısı
+      let lastPegIdx = -1;
+      let flapperDeflection = 0;
       let flapperSpringVel = 0;
+      let lastFrameTime = startTime;
 
-      function physicsStep(now) {
-        let dt = (now - lastTime) / 1000;
-        lastTime = now;
-        if (dt > 0.05) dt = 0.016; // FPS düşüşü kalkanı
+      function animLoop(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        let dt = (now - lastFrameTime) / 1000;
+        lastFrameTime = now;
+        if (dt > 0.05) dt = 0.016;
 
-        // Açısal Fizik: Sürtünme diferansiyeli
-        const alphaFriction = -friction * omega;
-        omega += alphaFriction * dt;
-        currentRot += omega * dt;
-        wheelRotation = currentRot;
+        let easeP = 0;
+        if (isHighDopamine) {
+          // YÜKSEK DOPAMİN: Son saniye Near-Miss gerilimi (Komşu pimde takılma ve hedefe sıçrama!)
+          if (progress < 0.85) {
+            const pSub = progress / 0.85;
+            easeP = 0.88 * (1 - Math.pow(1 - pSub, 3.8));
+          } else if (progress >= 0.85 && progress < 0.93) {
+            // Komşu pimin ucunda asılı kalma (Kalp durduran duraklama!)
+            const pSub = (progress - 0.85) / 0.08;
+            easeP = 0.88 + pSub * 0.035;
+          } else {
+            // Son anda tırnak pimi aşar ve hedefin tam merkezine oturur!
+            const pSub = (progress - 0.93) / 0.07;
+            const easeOutSub = Math.sin(pSub * Math.PI * 0.5);
+            easeP = 0.915 + 0.085 * easeOutSub;
+          }
+        } else {
+          // STANDART / İPEKSİ MOD: Kesintisiz pürüzsüz quintic sönüm
+          easeP = 1 - Math.pow(1 - progress, 4.5);
+        }
 
-        // Tırnak & Pim Fiziksel Çarpışma Hesaplaması
+        // Çark rotasyonunu güncelle
+        wheelRotation = startRotation + totalDelta * easeP;
+
+        // Tırnak (Pointer Flapper) Fiziksel Temas ve Titreşim Dinamiği
         const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
         const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
 
-        // Pim tırnağa çarpıp iterken
-        if (phaseInSlice < 0.28) {
-          const pushFraction = phaseInSlice / 0.28;
-          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 22; // tırnak 22 dereceye kadar itilir
-          if (curIdx !== lastPegIndex) {
-            lastPegIndex = curIdx;
-            playTick(720 + Math.min(220, omega * 15));
-            flapperSpringVel = 45;
+        if (phaseInSlice < 0.26) {
+          const pushFraction = phaseInSlice / 0.26;
+          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
+          if (curIdx !== lastPegIdx) {
+            lastPegIdx = curIdx;
+            playTick(720 + Math.random() * 80);
+            flapperSpringVel = 50;
           }
         } else {
-          // Pimden kurtulunca sönümlü yay titreşimi
-          flapperSpringVel += -350 * flapperDeflection * dt - 18 * flapperSpringVel * dt;
+          flapperSpringVel += -400 * flapperDeflection * dt - 22 * flapperSpringVel * dt;
           flapperDeflection += flapperSpringVel * dt;
-          if (Math.abs(flapperDeflection) < 0.2 && Math.abs(flapperSpringVel) < 0.5) {
-            flapperDeflection = 0;
-            flapperSpringVel = 0;
-          }
+          if (Math.abs(flapperDeflection) < 0.1) flapperDeflection = 0;
         }
 
         if (pointerEl) {
@@ -920,40 +979,87 @@
 
         drawWheel();
 
-        // Durma Kriteri (Açısal hız kritik eşiğin altına indiğinde)
-        if (omega > 0.08) {
-          requestAnimationFrame(physicsStep);
+        if (progress < 1) {
+          requestAnimationFrame(animLoop);
         } else {
-          // Çark dilim içine oturup mikronluk son yaylanmayı tamamlar
+          // Süre bittiğinde kesin tam hedef merkezine pürüzsüzce otur
           isPlaying = false;
+          wheelRotation = startRotation + totalDelta;
           if (pointerEl) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
-          
-          // Tam hedef açıya kilitlen
-          wheelRotation = currentModulo + totalDelta;
           drawWheel();
 
-          const winnerIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
-          finishGame(names[winnerIdx], targetName !== null, '3D Gerçek Fizik Çarkı');
+          const winnerName = names[targetIndex];
+          setTimeout(() => {
+            finishGame(winnerName, targetName !== null, '3D Çarkıfelek');
+          }, 450);
         }
       }
 
-      requestAnimationFrame(physicsStep);
+      requestAnimationFrame(animLoop);
     }
 
-    // --- 2. 3D RETRO VEGAS SLOT (KİŞİ EŞLEŞTİRME & DİĞER İSİMLERDEN ŞERİT) ---
+    // --- 2. 3D RETRO VEGAS SLOT (3X3 MATRİS, ÇAPRAZ SOS ÇİZGİSİ & NUDGE DROP) ---
     const SLOT_BADGES = ['👑', '⭐', '🎯', '💎', '🎲', '🍀', '✨', '🔥', '🏆', '♠️', '♥️', '♦️', '♣️'];
 
-    function createSlotNameCell(name, badge = null, isWinner = false) {
+    function createSlotNameCell(name, badge = null, isWinner = false, cellId = '') {
       const icon = isWinner ? '👑' : (badge || SLOT_BADGES[Math.floor(Math.random() * SLOT_BADGES.length)]);
+      const idAttr = cellId ? `id="${cellId}"` : '';
       return `
-        <div class="slot-symbol-cell ${isWinner ? 'bg-amber-950/80 border-y-2 border-amber-400' : 'bg-zinc-950/90'} text-center select-none px-1 flex flex-col items-center justify-center">
+        <div ${idAttr} class="slot-symbol-cell ${isWinner ? 'slot-winner-cell' : 'bg-zinc-950/90'} text-center select-none px-1 flex flex-col items-center justify-center transition-all duration-300">
           <span class="text-xl md:text-2xl leading-tight filter drop-shadow select-none">${icon}</span>
-          <span class="text-[11px] md:text-xs font-black ${isWinner ? 'text-amber-300 font-serif' : 'text-zinc-200'} uppercase truncate w-full tracking-wider mt-0.5">${name}</span>
+          <span class="text-[11px] md:text-xs font-black ${isWinner ? 'text-black font-serif' : 'text-zinc-100'} uppercase truncate w-full tracking-wider mt-0.5">${name}</span>
         </div>
       `;
     }
 
+    function clearSlotSosLine() {
+      const svg = document.getElementById('slotSosLineSvg');
+      if (svg) {
+        // Mevcut çizgileri temizle ama defs korunur
+        const lines = svg.querySelectorAll('line');
+        lines.forEach(l => l.remove());
+      }
+      const defaultPayline = document.getElementById('slotDefaultPayline');
+      if (defaultPayline) defaultPayline.style.opacity = '1';
+    }
+
+    function drawSlotSosLine(pattern) {
+      const svg = document.getElementById('slotSosLineSvg');
+      if (!svg) return;
+      clearSlotSosLine();
+
+      const defaultPayline = document.getElementById('slotDefaultPayline');
+      if (defaultPayline) defaultPayline.style.opacity = '0.2';
+
+      let x1 = '12%', y1 = '50%', x2 = '88%', y2 = '50%';
+      if (pattern === 'diag_down') {
+        // Sol Üst [0,0] -> Sağ Alt [2,2]
+        x1 = '12%'; y1 = '16%'; x2 = '88%'; y2 = '84%';
+      } else if (pattern === 'diag_up') {
+        // Sol Alt [0,2] -> Sağ Üst [2,0]
+        x1 = '12%'; y1 = '84%'; x2 = '88%'; y2 = '16%';
+      } else if (pattern === 'center') {
+        // Yatay Orta
+        x1 = '6%'; y1 = '50%'; x2 = '94%'; y2 = '50%';
+      }
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', 'url(#sosLaserGrad)');
+      line.setAttribute('stroke-width', '7');
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('filter', 'url(#sosGlow)');
+      line.setAttribute('class', 'sos-line-animated');
+
+      svg.appendChild(line);
+      playWinSound();
+    }
+
     function initSlotDisplay() {
+      clearSlotSosLine();
       const col1 = document.getElementById('slotReelCol1');
       const col2 = document.getElementById('slotReelCol2');
       const col3 = document.getElementById('slotReelCol3');
@@ -998,6 +1104,7 @@
     function spinSlot(targetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
+      clearSlotSosLine();
       pullSlotLever();
       playLeverCrankSound();
       broadcast({ type: 'spin_start' });
@@ -1016,6 +1123,20 @@
       const meter = document.getElementById('slotWinMeter');
       if (meter) meter.textContent = 'ÇEVRİLİYOR...';
 
+      // 3x3 KAZANMA HATTI SEÇİMİ (Çapraz SOS veya Yatay Hat)
+      // %80 ihtimalle çapraz (diag_down veya diag_up), %20 ihtimalle orta düz
+      const patterns = ['diag_down', 'diag_up', 'center'];
+      const chosenPattern = (Math.random() < 0.45) ? 'diag_down' : ((Math.random() < 0.8) ? 'diag_up' : 'center');
+
+      // Her makaranın son 3 hücresinde (Row 0: Üst, Row 1: Orta, Row 2: Alt) kazanan hedef kişinin satır indeksi:
+      // diag_down: Col 0 -> Row 0, Col 1 -> Row 1, Col 2 -> Row 2
+      // diag_up:   Col 0 -> Row 2, Col 1 -> Row 1, Col 2 -> Row 0
+      // center:    Col 0 -> Row 1, Col 1 -> Row 1, Col 2 -> Row 1
+      let targetRowPerCol = [1, 1, 1];
+      if (chosenPattern === 'diag_down') targetRowPerCol = [0, 1, 2];
+      else if (chosenPattern === 'diag_up') targetRowPerCol = [2, 1, 0];
+      else if (chosenPattern === 'center') targetRowPerCol = [1, 1, 1];
+
       // Diğer katılımcıların isim havuzu (kazanan hariç diğer kişiler)
       const otherNames = names.filter(n => n.trim().toLowerCase() !== target.trim().toLowerCase());
       const getOtherName = () => {
@@ -1023,12 +1144,14 @@
         return otherNames[Math.floor(Math.random() * otherNames.length)];
       };
 
-      // 3 Makara için dinamik isim zincirleri oluştur (Sondan 2. hücre tam Payline hedefine oturur)
       const CELL_HEIGHT = 74;
+      const slotDuration = Math.max(2500, spinDuration * 750);
+      const isHighDopamine = (dopamineLevel > 50);
+
       const reelConfigs = [
-        { col: col1, count: 26, duration: 2000, delay: 0 },
-        { col: col2, count: 34, duration: 2700, delay: 0 },
-        { col: col3, count: 42, duration: 3500, delay: 0 }
+        { col: col1, count: 26, duration: Math.floor(slotDuration * 0.65), targetRow: targetRowPerCol[0], colIdx: 0 },
+        { col: col2, count: 34, duration: Math.floor(slotDuration * 0.82), targetRow: targetRowPerCol[1], colIdx: 1 },
+        { col: col3, count: 42, duration: Math.floor(slotDuration * 1.00), targetRow: targetRowPerCol[2], colIdx: 2 }
       ];
 
       reelConfigs.forEach((cfg) => {
@@ -1037,19 +1160,23 @@
         cfg.col.style.transform = 'translateY(0px)';
 
         let html = '';
-        // Başlangıç sembolü
+        // Başlangıç hücresi
         html += createSlotNameCell(getOtherName());
 
-        // Dönen ara şeritteki tüm hücreler: Sınıftaki diğer kişilerin isimleri!
-        for (let i = 1; i < cfg.count - 2; i++) {
+        // Dönen ara şerit: Sadece sınıftaki diğer katılımcıların isimleri!
+        for (let i = 1; i < cfg.count - 3; i++) {
           const randomPerson = names[Math.floor(Math.random() * names.length)];
           html += createSlotNameCell(randomPerson);
         }
 
-        // Son 3 hücre: [Üstteki Arkadaşı, HEDEF KAZANAN KİŞİ (Payline), Alttaki Arkadaşı]
-        html += createSlotNameCell(getOtherName());
-        html += createSlotNameCell(target, '👑', true); // Tam orta payline'da 3'lü eşleşme
-        html += createSlotNameCell(getOtherName());
+        // Son 3 hücre (3x3 Pencere):
+        // cfg.targetRow hangi indeksteyse (0, 1, 2) o hücreye KAZANAN KİŞİ yerleştirilir!
+        for (let r = 0; r < 3; r++) {
+          const isWinnerCell = (r === cfg.targetRow);
+          const cellName = isWinnerCell ? target : getOtherName();
+          const cellId = `slotCell_${cfg.colIdx}_${r}`;
+          html += createSlotNameCell(cellName, isWinnerCell ? '👑' : null, isWinnerCell, cellId);
+        }
 
         cfg.col.innerHTML = html;
       });
@@ -1057,32 +1184,59 @@
       // Makaraları dikey kaydırırken dişli tıkırtısı
       const spinTickInterval = setInterval(() => {
         playTick(620);
-      }, 90);
+      }, 85);
       activeIntervals.push(spinTickInterval);
 
-      // DOM repaint sonrası dikey fiziksel akış başlat
+      // DOM repaint sonrası kaydırmayı başlat
       requestAnimationFrame(() => {
         reelConfigs.forEach((cfg, idx) => {
-          const targetY = -(cfg.count - 2) * CELL_HEIGHT;
+          // Son 3 hücrenin pencereye oturması için hedef Y
+          const finalY = -(cfg.count - 3) * CELL_HEIGHT;
+
+          // DOPAMİN: Son makara (idx === 2) yüksek dopaminde önce 1 hücre yukarıda (başka isimde) durur gibi olur!
+          const fakeY = (idx === 2 && isHighDopamine) ? (finalY + CELL_HEIGHT) : finalY;
+
           cfg.col.style.transition = `transform ${cfg.duration}ms cubic-bezier(0.12, 0.84, 0.35, 1.14)`;
-          cfg.col.style.transform = `translateY(${targetY}px)`;
+          cfg.col.style.transform = `translateY(${fakeY}px)`;
 
           setTimeout(() => {
             playReelStopSound();
             cfg.col.parentElement.classList.add('reel-locked');
             if (idx === 0) playTick(750);
             if (idx === 1) playTick(850);
+
             if (idx === 2) {
               clearInterval(spinTickInterval);
-              isPlaying = false;
-              if (meter) meter.textContent = 'EŞLEŞTİ!';
-              setTimeout(() => {
-                finishGame(target, targetName !== null, '3D Vegas Çekilişi');
-              }, 450);
+
+              if (isHighDopamine) {
+                // SON SANİYEDE DÜŞÜŞ (NUDGE DROP):
+                // 350ms bekleyip makara 3'ü hedeflenen satıra kaydır!
+                setTimeout(() => {
+                  cfg.col.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.25)';
+                  cfg.col.style.transform = `translateY(${finalY}px)`;
+                  playReelStopSound();
+                  playIvoryBallClick(1100, 0.3);
+
+                  // Çapraz SOS çizgisini çiz ve kutla
+                  finalizeSlotWin(target, targetName, chosenPattern, meter);
+                }, 380);
+              } else {
+                finalizeSlotWin(target, targetName, chosenPattern, meter);
+              }
             }
           }, cfg.duration);
         });
       });
+    }
+
+    function finalizeSlotWin(target, targetName, chosenPattern, meter) {
+      isPlaying = false;
+      if (meter) meter.textContent = 'EŞLEŞTİ!';
+      drawSlotSosLine(chosenPattern);
+
+      setTimeout(() => {
+        finishGame(target, targetName !== null, 'Vegas Çekilişi (3x3)');
+      }, 1000);
     }
 
     // --- 3. 3D MONTE CARLO RULET MASASI (DERİN 3D ÇANAK & FİLDİŞİ TOP) ---
@@ -1422,21 +1576,27 @@
       const rPocketCenter = (rPocketsOuter + rPocketsInner) / 2;
       const rDeflector = (rMahoganyInner + rPocketsOuter) / 2;
 
-      const duration = 6200;
+      const duration = Math.max(4000, spinDuration * 1000);
+      const isHighDopamine = (dopamineLevel > 50);
       const startTime = performance.now();
 
+      // Dopamin yüksekse son saniye perdeden sekme (Fakeout) için sahte komşu cep
+      const fakeTargetIndex = (targetIndex + (Math.random() > 0.5 ? 1 : N - 1)) % N;
+      let fakeoutTriggered = false;
+
       const startWheelAngle = rouletteAngle;
-      const totalWheelTurns = (3.8 + Math.random() * 0.4) * 2 * Math.PI;
+      const totalWheelTurns = (3.5 + (duration / 2500)) * Math.PI;
       const finalWheelAngle = startWheelAngle + totalWheelTurns;
+      
       const targetPocketAngle = finalWheelAngle + targetIndex * arc + arc / 2;
+      const fakePocketAngle = finalWheelAngle + fakeTargetIndex * arc + arc / 2;
 
       const startBallAngle = ballAngle;
       const desiredMod = ((targetPocketAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       const currentMod = ((startBallAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       let ballDiff = currentMod - desiredMod;
       if (ballDiff < 0) ballDiff += 2 * Math.PI;
-      const totalBackwardTurns = (8 * 2 * Math.PI) + ballDiff;
-      const finalBallAngle = startBallAngle - totalBackwardTurns;
+      const totalBackwardTurns = (Math.max(6, Math.floor(duration / 700)) * 2 * Math.PI) + ballDiff;
 
       let lastPipTime = 0;
       let hitRim1 = false;
@@ -1449,14 +1609,14 @@
         const progress = Math.min(elapsed / duration, 1);
 
         // Çark Dönüşü
-        const wheelEase = 1 - Math.pow(1 - progress, 2.6);
+        const wheelEase = 1 - Math.pow(1 - progress, 2.5);
         rouletteAngle = startWheelAngle + totalWheelTurns * wheelEase;
 
         // Top Açısal Hızı
-        const ballEase = 1 - Math.pow(1 - progress, 3.4);
-        ballAngle = startBallAngle - totalBackwardTurns * ballEase;
+        const ballEase = 1 - Math.pow(1 - progress, 3.2);
+        let currentBallAngle = startBallAngle - totalBackwardTurns * ballEase;
 
-        // --- ÇOK AŞAMALI FİZİK: DÜŞÜŞ, KENARA ÇARPMA VE SEKME SİMÜLASYONU ---
+        // --- ÇOK AŞAMALI FİZİK: DÜŞÜŞ, KENARA ÇARPMA, VE DOPAMİN FAKEOUT SEKME SİMÜLASYONU ---
         let ballDist = rMahoganyInner - 4.5;
         let ballZ = 0.96;
 
@@ -1485,7 +1645,6 @@
           let baseDist = (rMahoganyInner - 8.0) - pSub * (rMahoganyInner - 8.0 - rDeflector);
           let baseZ = 0.78 - pSub * 0.40;
 
-          // 1. Elmas Saptırıcı Çarpışması (~0.63)
           if (progress >= 0.63 && progress < 0.69) {
             const pHit = (progress - 0.63) / 0.06;
             baseDist += Math.sin(pHit * Math.PI) * 6.5;
@@ -1496,7 +1655,6 @@
             }
           }
 
-          // 2. Elmas Saptırıcı Çarpışması (~0.70)
           if (progress >= 0.70 && progress < 0.76) {
             const pHit = (progress - 0.70) / 0.06;
             baseDist += Math.sin(pHit * Math.PI) * 5.0;
@@ -1510,19 +1668,26 @@
           ballDist = baseDist;
           ballZ = baseZ;
 
-        } else if (progress >= 0.76 && progress < 0.96) {
-          // AŞAMA 4: Ceplere İniş & Pirinç Perdeler Arasında Sekerek İlerleme (Fret Hopping)
-          const pSub = (progress - 0.76) / 0.20;
+        } else if (progress >= 0.76 && progress < 0.92) {
+          // AŞAMA 4: Ceplere İniş & Pirinç Perdeler Arasında Sekerek İlerleme
+          const pSub = (progress - 0.76) / 0.16;
           const hops = 5;
           const hopPhase = pSub * hops * Math.PI;
-          const decay = Math.pow(1 - pSub, 1.5);
-          
-          const hopHeight = Math.abs(Math.sin(hopPhase)) * decay * 0.42;
+          const decay = Math.pow(1 - pSub, 1.4);
+
+          const hopHeight = Math.abs(Math.sin(hopPhase)) * decay * 0.38;
           ballZ = hopHeight;
 
-          const radialHop = Math.sin(hopPhase * 2) * decay * 4.0;
+          const radialHop = Math.sin(hopPhase * 2) * decay * 3.8;
           const baseDist = rDeflector - pSub * (rDeflector - rPocketCenter);
           ballDist = baseDist + radialHop;
+
+          // YÜKSEK DOPAMİN: Top bu aşamada komşu cepte duracak gibi yavaşlar!
+          if (isHighDopamine && pSub > 0.65) {
+            currentBallAngle = fakePocketAngle - (1 - pSub) * arc * 0.7;
+            const fakeName = names[fakeTargetIndex];
+            if (statusBadge) statusBadge.textContent = `Krupiye: Top ${fakeName} cebinde duruyor mu?!`;
+          }
 
           const currentBounceIndex = Math.floor(pSub * hops);
           if (currentBounceIndex > fretBounceCount) {
@@ -1531,13 +1696,31 @@
           }
 
         } else {
-          // AŞAMA 5: Hedef Cebe Tam Oturma & Kilitlenme (Resting)
-          const pSub = (progress - 0.96) / 0.04;
-          const settleDecay = 1 - pSub;
-          ballDist = rPocketCenter + settleDecay * 1.5 * Math.sin(pSub * Math.PI * 3);
-          ballZ = Math.max(0, settleDecay * 0.04);
+          // AŞAMA 5: SON SANİYE YER DEĞİŞTİRME VEYA HEDEFE KİLİTLENME
+          const pSub = (progress - 0.92) / 0.08;
+
+          if (isHighDopamine) {
+            // SON SANİYE PERDEDEN SEKTİRME (FAKEOUT KICK!)
+            if (!fakeoutTriggered) {
+              fakeoutTriggered = true;
+              playIvoryBallClick(1700, 0.35); // Sert pirinç perdeye çarpış
+              if (statusBadge) statusBadge.textContent = `⚡ DİKKAT! Top perdeden sekti ➔ ${names[targetIndex]}!`;
+            }
+            // Zıplama yüksekliği ve hedefe atlama kavis eğrisi
+            const kickZ = Math.sin(pSub * Math.PI) * 0.38;
+            ballZ = Math.max(0, kickZ);
+            ballDist = rPocketCenter + Math.sin(pSub * Math.PI) * 2.2;
+            currentBallAngle = fakePocketAngle + (targetPocketAngle - fakePocketAngle) * Math.sin(pSub * Math.PI * 0.5);
+          } else {
+            // Normal yumuşak yerleşme
+            const settleDecay = 1 - pSub;
+            ballDist = rPocketCenter + settleDecay * 1.5 * Math.sin(pSub * Math.PI * 3);
+            ballZ = Math.max(0, settleDecay * 0.04);
+            currentBallAngle = targetPocketAngle;
+          }
         }
 
+        ballAngle = currentBallAngle;
         drawRoulette(ballDist, ballZ);
 
         // Fildişi Top Tıkırtıları (Dış parkurda)
@@ -1565,13 +1748,12 @@
           }
 
           const winnerName = names[targetIndex];
-          const statusBadge = document.getElementById('rouletteStatusBadge');
           if (statusBadge) statusBadge.textContent = '👑 KAZANAN: ' + winnerName;
           renderRouletteTable(winnerName);
 
           setTimeout(() => {
             finishGame(winnerName, targetName !== null, '3D Monte Carlo Ruleti');
-          }, 1200);
+          }, 1100);
         }
       }
       requestAnimationFrame(anim);
@@ -1864,6 +2046,7 @@
         if (statusBadge) statusBadge.textContent = 'Krupiye: Çark çevrilmeye hazır';
         renderRouletteTable();
       } else if (activeGameMode === 'slot') {
+        clearSlotSosLine();
         initSlotDisplay();
       }
     }
@@ -1977,7 +2160,10 @@
 
         conn.on('data', (data) => {
           if (!data || !data.type) return;
-          if (data.type === 'sync_names') {
+          if (data.type === 'set_settings') {
+            if (data.duration) spinDuration = parseFloat(data.duration);
+            if (data.dopamine !== undefined) dopamineLevel = parseInt(data.dopamine);
+          } else if (data.type === 'sync_names') {
             if (Array.isArray(data.names) && data.names.length) {
               names = data.names;
               saveStorage();
@@ -1989,6 +2175,8 @@
             }
           } else if (data.type === 'spin') {
             closeModal();
+            if (data.duration) spinDuration = parseFloat(data.duration);
+            if (data.dopamine !== undefined) dopamineLevel = parseInt(data.dopamine);
             if (data.mode && data.mode !== activeGameMode) {
               setGameMode(data.mode, false);
             }
