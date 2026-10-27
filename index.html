@@ -1119,9 +1119,11 @@
       // Çark saat yönünde dönerken hedefe varmadan hemen önceki komşu dilim: (targetIndex + 1) % N
       const fakeTargetIndex = (targetIndex + 1) % N;
 
-      // Kumandadan gelen süre ve dopamin seviyesi
+      // Kumandadan gelen süre ve sürekli (analog) dopamin seviyesi ölçeklemesi
       const duration = Math.max(4500, spinDuration * 1000);
-      const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
+      const dNorm = Math.max(0, Math.min(100, dopamineLevel)) / 100;
+      const isDopamineActive = (dNorm >= 0.12) || (fakeTargetName !== null);
+      const effD = (fakeTargetName !== null) ? Math.max(0.60, dNorm) : dNorm;
 
       // Hedeflenen dilimin tam merkezinin tepe ibresiyle (POINTER_ANGLE) çakışması için gereken açı
       const targetCenterAngle = (targetIndex + 0.5) * arc;
@@ -1137,17 +1139,24 @@
       const startRotation = wheelRotation;
       const finalRotation = startRotation + totalDelta;
 
-      // Kazanan ile Yem yan yana olduğundan, sahte hedefin pim çentiği açısı: finalRotation - 0.5 * arc
-      // DEEPSEEK KİNEMATİK SÖNÜM: Son saniyelerde dramatik yavaşlama (C^1 sürekli analitik model)
+      // DOPAMİN DİNAMİĞİ (%0 ile %100 ARASI KESİNTİSİZ ANALOG ÖLÇEKLEME):
+      // %0: Doğal ve hızlı sönüm, pPeg = 0.88 (son ~0.8s)
+      // %100: Maksimum gerilim ve ağır çekim, pPeg = 0.64 (son 2.5s boyunca pimde sürünme!)
       const pegRatio = (totalDelta - 0.5 * arc) / totalDelta;
-      const pPeg = 0.76; // Son %24'lük genişletilmiş gerilim ve yavaşlama penceresi (son ~2 saniye)
-      const crawlC = isHighDopamine ? (0.025 + (dopamineLevel / 100) * 0.02) : 0.05;
-      const span2 = 1 - pPeg;
-      const a = 3.2; // İlk fazda belirgin ve doğal sönüm katsayısı
+      const pPeg = 0.88 - effD * 0.24; 
+      const span2 = 1.0 - pPeg;
+      // Sürünme hızı: %0'da 0.080, %100'de 0.010 (8 kat daha ağır ve gerilimli!)
+      const crawlC = 0.080 - effD * 0.070;
+      const a = 2.4 + effD * 1.2;
       const vPeg = (pegRatio * crawlC) / pPeg;
       const m0 = vPeg * span2;
       const m1 = 0; // Kazanan dilim merkezine sıfır hızla pürüzsüzce oturur
       let hasOvercomePeg = false;
+
+      // İbre (flapper) gerilim ve titreme şiddeti: %0'da normal, %100'de kalp krizi seviyesi
+      const maxFlapperDeflection = 14.0 + effD * 12.0; // 14° ile 26° arası bükülme
+      const flapperTremorAmp = 0.8 + effD * 2.4;
+      const flapperSnapVel = 110 + effD * 90; // Pimi aşınca fırlama ivmesi
 
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
@@ -1172,18 +1181,18 @@
         let easeP;
         let currentSpeed;
 
-        if (isHighDopamine) {
+        if (isDopamineActive) {
           if (progress < pPeg) {
             const pn = progress / pPeg;
             const oneMinusPn = Math.max(0, 1 - pn);
             easeP = pegRatio * ((1 - Math.pow(oneMinusPn, a)) * (1 - crawlC) + crawlC * pn);
             currentSpeed = (pegRatio * totalDelta / (pPeg * (duration / 1000))) * (a * Math.pow(oneMinusPn, a - 1) * (1 - crawlC) + crawlC);
           } else {
-            // PİMİ AŞMA VE KAZANANIN MERKEZİNE YERLEŞME (SON SANİYE SÜRÜNMESİ)
-            if (!hasOvercomePeg && progress >= pPeg + 0.05) {
+            // PİMİ AŞMA VE KAZANANIN MERKEZİNE YERLEŞME (DOPAMİN SÜRÜNMESİ)
+            if (!hasOvercomePeg && progress >= pPeg + 0.06 * (1 - effD * 0.3)) {
               hasOvercomePeg = true;
-              playTick(860);
-              flapperSpringVel = 140; // Pimi aşınca ibreye fırlama ivmesi
+              playTick(820 + Math.floor(effD * 140));
+              flapperSpringVel = flapperSnapVel;
             }
             const tRatio = (progress - pPeg) / span2;
             const t2 = tRatio * tRatio, t3 = t2 * tRatio;
@@ -1196,7 +1205,8 @@
             currentSpeed = Math.max(0, (dh * totalDelta) / (span2 * (duration / 1000)));
           }
         } else {
-          const pExp = 4.6;
+          // %0 Standart Doğal Fiziksel Sönüm (Fakeout Yok)
+          const pExp = 4.2;
           easeP = 1 - Math.pow(1 - progress, pExp);
           currentSpeed = (totalDelta / duration) * (pExp * Math.pow(Math.max(0, 1 - progress), pExp - 1));
         }
@@ -1208,10 +1218,11 @@
         const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
         const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
 
-        if (isHighDopamine && progress >= pPeg - 0.12 && progress < pPeg) {
+        const tensionWindow = 0.06 + effD * 0.10;
+        if (isDopamineActive && progress >= pPeg - tensionWindow && progress < pPeg) {
           // Pim çentiğinde maksimum bükülme gerilimi ve gerilim titremesi (tremor)
-          const tensionProgress = (progress - (pPeg - 0.12)) / 0.12;
-          flapperDeflection = -18.0 * tensionProgress - Math.sin(now * 0.05) * 1.8;
+          const tensionProgress = (progress - (pPeg - tensionWindow)) / tensionWindow;
+          flapperDeflection = -maxFlapperDeflection * tensionProgress - Math.sin(now * (0.04 + effD * 0.03)) * flapperTremorAmp;
           flapperSpringVel = 0;
         } else if (phaseInSlice < 0.24) {
           const pushFraction = phaseInSlice / 0.24;
@@ -1420,7 +1431,10 @@
 
       const CELL_HEIGHT = 74;
       const slotDuration = Math.max(2500, spinDuration * 750);
-      const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
+      const dNorm = Math.max(0, Math.min(100, dopamineLevel)) / 100;
+      const isHighDopamine = (dNorm >= 0.15) || (fakeTargetName !== null);
+      const effD = (fakeTargetName !== null) ? Math.max(0.60, dNorm) : dNorm;
+      const nudgeHoldTime = 220 + Math.floor(effD * 650);
 
       const reelConfigs = [
         { col: col1, count: 26, duration: Math.floor(slotDuration * 0.65), targetRow: 1, colIdx: 0 },
@@ -1502,7 +1516,7 @@
                   setTimeout(() => {
                     finalizeSlotWin(target, targetName, meter);
                   }, 340);
-                }, 360);
+                }, nudgeHoldTime);
               } else {
                 finalizeSlotWin(target, targetName, meter);
               }
@@ -1976,7 +1990,9 @@
       const rDeflector = (rMahoganyInner + rPocketsOuter) / 2;
 
       const duration = Math.max(4000, spinDuration * 1000);
-      const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
+      const dNorm = Math.max(0, Math.min(100, dopamineLevel)) / 100;
+      const isHighDopamine = (dNorm >= 0.15) || (fakeTargetName !== null);
+      const effD = (fakeTargetName !== null) ? Math.max(0.60, dNorm) : dNorm;
       const startTime = performance.now();
       let fakeoutTriggered = false;
 
@@ -2114,14 +2130,14 @@
         } else if (progress >= 0.76 && progress < 0.92) {
           // AŞAMA 4: Ceplere İniş & Pirinç Perdeler Arasında Gerçek Sekerek İlerleme
           const pSub = (progress - 0.76) / 0.16;
-          const hops = 5;
+          const hops = Math.floor(3 + effD * 4);
           const hopPhase = pSub * hops * Math.PI;
           const decay = Math.pow(1 - pSub, 1.4);
 
-          const hopHeight = Math.abs(Math.sin(hopPhase)) * decay * 0.38;
+          const hopHeight = Math.abs(Math.sin(hopPhase)) * decay * (0.30 + effD * 0.16);
           ballZ = hopHeight;
 
-          const radialHop = Math.sin(hopPhase * 2) * decay * 3.8;
+          const radialHop = Math.sin(hopPhase * 2) * decay * (2.6 + effD * 2.2);
           const baseDist = rDeflector - pSub * (rDeflector - rPocketCenter);
           ballDist = baseDist + radialHop;
 
