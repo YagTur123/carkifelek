@@ -964,13 +964,24 @@
       let targetIndex = targetName ? names.findIndex(n => trNormalize(n) === trNormalize(targetName)) : -1;
       if (targetIndex === -1) targetIndex = Math.floor(Math.random() * N);
 
-      // Sahte Hedef (Yem / Troll / Near-Miss Hedefi)
-      let fakeTargetIndex = -1;
-      if (fakeTargetName) {
-        fakeTargetIndex = names.findIndex(n => trNormalize(n) === trNormalize(fakeTargetName));
-      }
-      if (fakeTargetIndex === -1 || fakeTargetIndex === targetIndex) {
-        fakeTargetIndex = (targetIndex + 1) % N;
+      // KULLANICI KURALI: Dopamin yüksekken veya yem seçildiğinde,
+      // bug ve açı sıçramasını önlemek için YEM ile KAZANAN çarkta ÖNCEDEN YAN YANA konur!
+      // Çark saat yönünde dönerken hedefe varmadan hemen önceki komşu dilim: (targetIndex + 1) % N
+      const prevNeighborIndex = (targetIndex + 1) % N;
+      let fakeTargetIndex = prevNeighborIndex;
+
+      if (fakeTargetName && N > 1) {
+        let foundIdx = names.findIndex(n => trNormalize(n) === trNormalize(fakeTargetName));
+        if (foundIdx !== -1 && foundIdx !== targetIndex) {
+          if (foundIdx !== prevNeighborIndex) {
+            // Yem kişiyi kazananın hemen komşu dilimine takas et (swap)
+            const temp = names[prevNeighborIndex];
+            names[prevNeighborIndex] = names[foundIdx];
+            names[foundIdx] = temp;
+            drawWheel();
+          }
+          fakeTargetIndex = prevNeighborIndex;
+        }
       }
 
       // Kumandadan gelen süre ve dopamin seviyesi
@@ -991,14 +1002,9 @@
       const startRotation = wheelRotation;
       const finalRotation = startRotation + totalDelta;
 
-      // Sahte hedefin merkezinin ibre altına geldiği son açı (Near-Miss duraklama açısı)
-      const fakeCenterAngle = (fakeTargetIndex + 0.5) * arc;
-      const fakeModulo = ((POINTER_ANGLE - fakeCenterAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-      const finalModulo = (finalRotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-      let fakeBackDiff = (finalModulo - fakeModulo) % (2 * Math.PI);
-      if (fakeBackDiff <= 0.08) fakeBackDiff += 2 * Math.PI;
-      const fakeStopRotation = finalRotation - fakeBackDiff;
-      const fakeStopRatio = Math.max(0.75, Math.min(0.96, (fakeStopRotation - startRotation) / totalDelta));
+      // Kazanan ile Yem artık yan yana olduğundan, sahte hedefin duraklama açısı tam olarak finalRotation - arc'tır!
+      const fakeStopRotation = finalRotation - arc;
+      const fakeStopRatio = Math.max(0.85, (fakeStopRotation - startRotation) / totalDelta);
 
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
@@ -1015,21 +1021,22 @@
         if (dt > 0.05) dt = 0.016;
 
         let easeP = 0;
-        if (isHighDopamine) {
-          // YÜKSEK DOPAMİN: Seçilen sahte hedefin diliminde asılı kalma ve son saniyede hedefe sıçrama!
-          if (progress < 0.83) {
-            const pSub = progress / 0.83;
-            easeP = fakeStopRatio * (1 - Math.pow(1 - pSub, 3.8));
-          } else if (progress >= 0.83 && progress < 0.92) {
-            // Sahte hedefin merkezinde / pimin ucunda nefes kesen duraklama!
-            const pSub = (progress - 0.83) / 0.09;
-            const creep = Math.sin(pSub * Math.PI * 0.5) * 0.008;
+        if (isHighDopamine && N > 1) {
+          // YÜKSEK DOPAMİN: Tam yanındaki komşu yem diliminde gerilimle asılı kalma ve son anda hedefe sıçrama!
+          if (progress < 0.84) {
+            const pSub = progress / 0.84;
+            easeP = fakeStopRatio * (1 - Math.pow(1 - pSub, 3.5));
+          } else if (progress >= 0.84 && progress < 0.93) {
+            // Yem diliminin pimin ucunda nefes kesen duraklama (tam yanındaki isimde!)
+            const pSub = (progress - 0.84) / 0.09;
+            const creep = Math.sin(pSub * Math.PI * 0.5) * (1.0 - fakeStopRatio) * 0.25;
             easeP = fakeStopRatio + creep;
           } else {
-            // Son anda tırnak pimi aşar ve asıl hedefin merkezine oturur!
-            const pSub = (progress - 0.92) / 0.08;
+            // Son anda tırnak tek pimi aşar ve asıl hedefin merkezine oturur!
+            const pSub = (progress - 0.93) / 0.07;
             const easeOutSub = Math.sin(pSub * Math.PI * 0.5);
-            easeP = fakeStopRatio + (1.0 - fakeStopRatio) * easeOutSub;
+            const remain = 1.0 - (fakeStopRatio + (1.0 - fakeStopRatio) * 0.25);
+            easeP = (fakeStopRatio + (1.0 - fakeStopRatio) * 0.25) + remain * easeOutSub;
           }
         } else {
           // STANDART / İPEKSİ MOD: Kesintisiz pürüzsüz quintic sönüm
@@ -1083,10 +1090,10 @@
     }
 
     // --- 2. 3D RETRO VEGAS SLOT (3X3 MATRİS, ÇAPRAZ SOS ÇİZGİSİ & NUDGE DROP) ---
-    const SLOT_BADGES = ['👑', '⭐', '🎯', '💎', '🎲', '🍀', '✨', '🔥', '🏆', '♠️', '♥️', '♦️', '♣️'];
+    const SLOT_BADGES = ['⭐', '🎯', '💎', '🎲', '🍀', '✨', '🔥', '🏆', '♠️', '♥️', '♦️', '♣️'];
 
     function createSlotNameCell(name, badge = null, isWinner = false, cellId = '') {
-      const icon = isWinner ? '👑' : (badge || SLOT_BADGES[Math.floor(Math.random() * SLOT_BADGES.length)]);
+      const icon = badge || SLOT_BADGES[Math.floor(Math.random() * SLOT_BADGES.length)];
       const idAttr = cellId ? `id="${cellId}"` : '';
       return `
         <div ${idAttr} class="slot-symbol-cell ${isWinner ? 'slot-winner-cell' : 'bg-zinc-950/90'} text-center select-none px-1 flex flex-col items-center justify-center transition-all duration-300">
@@ -1175,7 +1182,7 @@
       col2.style.transform = 'translateY(0px)';
       col2.innerHTML = 
         createSlotNameCell(names[(3 % N)]) + 
-        createSlotNameCell(names[(4 % N)], '👑') + 
+        createSlotNameCell(names[(4 % N)], '💎') + 
         createSlotNameCell(names[(5 % N)]);
 
       col3.style.transition = 'none';
@@ -1283,11 +1290,11 @@
 
         let html = '';
         for (let i = 0; i < cfg.count; i++) {
-          const isRealWinner = (i === realWinnerIdx);
           const isFakeWinner = (cfg.colIdx === 2 && isHighDopamine && i === fakeWinnerIdx);
-          const badge = isRealWinner ? '👑' : (isFakeWinner ? '🎭' : null);
+          const badge = isFakeWinner ? '🎭' : null;
           const cellId = (i >= cfg.count - 3) ? `slotCell_${cfg.colIdx}_${i - (cfg.count - 3)}` : '';
-          html += createSlotNameCell(cellNames[i], badge, isRealWinner, cellId);
+          // Taç dönme ve ilk duruş esnasında erkenden gösterilmez, eşit şanslı döner!
+          html += createSlotNameCell(cellNames[i], badge, false, cellId);
         }
 
         cfg.col.innerHTML = html;
@@ -1346,6 +1353,21 @@
       isPlaying = false;
       if (meter) meter.textContent = 'EŞLEŞTİ!';
       drawSlotSosLine(chosenPattern);
+
+      // Kazanan 3 hücreyi tam bu anda SOS çizgisiyle birlikte kutlama efektiyle parlat
+      let targetRows = [1, 1, 1];
+      if (chosenPattern === 'diag_down') targetRows = [0, 1, 2];
+      else if (chosenPattern === 'diag_up') targetRows = [2, 1, 0];
+      targetRows.forEach((r, colIdx) => {
+        const cell = document.getElementById(`slotCell_${colIdx}_${r}`);
+        if (cell) {
+          cell.classList.add('slot-winner-cell');
+          const nameSpan = cell.querySelector('span:nth-child(2)');
+          if (nameSpan) {
+            nameSpan.className = 'text-[11px] md:text-xs font-black text-black font-serif uppercase truncate w-full tracking-wider mt-0.5';
+          }
+        }
+      });
 
       setTimeout(() => {
         finishGame(target, targetName !== null, 'Vegas Çekilişi (3x3)');
