@@ -50,30 +50,114 @@
       border-radius: 50%;
     }
 
-    /* 3D Slot Kavisli Silindir Derinliği */
+    /* 3D Slot Kabini & Retro Vegas Marquee */
     .slot-machine-cabinet {
-      background: linear-gradient(180deg, #1f1b14 0%, #0d0a06 100%);
-      box-shadow: 0 30px 60px rgba(0,0,0,0.9), inset 0 2px 3px rgba(254, 240, 138, 0.3);
+      background: radial-gradient(circle at 50% 20%, #2a2016 0%, #15110b 60%, #0a0805 100%);
+      box-shadow: 
+        0 35px 70px rgba(0,0,0,0.95), 
+        0 0 0 4px #78350f, 
+        0 0 0 8px #d4af37, 
+        0 0 0 12px #18120c,
+        inset 0 2px 4px rgba(254, 240, 138, 0.4);
     }
-    .slot-reel-viewport {
-      perspective: 600px;
-      box-shadow: inset 0 35px 30px -10px rgba(0,0,0,0.95), inset 0 -35px 30px -10px rgba(0,0,0,0.95);
+    .slot-marquee-header {
+      background: linear-gradient(180deg, #991b1b 0%, #7f1d1d 60%, #450a0a 100%);
+      box-shadow: inset 0 2px 4px rgba(254, 202, 202, 0.3), 0 4px 12px rgba(0,0,0,0.7);
     }
-    .reel-spinning {
-      filter: blur(1.5px);
-      animation: reel-vibrate 0.08s infinite alternate ease-in-out;
+    .chaser-bulb {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fde047;
+      box-shadow: 0 0 8px #fde047;
+      animation: chaser-glow 0.8s infinite alternate ease-in-out;
     }
-    @keyframes reel-vibrate {
-      0% { transform: translateY(-3px); }
-      100% { transform: translateY(3px); }
+    .chaser-bulb:nth-child(even) {
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+      animation-delay: 0.4s;
+    }
+    @keyframes chaser-glow {
+      0% { opacity: 0.35; transform: scale(0.85); }
+      100% { opacity: 1; transform: scale(1.15); }
+    }
+    .slot-chrome-frame {
+      background: linear-gradient(135deg, #71717a 0%, #e4e4e7 30%, #a1a1aa 50%, #f4f4f5 70%, #52525b 100%);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.8), inset 0 2px 3px rgba(255,255,255,0.8);
+    }
+    .slot-glass-viewport {
+      perspective: 700px;
+      background: #09090b;
+      box-shadow: 
+        inset 0 45px 35px -15px rgba(0,0,0,0.98), 
+        inset 0 -45px 35px -15px rgba(0,0,0,0.98),
+        inset 0 0 20px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    .slot-glass-reflection {
+      background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 30%, transparent 60%, rgba(0,0,0,0.5) 100%);
+      pointer-events: none;
+    }
+    .slot-payline {
+      box-shadow: 0 0 12px #ef4444, 0 0 4px #fbbf24;
+      animation: payline-pulse 1.2s infinite alternate ease-in-out;
+    }
+    @keyframes payline-pulse {
+      0% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    .slot-reel-strip {
+      display: flex;
+      flex-direction: column;
+      will-change: transform;
+    }
+    .slot-symbol-cell {
+      height: 74px;
+      min-height: 74px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .reel-locked {
-      animation: reel-bounce 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      animation: reel-snap-bounce 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
-    @keyframes reel-bounce {
-      0% { transform: translateY(-16px) scale(0.92); }
-      65% { transform: translateY(6px) scale(1.05); }
+    @keyframes reel-snap-bounce {
+      0% { transform: translateY(-16px) scale(0.94); }
+      60% { transform: translateY(6px) scale(1.04); }
       100% { transform: translateY(0) scale(1); }
+    }
+    .slot-spin-action-btn {
+      background: radial-gradient(circle at 50% 30%, #ef4444 0%, #b91c1c 65%, #7f1d1d 100%);
+      box-shadow: 
+        0 8px 0 #450a0a,
+        0 14px 20px rgba(0,0,0,0.7),
+        inset 0 2px 3px rgba(254, 202, 202, 0.5);
+      transition: all 0.08s ease;
+    }
+    .slot-spin-action-btn:active {
+      transform: translateY(6px);
+      box-shadow: 
+        0 2px 0 #450a0a,
+        0 6px 10px rgba(0,0,0,0.6),
+        inset 0 1px 2px rgba(254, 202, 202, 0.5);
+    }
+
+    /* Rulet Masası & Bahis Izgarası Stilleri */
+    .roulette-table-winner {
+      background: linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #d97706 100%) !important;
+      border-color: #fef08a !important;
+      color: #000 !important;
+      transform: scale(1.05);
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.9), inset 0 1px 3px rgba(255,255,255,0.7) !important;
+      animation: winner-table-pulse 0.9s infinite alternate ease-in-out;
+      z-index: 10;
+    }
+    @keyframes winner-table-pulse {
+      0% { box-shadow: 0 0 12px rgba(245, 158, 11, 0.7); }
+      100% { box-shadow: 0 0 32px rgba(254, 240, 138, 1), 0 0 15px rgba(245, 158, 11, 0.8); }
     }
 
     /* 3D Kart Animasyonları */
@@ -162,48 +246,113 @@
       </div>
     </div>
 
-    <!-- 2. 3D VEGAS SLOT MAKİNESİ (KOL & PARILTI DETAYLI) -->
+    <!-- 2. 3D RETRO VEGAS SLOT MAKİNESİ (KABİN, MARQUEE & SİLİNDİRİK MAKARALAR) -->
     <div id="gameSlotView" class="game-view hidden flex items-center justify-center">
       <div class="relative flex items-center">
-        <!-- Slot Kasası -->
-        <div class="slot-machine-cabinet border-4 border-amber-500/80 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col items-center gap-6 max-w-md w-full relative">
-          <div class="text-center">
-            <h2 class="text-amber-300 font-serif font-black text-2xl tracking-widest uppercase drop-shadow">VEGAS SLOTS</h2>
-            <p class="text-[10px] text-zinc-400 tracking-wider">3 EŞLEŞME = BÜYÜK İKRAMİYE</p>
+        <!-- Slot Kasası (Physical Casino Cabinet) -->
+        <div class="slot-machine-cabinet rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col items-center gap-4 max-w-lg w-full relative">
+          
+          <!-- Üst Marquee Tabela & Ritmik Koşan Neon Ampuller -->
+          <div class="slot-marquee-header w-full rounded-2xl py-2.5 px-4 border border-amber-500/80 relative flex flex-col items-center">
+            <!-- Neon Chaser Ampulleri (Üst Dizi) -->
+            <div class="flex items-center justify-between w-full px-2 mb-1.5">
+              <div class="chaser-bulb"></div>
+              <div class="chaser-bulb"></div>
+              <div class="chaser-bulb"></div>
+              <div class="chaser-bulb"></div>
+              <div class="chaser-bulb"></div>
+              <div class="chaser-bulb"></div>
+              <div class="chaser-bulb"></div>
+              <div class="chaser-bulb"></div>
+            </div>
+            
+            <h2 class="text-amber-300 font-serif font-black text-xl md:text-2xl tracking-widest uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center gap-2">
+              <span>★</span> LAS VEGAS SLOTS <span>★</span>
+            </h2>
+            <div class="text-[11px] font-mono font-bold tracking-widest text-red-200 uppercase bg-black/60 px-3 py-0.5 rounded-full border border-red-500/40 mt-0.5">
+              JACKPOT 777
+            </div>
           </div>
 
-          <!-- 3 Makaralı Pencere -->
-          <div class="relative flex items-center gap-3 bg-black p-4 rounded-2xl border-2 border-amber-700/80 shadow-2xl w-full justify-center">
-            <!-- Altın Payline Lazer Çizgisi -->
-            <div class="absolute inset-x-2 top-1/2 -translate-y-1/2 h-[2px] bg-gradient-to-r from-amber-500/10 via-amber-400 to-amber-500/10 pointer-events-none z-20 shadow-[0_0_10px_#f59e0b]"></div>
-            <div class="w-24 md:w-28 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative slot-reel-viewport flex items-center justify-center p-2">
-              <div id="slotReel1" class="text-center font-black text-sm md:text-base text-amber-200 font-serif truncate w-full">---</div>
-            </div>
-            <div class="w-24 md:w-28 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative slot-reel-viewport flex items-center justify-center p-2">
-              <div id="slotReel2" class="text-center font-black text-sm md:text-base text-amber-200 font-serif truncate w-full">---</div>
-            </div>
-            <div class="w-24 md:w-28 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative slot-reel-viewport flex items-center justify-center p-2">
-              <div id="slotReel3" class="text-center font-black text-sm md:text-base text-amber-200 font-serif truncate w-full">---</div>
+          <!-- Makaralar Çerçevesi (Krom Bezel & Silindirik Cam) -->
+          <div class="slot-chrome-frame p-2.5 rounded-2xl w-full">
+            <div class="slot-glass-viewport rounded-xl border-2 border-zinc-950 p-2 relative flex items-center justify-center gap-2 overflow-hidden h-[222px]">
+              
+              <!-- Cam Yansıması Overlay -->
+              <div class="slot-glass-reflection absolute inset-0 z-30"></div>
+
+              <!-- Altın / Neon Payline Çizgisi & Oklar -->
+              <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 z-25 flex items-center pointer-events-none">
+                <span class="text-rose-500 font-black text-xs px-1 select-none drop-shadow">▶</span>
+                <div class="slot-payline flex-1 h-[3px] bg-gradient-to-r from-rose-500 via-amber-300 to-rose-500"></div>
+                <span class="text-rose-500 font-black text-xs px-1 select-none drop-shadow">◀</span>
+              </div>
+
+              <!-- Makara 1 -->
+              <div class="w-24 md:w-28 h-full bg-zinc-950/90 rounded-lg overflow-hidden relative border border-zinc-800/80 shadow-inner">
+                <div id="slotReelCol1" class="slot-reel-strip">
+                  <!-- Dinamik semboller doldurulacak -->
+                </div>
+              </div>
+
+              <!-- Makara 2 -->
+              <div class="w-24 md:w-28 h-full bg-zinc-950/90 rounded-lg overflow-hidden relative border border-zinc-800/80 shadow-inner">
+                <div id="slotReelCol2" class="slot-reel-strip">
+                  <!-- Dinamik semboller doldurulacak -->
+                </div>
+              </div>
+
+              <!-- Makara 3 -->
+              <div class="w-24 md:w-28 h-full bg-zinc-950/90 rounded-lg overflow-hidden relative border border-zinc-800/80 shadow-inner">
+                <div id="slotReelCol3" class="slot-reel-strip">
+                  <!-- Dinamik semboller doldurulacak -->
+                </div>
+              </div>
+
             </div>
           </div>
 
-          <button id="slotSpinBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 text-black font-black text-sm uppercase tracking-widest shadow-xl transition active:scale-98">
-            KOLU ÇEK (SPIN)
-          </button>
+          <!-- Alt Kontrol Masası (LED Sayaçlar & 3D Kırmızı SPIN Butonu) -->
+          <div class="w-full flex flex-col gap-3">
+            <div class="grid grid-cols-3 gap-2 bg-black/80 p-2 rounded-xl border border-amber-600/50 shadow-inner">
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] text-zinc-400 font-mono">KREDİ</span>
+                <span class="text-amber-400 font-mono font-bold text-xs md:text-sm">777</span>
+              </div>
+              <div class="flex flex-col items-center border-x border-zinc-800">
+                <span class="text-[9px] text-zinc-400 font-mono">BAHİS</span>
+                <span class="text-amber-400 font-mono font-bold text-xs md:text-sm">25</span>
+              </div>
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] text-zinc-400 font-mono">KAZANÇ</span>
+                <span id="slotWinMeter" class="text-emerald-400 font-mono font-bold text-xs md:text-sm">0</span>
+              </div>
+            </div>
+
+            <button id="slotSpinBtn" class="slot-spin-action-btn w-full py-3.5 rounded-xl text-white font-black text-sm md:text-base uppercase tracking-widest drop-shadow">
+              KOLU ÇEK / SPIN
+            </button>
+          </div>
+
+          <!-- Madeni Para Haznesi (Coin Tray) -->
+          <div class="w-28 h-4 bg-gradient-to-b from-zinc-900 to-zinc-950 rounded-b-lg border-x-2 border-b-2 border-zinc-700/60 shadow-inner flex items-center justify-center -mt-2">
+            <div class="w-16 h-1 bg-amber-500/40 rounded-full"></div>
+          </div>
+
         </div>
 
-        <!-- Mekanik 3D Slot Kolu (Sağ Taraf) -->
+        <!-- Mekanik 3D Slot Kolu (One-Armed Bandit) -->
         <div class="hidden md:flex flex-col items-center -ml-3 z-10 cursor-pointer group" id="slotLeverControl">
-          <div class="w-5 h-8 bg-zinc-800 rounded-r border border-zinc-700"></div>
+          <div class="w-5 h-8 bg-zinc-800 rounded-r border border-zinc-700 shadow-md"></div>
           <div id="slotLeverArm" class="lever-arm w-3.5 h-28 bg-gradient-to-r from-zinc-300 via-zinc-100 to-zinc-400 rounded-full shadow-lg relative flex flex-col items-center">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-rose-700 via-rose-500 to-red-400 absolute -top-4 shadow-md group-hover:scale-105 transition-transform"></div>
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-rose-700 via-rose-500 to-red-400 absolute -top-4 shadow-md group-hover:scale-105 transition-transform border border-red-300"></div>
           </div>
-          <div class="w-6 h-6 rounded-full bg-zinc-900 border-2 border-zinc-700 -mt-2"></div>
+          <div class="w-6 h-6 rounded-full bg-zinc-900 border-2 border-zinc-700 -mt-2 shadow"></div>
         </div>
       </div>
     </div>
 
-    <!-- 3. 3D RULET (TAM YUKARIDAN BAKIŞ - YAZISIZ & MAUN KASA) -->
+    <!-- 3. 3D RULET (TAM YUKARIDAN BAKIŞ & MONTE CARLO RULET MASASI) -->
     <div id="gameRouletteView" class="game-view hidden flex flex-col items-center justify-center w-full max-w-4xl px-4 perspective-stage">
       
       <!-- Tam Yukarıdan 3D Rulet Çanağı & Kasa Yapısı -->
@@ -215,10 +364,30 @@
         <!-- 3D Canvas Çark (Tam Tepeden Bakış) -->
         <canvas id="rouletteCanvas" class="rounded-full cursor-pointer relative z-10 border-4 border-amber-600/90 shadow-2xl"></canvas>
 
-        <!-- Merkez Döner Göbek (Yazısız, Zarif Altın Somun) -->
+        <!-- Merkez Döner Göbek (Altın Taç Butonu) -->
         <button id="rouletteSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-950 border-4 border-amber-500/90 text-amber-300 font-black hover:border-amber-400 active:scale-95 shadow-[0_0_35px_rgba(212,175,55,0.5)] flex items-center justify-center z-20">
           <span class="text-xl md:text-2xl drop-shadow select-none">👑</span>
         </button>
+
+      </div>
+
+      <!-- MONTE CARLO CASINO RULET MASASI (BAHİS IZGARASI & İSİMLER) -->
+      <div id="rouletteFeltTable" class="w-full max-w-3xl mt-5 p-3.5 md:p-4 rounded-2xl bg-gradient-to-b from-[#0a351b] via-[#062412] to-[#041a0d] border-2 border-amber-500/70 shadow-[0_15px_40px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.2)]">
+        
+        <div class="flex items-center justify-between border-b border-amber-500/30 pb-2 mb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-amber-400 text-sm">♠</span>
+            <span class="text-amber-300 font-serif font-black tracking-wider text-xs md:text-sm uppercase">MONTE CARLO RULET MASASI</span>
+          </div>
+          <div id="rouletteStatusBadge" class="text-[11px] font-mono text-amber-300 font-semibold px-2.5 py-0.5 rounded-full bg-black/60 border border-amber-500/40">
+            Krupiye: Çark çevrilmeye hazır
+          </div>
+        </div>
+
+        <!-- Tüm İsimlerin Yer Aldığı Rulet Izgarası -->
+        <div id="rouletteTableGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 max-h-44 overflow-y-auto custom-scroll pr-1">
+          <!-- JS ile doldurulacak -->
+        </div>
 
       </div>
 
@@ -699,12 +868,52 @@
       requestAnimationFrame(anim);
     }
 
-    // --- 2. 3D VEGAS SLOT (MEKANİK KOL ENTEGRELİ) ---
+    // --- 2. 3D RETRO VEGAS SLOT (GITHUB AÇIK KAYNAKLI KABİN & MAKARALAR) ---
+    const SLOT_SYMBOLS = [
+      { icon: '🍒', name: 'KİRAZ' },
+      { icon: '🍋', name: 'LİMON' },
+      { icon: '🔔', name: 'ÇAN' },
+      { icon: '7️⃣', name: '777' },
+      { icon: '⭐', name: 'YILDIZ' },
+      { icon: '💎', name: 'ELMAS' },
+      { icon: '🍇', name: 'ÜZÜM' },
+      { icon: '🍀', name: 'YONCA' },
+      { icon: '💰', name: 'ALTIN' }
+    ];
+
+    function createSlotCell(icon, text, isWinner = false) {
+      return `
+        <div class="slot-symbol-cell ${isWinner ? 'bg-amber-950/70 border-y border-amber-500/60' : ''} text-center select-none px-1">
+          <span class="text-2xl md:text-3xl leading-tight filter drop-shadow">${icon}</span>
+          <span class="text-[10px] md:text-xs font-black ${isWinner ? 'text-amber-300' : 'text-zinc-200'} font-mono uppercase truncate w-full tracking-wider mt-0.5">${text}</span>
+        </div>
+      `;
+    }
+
     function initSlotDisplay() {
-      if (!names.length) return;
-      document.getElementById('slotReel1').textContent = '💎 ' + names[0];
-      document.getElementById('slotReel2').textContent = '👑 ' + names[Math.min(1, names.length - 1)];
-      document.getElementById('slotReel3').textContent = '7️⃣ ' + names[Math.min(2, names.length - 1)];
+      const col1 = document.getElementById('slotReelCol1');
+      const col2 = document.getElementById('slotReelCol2');
+      const col3 = document.getElementById('slotReelCol3');
+      if (!col1 || !col2 || !col3) return;
+
+      const p1 = names[0] || 'LUCKY';
+      const p2 = names[Math.min(1, names.length - 1)] || '777';
+      const p3 = names[Math.min(2, names.length - 1)] || 'JACKPOT';
+
+      col1.style.transition = 'none';
+      col1.style.transform = 'translateY(0px)';
+      col1.innerHTML = createSlotCell('🍒', 'KİRAZ') + createSlotCell('💎', p1) + createSlotCell('🔔', 'ÇAN');
+
+      col2.style.transition = 'none';
+      col2.style.transform = 'translateY(0px)';
+      col2.innerHTML = createSlotCell('🍋', 'LİMON') + createSlotCell('👑', p2) + createSlotCell('⭐', 'YILDIZ');
+
+      col3.style.transition = 'none';
+      col3.style.transform = 'translateY(0px)';
+      col3.innerHTML = createSlotCell('🍇', 'ÜZÜM') + createSlotCell('7️⃣', p3) + createSlotCell('🍀', 'YONCA');
+
+      const meter = document.getElementById('slotWinMeter');
+      if (meter) meter.textContent = '0';
     }
 
     function pullSlotLever() {
@@ -730,54 +939,76 @@
       }
       target = target || names[0] || 'Şanslı Kişi';
 
-      const r1 = document.getElementById('slotReel1');
-      const r2 = document.getElementById('slotReel2');
-      const r3 = document.getElementById('slotReel3');
+      const col1 = document.getElementById('slotReelCol1');
+      const col2 = document.getElementById('slotReelCol2');
+      const col3 = document.getElementById('slotReelCol3');
+      const meter = document.getElementById('slotWinMeter');
+      if (meter) meter.textContent = '---';
 
-      const symbols = ['💎', '👑', '7️⃣', '🔔', '🍒', '⭐', '💰'];
-      const getRandomDisplay = () => {
-        const sym = symbols[Math.floor(Math.random() * symbols.length)];
-        const nm = names[Math.floor(Math.random() * names.length)];
-        return `${sym} ${nm}`;
-      };
+      // 3 Makara için dinamik sembol zincirleri oluştur (Sondan 2. hücre tam Payline hedefine oturur)
+      const CELL_HEIGHT = 74;
+      const reelConfigs = [
+        { col: col1, count: 26, duration: 2000, delay: 0 },
+        { col: col2, count: 34, duration: 2700, delay: 0 },
+        { col: col3, count: 42, duration: 3500, delay: 0 }
+      ];
 
-      r1.classList.add('reel-spinning');
-      r2.classList.add('reel-spinning');
-      r3.classList.add('reel-spinning');
+      reelConfigs.forEach((cfg) => {
+        cfg.col.parentElement.classList.remove('reel-locked');
+        cfg.col.style.transition = 'none';
+        cfg.col.style.transform = 'translateY(0px)';
 
-      let i1 = setInterval(() => { r1.textContent = getRandomDisplay(); playTick(550); }, 50);
-      let i2 = setInterval(() => { r2.textContent = getRandomDisplay(); }, 50);
-      let i3 = setInterval(() => { r3.textContent = getRandomDisplay(); }, 50);
-      activeIntervals.push(i1, i2, i3);
+        let html = '';
+        // Başlangıç sembolü
+        html += createSlotCell(SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)].icon, 'SPIN');
 
-      function lockReel(el, text) {
-        el.classList.remove('reel-spinning');
-        el.textContent = text;
-        el.classList.remove('reel-locked');
-        void el.offsetWidth;
-        el.classList.add('reel-locked');
-        playReelStopSound();
-        triggerScreenShake();
-      }
+        // Ara döner semboller ve isimler
+        for (let i = 1; i < cfg.count - 2; i++) {
+          const sym = SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)];
+          const randomName = names[Math.floor(Math.random() * names.length)];
+          const showName = (Math.random() > 0.45);
+          html += createSlotCell(sym.icon, showName ? randomName : sym.name);
+        }
 
-      setTimeout(() => {
-        clearInterval(i1);
-        lockReel(r1, '👑 ' + target);
-      }, 1900);
+        // Son 3 hücre: [Üst Sembol, HEDEF KAZANAN İSİM (Payline), Alt Sembol]
+        const topSym = SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)];
+        const botSym = SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)];
+        html += createSlotCell(topSym.icon, topSym.name);
+        html += createSlotCell('👑', target, true); // Tam orta payline
+        html += createSlotCell(botSym.icon, botSym.name);
 
-      setTimeout(() => {
-        clearInterval(i2);
-        lockReel(r2, '👑 ' + target);
-      }, 2800);
+        cfg.col.innerHTML = html;
+      });
 
-      setTimeout(() => {
-        clearInterval(i3);
-        lockReel(r3, '👑 ' + target);
-        isPlaying = false;
-        setTimeout(() => {
-          finishGame(target, targetName !== null, '3D Vegas Slots');
-        }, 500);
-      }, 3700);
+      // Makaraları dikey kaydır
+      const spinTickInterval = setInterval(() => {
+        playTick(620);
+      }, 90);
+      activeIntervals.push(spinTickInterval);
+
+      // DOM repaint sonrası kaydırmayı başlat
+      requestAnimationFrame(() => {
+        reelConfigs.forEach((cfg, idx) => {
+          const targetY = -(cfg.count - 2) * CELL_HEIGHT;
+          cfg.col.style.transition = `transform ${cfg.duration}ms cubic-bezier(0.12, 0.84, 0.35, 1.14)`;
+          cfg.col.style.transform = `translateY(${targetY}px)`;
+
+          setTimeout(() => {
+            playReelStopSound();
+            cfg.col.parentElement.classList.add('reel-locked');
+            if (idx === 0) playTick(750);
+            if (idx === 1) playTick(850);
+            if (idx === 2) {
+              clearInterval(spinTickInterval);
+              isPlaying = false;
+              if (meter) meter.textContent = '9999';
+              setTimeout(() => {
+                finishGame(target, targetName !== null, '3D Vegas Slots');
+              }, 450);
+            }
+          }, cfg.duration);
+        });
+      });
     }
 
     // --- 3. 3D MONTE CARLO RULET MASASI (DERİN 3D ÇANAK & FİLDİŞİ TOP) ---
@@ -796,6 +1027,7 @@
       rouletteCtx.scale(dpr, dpr);
       rouletteRadius = size / 2;
       drawRoulette();
+      renderRouletteTable();
     }
 
     function drawRoulette(ballDist = null, ballZ = 0) {
@@ -913,6 +1145,30 @@
         rouletteCtx.strokeStyle = '#d4af37';
         rouletteCtx.lineWidth = 1.4;
         rouletteCtx.stroke();
+
+        // Cep İçi İsim & Numara Yazıları (Net, Kontrastlı ve Radyal Hizalı)
+        rouletteCtx.save();
+        rouletteCtx.translate(cx, cy);
+        rouletteCtx.rotate(a + arc / 2);
+
+        // 1. Cep Numarası (Dış Çembere Yakın, Altın Sarısı)
+        rouletteCtx.textAlign = 'right';
+        rouletteCtx.fillStyle = '#fde047';
+        rouletteCtx.font = 'bold 9px monospace';
+        rouletteCtx.shadowColor = 'rgba(0,0,0,0.9)';
+        rouletteCtx.shadowBlur = 4;
+        rouletteCtx.fillText((i + 1).toString(), rPocketsOuter - 4, 3);
+
+        // 2. Öğrenci İsmi (Net Beyaz & Dinamik Font Boyutu)
+        const fontSize = N > 32 ? 8 : (N > 18 ? 9 : 10.5);
+        rouletteCtx.font = `bold ${fontSize}px sans-serif`;
+        rouletteCtx.fillStyle = '#ffffff';
+        let displayName = names[i] || '';
+        const maxLen = N > 25 ? 7 : 11;
+        if (displayName.length > maxLen) displayName = displayName.substring(0, maxLen - 1) + '…';
+        rouletteCtx.fillText(displayName, rPocketsOuter - 19, 3.5);
+
+        rouletteCtx.restore();
       }
 
       // 5. Pirinç Merkez Kule (Turret Cone & Spindle)
@@ -1034,10 +1290,45 @@
       }
     }
 
+    // --- MONTE CARLO RULET MASASI (BAHİS IZGARASI RENDER) ---
+    function renderRouletteTable(winningName = null) {
+      const grid = document.getElementById('rouletteTableGrid');
+      if (!grid || !names.length) return;
+      grid.innerHTML = names.map((name, idx) => {
+        const isRed = (idx % 2 === 0);
+        const isWinner = (winningName && name === winningName);
+        const bgClass = isWinner 
+          ? 'roulette-table-winner' 
+          : (isRed ? 'bg-red-950/80 border-red-700/60 text-red-100 hover:border-red-400' : 'bg-zinc-950/80 border-zinc-700/60 text-zinc-100 hover:border-zinc-400');
+        const numColor = isRed ? 'bg-red-700 text-white' : 'bg-zinc-800 text-amber-300';
+        return `
+          <div id="rouletteCell_${idx}" class="roulette-chip-slot flex items-center gap-2 p-2 rounded-xl border transition-all duration-300 ${bgClass} select-none shadow-sm">
+            <span class="w-5 h-5 rounded-full ${numColor} flex items-center justify-center text-[10px] font-mono font-bold border border-amber-500/40 shadow-sm shrink-0">
+              ${idx + 1}
+            </span>
+            <span class="text-xs font-semibold truncate tracking-wide">${name}</span>
+            ${isWinner ? '<span class="ml-auto text-xs drop-shadow select-none">👑</span>' : ''}
+          </div>
+        `;
+      }).join('');
+
+      if (winningName) {
+        const winnerIdx = names.indexOf(winningName);
+        if (winnerIdx !== -1) {
+          const el = document.getElementById(`rouletteCell_${winnerIdx}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }
+
     function spinRoulette(targetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
       broadcast({ type: 'spin_start' });
+
+      const statusBadge = document.getElementById('rouletteStatusBadge');
+      if (statusBadge) statusBadge.textContent = 'Krupiye: Fildişi Top Hızla Dönüyor...';
+      renderRouletteTable();
 
       const stage3D = document.getElementById('roulette3DStage');
       if (stage3D) {
@@ -1200,6 +1491,9 @@
           }
 
           const winnerName = names[targetIndex];
+          const statusBadge = document.getElementById('rouletteStatusBadge');
+          if (statusBadge) statusBadge.textContent = '👑 KAZANAN: ' + winnerName;
+          renderRouletteTable(winnerName);
 
           setTimeout(() => {
             finishGame(winnerName, targetName !== null, '3D Monte Carlo Ruleti');
@@ -1490,8 +1784,11 @@
       } else if (activeGameMode === 'roulette') {
         const stage3D = document.getElementById('roulette3DStage');
         if (stage3D) stage3D.classList.remove('roulette-spinning-cam', 'roulette-zoom-winner');
-        const statusLabel = document.getElementById('rouletteCurrentNumber');
-        if (statusLabel) statusLabel.textContent = 'Krupiye: "Faites vos jeux! (Bahisler açık)"';
+        const statusBadge = document.getElementById('rouletteStatusBadge');
+        if (statusBadge) statusBadge.textContent = 'Krupiye: Çark çevrilmeye hazır';
+        renderRouletteTable();
+      } else if (activeGameMode === 'slot') {
+        initSlotDisplay();
       }
     }
 
@@ -1502,7 +1799,8 @@
         updateRoundUI();
         if (activeGameMode === 'wheel') drawWheel();
         else if (activeGameMode === 'cards') renderFullCardsShowcase();
-        else if (activeGameMode === 'roulette') drawRoulette();
+        else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
+        else if (activeGameMode === 'slot') initSlotDisplay();
         broadcast({ type: 'sync_names', names: names });
       }
       closeModal();
@@ -1610,7 +1908,8 @@
               updateRoundUI();
               if (activeGameMode === 'wheel') drawWheel();
               else if (activeGameMode === 'cards') renderFullCardsShowcase();
-              else if (activeGameMode === 'roulette') drawRoulette();
+              else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
+              else if (activeGameMode === 'slot') initSlotDisplay();
             }
           } else if (data.type === 'spin') {
             closeModal();
@@ -1637,7 +1936,8 @@
             updateRoundUI();
             if (activeGameMode === 'wheel') drawWheel();
             else if (activeGameMode === 'cards') renderFullCardsShowcase();
-            else if (activeGameMode === 'roulette') drawRoulette();
+            else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
+            else if (activeGameMode === 'slot') initSlotDisplay();
           }
         });
 
