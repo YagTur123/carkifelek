@@ -6,6 +6,7 @@
   <title>Çark Kumandası</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     .custom-scroll::-webkit-scrollbar { width: 4px; }
@@ -29,27 +30,45 @@
         </div>
       </div>
 
-      <!-- Bağlantı Kodu Giriş Alanı -->
-      <div class="flex gap-2">
-        <input 
-          type="text" 
-          id="roomIdInput" 
-          placeholder="Oda Kodu (örn: cark-4921)" 
-          class="flex-1 bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 font-mono"
-        />
-        <button 
-          id="connectBtn" 
-          class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2 rounded text-xs transition">
-          Bağlan
-        </button>
+      <!-- 1. CANLI AÇIK TAHTALAR (Otomatik Keşif Listesi) -->
+      <div id="lobbyContainer" class="flex flex-col gap-1.5 bg-zinc-950 p-2.5 rounded border border-zinc-800">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-semibold text-zinc-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Açık Tahtalar (Canlı Keşif)
+          </span>
+          <button id="toggleManualCodeBtn" class="text-[11px] text-amber-400 hover:text-amber-300">
+            Manuel Kod
+          </button>
+        </div>
+
+        <div id="activeRoomsList" class="space-y-1.5 mt-1">
+          <div class="text-[11px] text-zinc-500 py-1 text-center italic">Açık tahtalar taranıyor...</div>
+        </div>
+
+        <!-- Manuel Kod Giriş Alanı (İsteğe Bağlı Gizlenebilir) -->
+        <div id="manualCodeArea" class="hidden flex gap-2 pt-2 border-t border-zinc-800/80">
+          <input 
+            type="text" 
+            id="roomIdInput" 
+            placeholder="Oda Kodu (örn: cark-4921)" 
+            class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 font-mono"
+          />
+          <button 
+            id="connectBtn" 
+            class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded text-xs transition">
+            Bağlan
+          </button>
+        </div>
       </div>
+
     </div>
   </header>
 
   <!-- Ana İçerik -->
   <main class="max-w-md w-full mx-auto p-4 flex-1 flex flex-col gap-4">
 
-    <!-- 1. Hedef ve Çevirme Paneli -->
+    <!-- Hedef ve Çevirme Paneli -->
     <section class="bg-zinc-900 border border-amber-900/40 rounded-xl p-4 flex flex-col gap-3 shadow-md">
       <div class="flex items-center justify-between border-b border-zinc-800 pb-2.5">
         <div>
@@ -198,6 +217,10 @@
     let peer = null;
     let conn = null;
 
+    // Canlı Keşfedilen Odalar (Lobby Map)
+    const discoveredRooms = new Map();
+    let mqttClient = null;
+
     function loadStorage() {
       const storedNames = localStorage.getItem('cark_names');
       if (storedNames) {
@@ -215,6 +238,79 @@
       localStorage.setItem('cark_names', JSON.stringify(names));
       localStorage.setItem('cark_history', JSON.stringify(history));
     }
+
+    // --- MQTT Canlı Tahta Keşfi ---
+    function initLobbyDiscovery() {
+      try {
+        mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+          clientId: 'ctrl_' + Math.random().toString(16).substring(2, 8),
+          clean: true,
+          connectTimeout: 4000
+        });
+
+        mqttClient.on('connect', () => {
+          mqttClient.subscribe('carkifelek_public_rooms');
+        });
+
+        mqttClient.on('message', (topic, message) => {
+          try {
+            const data = JSON.parse(message.toString());
+            if (data.roomId && data.lastSeen) {
+              discoveredRooms.set(data.roomId, data);
+              renderActiveRoomsList();
+            }
+          } catch (e) {}
+        });
+
+        // 8 saniyeden eski sinyalleri temizle
+        setInterval(() => {
+          const now = Date.now();
+          let changed = false;
+          for (const [roomId, room] of discoveredRooms.entries()) {
+            if (now - room.lastSeen > 8000) {
+              discoveredRooms.delete(roomId);
+              changed = true;
+            }
+          }
+          if (changed) renderActiveRoomsList();
+        }, 3000);
+
+      } catch (e) {
+        console.warn('Lobby discovery error:', e);
+      }
+    }
+
+    function renderActiveRoomsList() {
+      const listEl = document.getElementById('activeRoomsList');
+      const rooms = Array.from(discoveredRooms.values());
+
+      if (rooms.length === 0) {
+        listEl.innerHTML = `<div class="text-[11px] text-zinc-500 py-1 text-center italic">Açık tahta aranıyor (Tahtadaki sayfayı açın)...</div>`;
+        return;
+      }
+
+      listEl.innerHTML = rooms.map(room => `
+        <div class="flex items-center justify-between p-2 rounded bg-zinc-900 border border-zinc-800 hover:border-amber-600/70 transition">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <div>
+              <div class="text-xs font-semibold text-zinc-200">${room.title || room.roomId}</div>
+              <div class="text-[10px] text-zinc-500 font-mono">${room.roomId} · ${room.studentCount || 0} kişi</div>
+            </div>
+          </div>
+          <button 
+            onclick="connectToRoom('${room.roomId}')"
+            class="px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition">
+            Bağlan
+          </button>
+        </div>
+      `).join('');
+    }
+
+    window.connectToRoom = function(targetRoom) {
+      document.getElementById('roomIdInput').value = targetRoom;
+      initConnection();
+    };
 
     function renderGrid(filter = '') {
       const grid = document.getElementById('studentsGrid');
@@ -248,9 +344,7 @@
           selectedTarget = (selectedTarget === name) ? null : name;
           updateTargetUI();
           renderGrid(document.getElementById('searchInput').value);
-          if (conn && conn.open) {
-            conn.send({ type: 'set_target', target: selectedTarget });
-          }
+          if (conn && conn.open) conn.send({ type: 'set_target', target: selectedTarget });
         });
 
         grid.appendChild(btn);
@@ -315,8 +409,8 @@
 
         conn.on('open', () => {
           isConnected = true;
-          setConnectionStatus('connected', 'Bağlandı');
-          showToast('Tahtaya bağlandı');
+          setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
+          showToast('Tahtaya bağlandı!');
           document.getElementById('triggerSpinBtn').disabled = false;
 
           conn.send({
@@ -325,9 +419,7 @@
           });
         });
 
-        conn.on('data', (data) => {
-          handleIncomingData(data);
-        });
+        conn.on('data', (data) => handleIncomingData(data));
 
         conn.on('close', () => {
           isConnected = false;
@@ -384,16 +476,13 @@
         setSpinningState(false);
         lastWinner = data.winner;
         
-        // Kazananı kartta göster
         document.getElementById('lastWinnerCard').classList.remove('hidden');
         document.getElementById('lastWinnerName').textContent = lastWinner;
 
-        // Geçmişi güncelle
         if (data.history) history = data.history;
         saveStorage();
         renderHistoryUI();
 
-        // Eğer Otomatik Eleme açıksa
         if (document.getElementById('autoRemoveToggle').checked) {
           removeStudent(lastWinner);
         }
@@ -487,6 +576,10 @@
       }
     });
 
+    document.getElementById('toggleManualCodeBtn').addEventListener('click', () => {
+      document.getElementById('manualCodeArea').classList.toggle('hidden');
+    });
+
     document.getElementById('searchInput').addEventListener('input', (e) => {
       renderGrid(e.target.value);
     });
@@ -542,9 +635,7 @@
       const toast = document.getElementById('toast');
       toast.textContent = msg;
       toast.classList.remove('opacity-0');
-      setTimeout(() => {
-        toast.classList.add('opacity-0');
-      }, 2000);
+      setTimeout(() => { toast.classList.add('opacity-0'); }, 2000);
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -552,6 +643,7 @@
       renderGrid();
       renderHistoryUI();
       updateTargetUI();
+      initLobbyDiscovery();
 
       const urlParams = new URLSearchParams(window.location.search);
       const roomParam = urlParams.get('room') || localStorage.getItem('cark_last_room');
