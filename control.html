@@ -17,7 +17,7 @@
 <body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col font-sans select-none pb-6 antialiased">
 
   <!-- Üst Bar -->
-  <header class="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-30">
+  <header class="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-30 shadow-lg">
     <div class="max-w-md mx-auto flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
@@ -50,18 +50,18 @@
         </div>
       </div>
 
-      <!-- 8 Oyunlu Mod Seçici -->
+      <!-- 8 Oyunlu Mod Seçici (Kompakt ve Kaydırmaz) -->
       <div class="flex flex-col gap-1">
         <span class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">3D Oyun Modu Seç</span>
         <div class="grid grid-cols-4 gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800 text-xs">
-          <button onclick="changeGameMode('wheel')" id="btnCtrlWheel" class="py-1 rounded bg-amber-500 text-black font-bold text-center">Çark</button>
-          <button onclick="changeGameMode('slot')" id="btnCtrlSlot" class="py-1 rounded text-zinc-400 hover:text-white text-center">Slot</button>
-          <button onclick="changeGameMode('roulette')" id="btnCtrlRoulette" class="py-1 rounded text-zinc-400 hover:text-white text-center">Rulet</button>
-          <button onclick="changeGameMode('plinko')" id="btnCtrlPlinko" class="py-1 rounded text-zinc-400 hover:text-white text-center">Plinko</button>
-          <button onclick="changeGameMode('dice')" id="btnCtrlDice" class="py-1 rounded text-zinc-400 hover:text-white text-center">3D Zar</button>
-          <button onclick="changeGameMode('cards')" id="btnCtrlCards" class="py-1 rounded text-zinc-400 hover:text-white text-center">Kartlar</button>
-          <button onclick="changeGameMode('coin')" id="btnCtrlCoin" class="py-1 rounded text-zinc-400 hover:text-white text-center">Sikke</button>
-          <button onclick="changeGameMode('crash')" id="btnCtrlCrash" class="py-1 rounded text-zinc-400 hover:text-white text-center">Roket</button>
+          <button onclick="changeGameMode('wheel')" id="btnCtrlWheel" class="py-1.5 rounded bg-amber-500 text-black font-bold text-center">Çark</button>
+          <button onclick="changeGameMode('slot')" id="btnCtrlSlot" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Slot</button>
+          <button onclick="changeGameMode('roulette')" id="btnCtrlRoulette" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Rulet</button>
+          <button onclick="changeGameMode('plinko')" id="btnCtrlPlinko" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Plinko</button>
+          <button onclick="changeGameMode('dice')" id="btnCtrlDice" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">3D Zar</button>
+          <button onclick="changeGameMode('cards')" id="btnCtrlCards" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Kartlar</button>
+          <button onclick="changeGameMode('coin')" id="btnCtrlCoin" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Sikke</button>
+          <button onclick="changeGameMode('crash')" id="btnCtrlCrash" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Roket</button>
         </div>
       </div>
 
@@ -167,21 +167,29 @@
     let lastWinner = null;
     let peer = null;
     let conn = null;
+    let spinTimeout = null;
 
     const discoveredRooms = new Map();
     let mqttClient = null;
 
     function loadStorage() {
-      const storedNames = localStorage.getItem('cark_names');
-      if (storedNames) { try { names = JSON.parse(storedNames); } catch (e) { names = [...DEFAULT_NAMES]; } }
-      else names = [...DEFAULT_NAMES];
-      const storedHist = localStorage.getItem('cark_history');
-      if (storedHist) { try { history = JSON.parse(storedHist); } catch (e) { history = []; } }
+      try {
+        const storedNames = localStorage.getItem('cark_names');
+        if (storedNames) names = JSON.parse(storedNames);
+        else names = [...DEFAULT_NAMES];
+        const storedHist = localStorage.getItem('cark_history');
+        if (storedHist) history = JSON.parse(storedHist);
+      } catch (e) {
+        names = [...DEFAULT_NAMES];
+        history = [];
+      }
     }
 
     function saveStorage() {
-      localStorage.setItem('cark_names', JSON.stringify(names));
-      localStorage.setItem('cark_history', JSON.stringify(history));
+      try {
+        localStorage.setItem('cark_names', JSON.stringify(names));
+        localStorage.setItem('cark_history', JSON.stringify(history));
+      } catch (e) {}
     }
 
     function changeGameMode(mode) {
@@ -191,8 +199,8 @@
         const btn = document.getElementById('btnCtrl' + m.charAt(0).toUpperCase() + m.slice(1));
         if (btn) {
           btn.className = (m === mode) 
-            ? 'py-1 rounded bg-amber-500 text-black font-bold text-center' 
-            : 'py-1 rounded text-zinc-400 hover:text-white text-center';
+            ? 'py-1.5 rounded bg-amber-500 text-black font-bold text-center' 
+            : 'py-1.5 rounded text-zinc-400 hover:text-white text-center';
         }
       });
 
@@ -214,7 +222,7 @@
       document.getElementById('triggerBtnText').textContent = textMap[currentGameMode] || 'OYNA';
     }
 
-    // --- MQTT Lobi Keşfi ---
+    // --- Güvenli MQTT Lobi Keşfi ---
     function initLobbyDiscovery() {
       try {
         mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
@@ -247,6 +255,12 @@
       } catch (e) {}
     }
 
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
     function renderActiveRoomsList() {
       const listEl = document.getElementById('activeRoomsList');
       const rooms = Array.from(discoveredRooms.values());
@@ -256,24 +270,34 @@
         return;
       }
 
-      listEl.innerHTML = rooms.map(room => `
-        <div class="flex items-center justify-between p-2 rounded bg-zinc-900 border border-zinc-800 hover:border-amber-600/70 transition">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <div>
-              <div class="text-xs font-semibold text-zinc-200">${room.title || room.roomId}</div>
-              <div class="text-[10px] text-zinc-500 font-mono">${room.roomId} · ${room.studentCount || 0} kişi</div>
-            </div>
+      listEl.innerHTML = '';
+      rooms.forEach(room => {
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between p-2 rounded bg-zinc-900 border border-zinc-800 hover:border-amber-600/70 transition';
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'flex items-center gap-2';
+        infoDiv.innerHTML = `
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <div>
+            <div class="text-xs font-semibold text-zinc-200">${escapeHtml(room.title || room.roomId)}</div>
+            <div class="text-[10px] text-zinc-500 font-mono">${escapeHtml(room.roomId)} · ${escapeHtml(room.studentCount || 0)} kişi</div>
           </div>
-          <button onclick="connectToRoom('${room.roomId}')" class="px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition">Bağlan</button>
-        </div>
-      `).join('');
-    }
+        `;
 
-    window.connectToRoom = function(targetRoom) {
-      document.getElementById('roomIdInput').value = targetRoom;
-      initConnection();
-    };
+        const btn = document.createElement('button');
+        btn.className = 'px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition';
+        btn.textContent = 'Bağlan';
+        btn.addEventListener('click', () => {
+          document.getElementById('roomIdInput').value = room.roomId;
+          initConnection();
+        });
+
+        card.appendChild(infoDiv);
+        card.appendChild(btn);
+        listEl.appendChild(card);
+      });
+    }
 
     function renderGrid(filter = '') {
       const grid = document.getElementById('studentsGrid');
@@ -296,7 +320,7 @@
             : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
         }`;
         btn.innerHTML = `
-          <span class="truncate max-w-[120px]">${name}</span>
+          <span class="truncate max-w-[120px]">${escapeHtml(name)}</span>
           ${isSelected ? '<span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Hedef</span>' : ''}
         `;
         btn.addEventListener('click', () => {
@@ -332,13 +356,13 @@
         <div class="flex items-center justify-between p-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs">
           <div>
             <div class="flex items-center gap-2">
-              <span class="text-amber-500 font-mono font-bold">#${item.round}</span>
-              <span class="text-zinc-200 font-semibold">${item.winner}</span>
+              <span class="text-amber-500 font-mono font-bold">#${escapeHtml(item.round)}</span>
+              <span class="text-zinc-200 font-semibold">${escapeHtml(item.winner)}</span>
               ${item.wasTargeted ? '<span class="text-[9px] px-1 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800">Hedef</span>' : ''}
             </div>
-            <div class="text-[10px] text-zinc-500">${item.game || 'Oyun'}</div>
+            <div class="text-[10px] text-zinc-500">${escapeHtml(item.game || 'Oyun')}</div>
           </div>
-          <span class="text-[10px] text-zinc-500 font-mono">${item.time}</span>
+          <span class="text-[10px] text-zinc-500 font-mono">${escapeHtml(item.time)}</span>
         </div>
       `).join('');
     }
@@ -432,9 +456,20 @@
       isGameRunning = spinning;
       const btn = document.getElementById('triggerSpinBtn');
       const text = document.getElementById('triggerBtnText');
+
+      if (spinTimeout) clearTimeout(spinTimeout);
+
       if (spinning) {
         btn.disabled = true;
         text.textContent = 'OYUN ÇALIŞIYOR...';
+        // 6.5 saniye kilitlenme koruması
+        spinTimeout = setTimeout(() => {
+          if (isGameRunning) {
+            isGameRunning = false;
+            btn.disabled = !isConnected;
+            updateTriggerBtnText();
+          }
+        }, 6500);
       } else {
         btn.disabled = !isConnected;
         updateTriggerBtnText();
@@ -442,6 +477,7 @@
     }
 
     function removeStudent(studentName) {
+      if (!studentName) return;
       names = names.filter(n => n !== studentName);
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);
@@ -454,10 +490,18 @@
       if (lastWinner) removeStudent(lastWinner);
     });
 
+    let lastTriggerTime = 0;
     document.getElementById('triggerSpinBtn').addEventListener('click', () => {
+      const now = Date.now();
+      if (now - lastTriggerTime < 1000) return; // 1 saniye cooldown
       if (!isConnected || !conn || !conn.open || isGameRunning) return;
+      lastTriggerTime = now;
       vibrate();
-      conn.send({ type: 'spin', target: selectedTarget });
+      conn.send({
+        type: 'spin',
+        target: selectedTarget,
+        mode: currentGameMode
+      });
       showToast(selectedTarget ? `Hedefle tetiklendi: ${selectedTarget}` : 'Rastgele tetiklendi');
     });
 
@@ -519,8 +563,12 @@
     document.getElementById('loadDefaultBtn').addEventListener('click', () => textarea.value = DEFAULT_NAMES.join('\n'));
 
     document.getElementById('saveAndSyncBtn').addEventListener('click', () => {
-      const parsed = textarea.value.split('\n').map(n => n.trim()).filter(n => n.length > 0);
-      if (!parsed.length) { showToast('En az 1 isim girin'); return; }
+      if (textarea.value.length > 20000) {
+        showToast('Liste çok uzun! Lütfen kısaltın.');
+        return;
+      }
+      const parsed = textarea.value.split('\n').map(n => n.trim()).filter(n => n.length > 0 && n.length < 30);
+      if (!parsed.length) { showToast('En az 1 geçerli isim girin'); return; }
       names = parsed;
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);
