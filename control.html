@@ -22,7 +22,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div class="w-2 h-4 bg-amber-500 rounded-sm"></div>
-          <h1 class="font-bold text-sm text-amber-100 font-serif">3D Oyun Kumandası</h1>
+          <h1 class="font-bold text-sm text-amber-100 font-serif">Casino Kumandası</h1>
         </div>
         <div id="connBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
           <span id="connDot" class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
@@ -50,18 +50,14 @@
         </div>
       </div>
 
-      <!-- 8 Oyunlu Mod Seçici (Kompakt ve Kaydırmaz) -->
+      <!-- 4 Klasik Oyun Seçici (Geniş ve Ferah) -->
       <div class="flex flex-col gap-1">
-        <span class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">3D Oyun Modu Seç</span>
-        <div class="grid grid-cols-4 gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800 text-xs">
-          <button onclick="changeGameMode('wheel')" id="btnCtrlWheel" class="py-1.5 rounded bg-amber-500 text-black font-bold text-center">Çark</button>
-          <button onclick="changeGameMode('slot')" id="btnCtrlSlot" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Slot</button>
-          <button onclick="changeGameMode('roulette')" id="btnCtrlRoulette" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Rulet</button>
-          <button onclick="changeGameMode('plinko')" id="btnCtrlPlinko" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Plinko</button>
-          <button onclick="changeGameMode('dice')" id="btnCtrlDice" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">3D Zar</button>
-          <button onclick="changeGameMode('cards')" id="btnCtrlCards" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Kartlar</button>
-          <button onclick="changeGameMode('coin')" id="btnCtrlCoin" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Sikke</button>
-          <button onclick="changeGameMode('crash')" id="btnCtrlCrash" class="py-1.5 rounded text-zinc-400 hover:text-white text-center">Roket</button>
+        <span class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Aktif Oyun Modu</span>
+        <div class="grid grid-cols-4 gap-1.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800 text-xs">
+          <button onclick="changeGameMode('wheel')" id="btnCtrlWheel" class="py-2 rounded bg-amber-500 text-black font-bold text-center transition">Çark</button>
+          <button onclick="changeGameMode('slot')" id="btnCtrlSlot" class="py-2 rounded text-zinc-400 hover:text-white text-center transition">Slot</button>
+          <button onclick="changeGameMode('roulette')" id="btnCtrlRoulette" class="py-2 rounded text-zinc-400 hover:text-white text-center transition">Rulet</button>
+          <button onclick="changeGameMode('cards')" id="btnCtrlCards" class="py-2 rounded text-zinc-400 hover:text-white text-center transition">Kartlar</button>
         </div>
       </div>
 
@@ -115,7 +111,7 @@
     <section id="studentsSection" class="flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <input type="text" id="searchInput" placeholder="Öğrenci ara..." class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 mr-2" />
-        <button id="toggleListEditorBtn" class="text-xs text-amber-300 hover:text-amber-200 font-medium px-2 py-2 rounded bg-zinc-900 border border-zinc-800 whitespace-nowrap">Düzenle</button>
+        <button id="toggleListEditorBtn" class="text-xs text-amber-300 hover:text-amber-200 font-medium px-2.5 py-2 rounded bg-zinc-900 border border-zinc-800 whitespace-nowrap">Düzenle</button>
       </div>
       <div id="studentsGrid" class="grid grid-cols-2 gap-2 max-h-[340px] overflow-y-auto custom-scroll pr-1"></div>
     </section>
@@ -194,13 +190,13 @@
 
     function changeGameMode(mode) {
       currentGameMode = mode;
-      const modes = ['wheel', 'slot', 'roulette', 'plinko', 'dice', 'cards', 'coin', 'crash'];
+      const modes = ['wheel', 'slot', 'roulette', 'cards'];
       modes.forEach(m => {
         const btn = document.getElementById('btnCtrl' + m.charAt(0).toUpperCase() + m.slice(1));
         if (btn) {
           btn.className = (m === mode) 
-            ? 'py-1.5 rounded bg-amber-500 text-black font-bold text-center' 
-            : 'py-1.5 rounded text-zinc-400 hover:text-white text-center';
+            ? 'py-2 rounded bg-amber-500 text-black font-bold text-center transition' 
+            : 'py-2 rounded text-zinc-400 hover:text-white text-center transition';
         }
       });
 
@@ -213,11 +209,7 @@
         wheel: 'ÇARKI UZAKTAN ÇEVİR',
         slot: 'SLOT KOLUNU ÇEK (SPIN)',
         roulette: 'RULET TOPUNU AT',
-        plinko: 'PLINKO TOPUNU DÜŞÜR',
-        dice: 'ZARLARI FIRLAT',
-        cards: 'KARTLARI DAĞIT VE AÇ',
-        coin: 'SİKKEYİ FIRLAT',
-        crash: 'ROKETİ ATEŞLE'
+        cards: 'KARTLARI DAĞIT VE AÇ'
       };
       document.getElementById('triggerBtnText').textContent = textMap[currentGameMode] || 'OYNA';
     }
@@ -462,7 +454,6 @@
       if (spinning) {
         btn.disabled = true;
         text.textContent = 'OYUN ÇALIŞIYOR...';
-        // 6.5 saniye kilitlenme koruması
         spinTimeout = setTimeout(() => {
           if (isGameRunning) {
             isGameRunning = false;
@@ -493,7 +484,7 @@
     let lastTriggerTime = 0;
     document.getElementById('triggerSpinBtn').addEventListener('click', () => {
       const now = Date.now();
-      if (now - lastTriggerTime < 1000) return; // 1 saniye cooldown
+      if (now - lastTriggerTime < 1000) return;
       if (!isConnected || !conn || !conn.open || isGameRunning) return;
       lastTriggerTime = now;
       vibrate();
@@ -564,7 +555,7 @@
 
     document.getElementById('saveAndSyncBtn').addEventListener('click', () => {
       if (textarea.value.length > 20000) {
-        showToast('Liste çok uzun! Lütfen kısaltın.');
+        showToast('Liste çok uzun!');
         return;
       }
       const parsed = textarea.value.split('\n').map(n => n.trim()).filter(n => n.length > 0 && n.length < 30);
