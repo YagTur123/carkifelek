@@ -301,7 +301,7 @@
             <div class="w-4 h-4 rounded-full bg-gradient-to-tr from-red-950 via-red-600 to-amber-200 absolute top-1 left-1/2 -translate-x-1/2 border border-amber-300 shadow-md"></div>
           </div>
         </div>
-        <canvas id="wheelCanvas" class="rounded-full cursor-pointer"></canvas>
+        <canvas id="wheelCanvas" class="rounded-full cursor-pointer block mx-auto"></canvas>
         <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-950 border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-2xl">
           <span class="text-amber-400 text-xs md:text-sm font-black uppercase tracking-widest font-serif">ÇEVİR</span>
         </button>
@@ -815,7 +815,6 @@
     function setGameMode(mode, broadcastSync = true) {
       if (isPlaying) return;
       clearAllIntervals();
-      closeModal();
       clearSlotSosLine();
       activeGameMode = mode;
       document.querySelectorAll('.game-view').forEach(el => el.classList.add('hidden'));
@@ -848,6 +847,8 @@
       else if (mode === 'roulette') resizeRouletteCanvas();
       else if (mode === 'cards') renderFullCardsShowcase();
 
+      closeModal();
+
       if (broadcastSync) broadcast({ type: 'game_mode_changed', mode: mode });
     }
 
@@ -873,7 +874,7 @@
     }
 
     function drawWheel(winnerHighlightIndex = -1, speed = 0) {
-      if (!wheelCanvas) return;
+      if (!wheelCanvas || wheelRadius <= 20) return;
       wheelCtx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
       if (!names.length) {
         wheelCtx.save();
@@ -1566,7 +1567,7 @@
     }
 
     function drawRoulette(ballDist = null, ballZ = 0, winnerHighlightIndex = -1, trail = [], sparks = []) {
-      if (!rouletteCanvas) return;
+      if (!rouletteCanvas || rouletteRadius <= 20) return;
       rouletteCtx.clearRect(0, 0, rouletteRadius * 2, rouletteRadius * 2);
       if (!names.length) {
         rouletteCtx.save();
@@ -2881,10 +2882,14 @@
     });
 
     function initApp() {
-      loadStorage();
-      setGameMode(activeGameMode, false);
-      initPeer();
-      initLobbyBroadcast();
+      try { loadStorage(); } catch (e) {}
+      try {
+        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        else if (activeGameMode === 'roulette') resizeRouletteCanvas();
+      } catch (e) {}
+      try { setGameMode(activeGameMode, false); } catch (e) {}
+      try { initPeer(); } catch (e) {}
+      try { initLobbyBroadcast(); } catch (e) {}
 
       // Ekran boyutunu ve canvas çizimini açılışta hemen garantile
       requestAnimationFrame(() => {
@@ -2899,6 +2904,10 @@
         if (activeGameMode === 'wheel') resizeWheelCanvas();
         else if (activeGameMode === 'roulette') resizeRouletteCanvas();
       }, 300);
+      setTimeout(() => {
+        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        else if (activeGameMode === 'roulette') resizeRouletteCanvas();
+      }, 800);
     }
 
     if (document.readyState === 'loading') {
