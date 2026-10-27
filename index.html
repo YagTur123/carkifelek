@@ -241,6 +241,9 @@
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
         <span class="hidden md:inline">Kamera</span>
       </button>
+      <button id="shuffleNamesBtn" title="İsimleri 0'dan Karıştır (Hedef & Yem Yan Yana)" class="px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-purple-300 hover:text-white transition flex items-center gap-1.5 active:scale-95 shadow-sm">
+        <span>🎲</span> <span class="hidden md:inline">Karıştır</span>
+      </button>
       <button id="toggleHistoryBtn" class="px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-white transition">Geçmiş (<span id="historyCount">0</span>)</button>
       <button id="soundToggleBtn" class="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition">
         <svg id="soundOnIcon" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
@@ -952,37 +955,79 @@
       wheelCtx.restore();
     }
 
+    // --- AKILLI 0'DAN KARIŞTIRMA (SMART SHUFFLE): HEDEF & YEM YAN YANA (ÇARKIFELEK & RULET) ---
+    function smartShuffleNames(targetName = null, fakeTargetName = null) {
+      if (!names || names.length < 2) return null;
+
+      // 1. Hedef (Kazanan) belirle
+      let target = targetName ? names.find(n => trNormalize(n) === trNormalize(targetName)) : null;
+      if (!target) {
+        target = names[Math.floor(Math.random() * names.length)];
+      }
+
+      // 2. Yem (Near-Miss Kurbanı) belirle
+      let fake = fakeTargetName ? names.find(n => trNormalize(n) === trNormalize(fakeTargetName)) : null;
+      if (!fake || trNormalize(fake) === trNormalize(target)) {
+        const candidateOthers = names.filter(n => trNormalize(n) !== trNormalize(target));
+        fake = candidateOthers.length ? candidateOthers[Math.floor(Math.random() * candidateOthers.length)] : null;
+      }
+
+      // 3. Hedef ve Yem dışındaki tüm kişileri al ve 0'dan rastgele karıştır (Fisher-Yates)
+      const others = names.filter(n => {
+        const norm = trNormalize(n);
+        return norm !== trNormalize(target) && (!fake || norm !== trNormalize(fake));
+      });
+
+      for (let i = others.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [others[i], others[j]] = [others[j], others[i]];
+      }
+
+      // 4. Hedef ve Yem'i YAN YANA (komşu dilim/cep) olarak rastgele bir konuma ekle
+      // Çark saat yönünde dönerken hedeften önceki dilim (targetIndex + 1) % N'dir.
+      // Rulette de komşu cepler yan yanadır.
+      // Diziye [target, fake] sırasıyla yan yana eklenir.
+      const insertIndex = Math.floor(Math.random() * (others.length + 1));
+      if (fake) {
+        others.splice(insertIndex, 0, target, fake);
+      } else {
+        others.splice(insertIndex, 0, target);
+      }
+
+      names = others;
+      saveStorage();
+      broadcast({ type: 'sync_names', names: names });
+
+      // Aktif mod görselini anında yenile
+      if (activeGameMode === 'wheel') drawWheel();
+      else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
+      else if (activeGameMode === 'slot') initSlotDisplay();
+      else if (activeGameMode === 'cards') renderFullCardsShowcase();
+
+      return { target, fake };
+    }
+
     // --- GELİŞMİŞ ANALİTİK FİZİK & DOPAMİN NEAR-MISS MOTORU İLE ÇARKIFELEK ---
     function spinWheel(targetName = null, fakeTargetName = null) {
       if (isPlaying || !names.length) return;
+
+      // KULLANICI KURALI: 0'DAN TAM RASTGELE SHUFFLE!
+      // Tüm liste 0'dan Fisher-Yates ile karıştırılır, Kazanan ve Yem yan yana yerleştirilir!
+      const pair = smartShuffleNames(targetName, fakeTargetName);
+      const actualTarget = pair ? pair.target : (targetName || names[0]);
+      const actualFake = pair ? pair.fake : fakeTargetName;
+
       isPlaying = true;
       broadcast({ type: 'spin_start' });
 
       const N = names.length, arc = (2 * Math.PI) / N;
       const POINTER_ANGLE = 1.5 * Math.PI; // 270 derece (tam tepe ibresi)
 
-      let targetIndex = targetName ? names.findIndex(n => trNormalize(n) === trNormalize(targetName)) : -1;
-      if (targetIndex === -1) targetIndex = Math.floor(Math.random() * N);
+      let targetIndex = names.findIndex(n => trNormalize(n) === trNormalize(actualTarget));
+      if (targetIndex === -1) targetIndex = 0;
 
-      // KULLANICI KURALI: Dopamin yüksekken veya yem seçildiğinde,
-      // bug ve açı sıçramasını önlemek için YEM ile KAZANAN çarkta ÖNCEDEN YAN YANA konur!
       // Çark saat yönünde dönerken hedefe varmadan hemen önceki komşu dilim: (targetIndex + 1) % N
-      const prevNeighborIndex = (targetIndex + 1) % N;
-      let fakeTargetIndex = prevNeighborIndex;
-
-      if (fakeTargetName && N > 1) {
-        let foundIdx = names.findIndex(n => trNormalize(n) === trNormalize(fakeTargetName));
-        if (foundIdx !== -1 && foundIdx !== targetIndex) {
-          if (foundIdx !== prevNeighborIndex) {
-            // Yem kişiyi kazananın hemen komşu dilimine takas et (swap)
-            const temp = names[prevNeighborIndex];
-            names[prevNeighborIndex] = names[foundIdx];
-            names[foundIdx] = temp;
-            drawWheel();
-          }
-          fakeTargetIndex = prevNeighborIndex;
-        }
-      }
+      const fakeTargetIndex = (targetIndex + 1) % N;
 
       // Kumandadan gelen süre ve dopamin seviyesi
       const duration = Math.max(3000, spinDuration * 1000);
@@ -1676,6 +1721,13 @@
 
     function spinRoulette(targetName = null, fakeTargetName = null) {
       if (isPlaying || !names.length) return;
+
+      // KULLANICI KURALI: 0'DAN TAM RASTGELE SHUFFLE!
+      // Tüm liste 0'dan Fisher-Yates ile karıştırılır, Kazanan ve Yem yan yana yerleştirilir!
+      const pair = smartShuffleNames(targetName, fakeTargetName);
+      const actualTarget = pair ? pair.target : (targetName || names[0]);
+      const actualFake = pair ? pair.fake : fakeTargetName;
+
       isPlaying = true;
       broadcast({ type: 'spin_start' });
 
@@ -1689,11 +1741,14 @@
         stage3D.classList.add('roulette-spinning-cam');
       }
 
-      let targetIndex = targetName ? names.findIndex(n => trNormalize(n) === trNormalize(targetName)) : -1;
+      const N = names.length, arc = (2 * Math.PI) / N;
+      let targetIndex = names.findIndex(n => trNormalize(n) === trNormalize(actualTarget));
       if (targetIndex === -1 && names.length > 0) targetIndex = Math.floor(Math.random() * names.length);
       if (targetIndex < 0 || targetIndex >= names.length) targetIndex = 0;
 
-      const N = names.length, arc = (2 * Math.PI) / N;
+      // Rulet ceplerinde kazananın hemen komşu cebi: (targetIndex + 1) % N
+      let fakeTargetIndex = (targetIndex + 1) % N;
+
       const R = rouletteRadius - 6;
       const rMahoganyInner = R - 16;
       const rPocketsOuter = R - 36;
@@ -1704,15 +1759,6 @@
       const duration = Math.max(4000, spinDuration * 1000);
       const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
       const startTime = performance.now();
-
-      // Sahte Hedef (Yem / Near-Miss kurbanı)
-      let fakeTargetIndex = -1;
-      if (fakeTargetName) {
-        fakeTargetIndex = names.findIndex(n => trNormalize(n) === trNormalize(fakeTargetName));
-      }
-      if (fakeTargetIndex === -1 || fakeTargetIndex === targetIndex) {
-        fakeTargetIndex = (targetIndex + (Math.random() > 0.5 ? 1 : N - 1)) % N;
-      }
       let fakeoutTriggered = false;
 
       const startWheelAngle = rouletteAngle;
@@ -2293,6 +2339,11 @@
     document.getElementById('rouletteSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
     document.getElementById('cardsShuffleBtn').addEventListener('click', shuffleCardsDeck);
     document.getElementById('cardsPickRandomBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
+    document.getElementById('shuffleNamesBtn')?.addEventListener('click', () => {
+      if (isPlaying) return;
+      playCardShuffleSound();
+      smartShuffleNames(pendingTarget, pendingFakeTarget);
+    });
 
     window.addEventListener('pointerdown', () => {
       initAudio();
@@ -2416,6 +2467,11 @@
               else if (activeGameMode === 'cards') renderFullCardsShowcase();
               else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
               else if (activeGameMode === 'slot') initSlotDisplay();
+            }
+          } else if (data.type === 'shuffle') {
+            if (!isPlaying) {
+              playCardShuffleSound();
+              smartShuffleNames(data.target, data.fakeTarget);
             }
           } else if (data.type === 'spin') {
             closeModal();
