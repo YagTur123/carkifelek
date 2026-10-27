@@ -142,12 +142,12 @@
       to { stroke-dashoffset: 0; }
     }
     .reel-locked {
-      animation: reel-snap-bounce 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      animation: reel-snap-bounce 0.24s cubic-bezier(0.25, 1, 0.5, 1) forwards;
     }
     @keyframes reel-snap-bounce {
-      0% { transform: translateY(-16px) scale(0.94); }
-      60% { transform: translateY(6px) scale(1.04); }
-      100% { transform: translateY(0) scale(1); }
+      0% { transform: translateY(-3.5px); }
+      55% { transform: translateY(1.5px); }
+      100% { transform: translateY(0); }
     }
     .slot-spin-action-btn {
       background: radial-gradient(circle at 50% 30%, #ef4444 0%, #b91c1c 65%, #7f1d1d 100%);
@@ -1029,7 +1029,7 @@
         // Çark rotasyonunu güncelle (Kesintisiz, sürekli ve analitik)
         wheelRotation = startRotation + totalDelta * easeP;
 
-        // Tırnak (Pointer Flapper) Fiziksel Temas ve Titreşim Dinamiği
+        // Tırnak (Pointer Flapper) Fiziksel Temas, Salınım ve Stoper Dinamiği (DeepSeek Çözümü)
         const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
         const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
 
@@ -1039,12 +1039,21 @@
           if (curIdx !== lastPegIdx) {
             lastPegIdx = curIdx;
             playTick(720 + Math.random() * 80);
-            flapperSpringVel = 50;
+            flapperSpringVel = 120; // Pimin ucundan fırlama ivmesi
           }
         } else {
-          flapperSpringVel += -400 * flapperDeflection * dt - 22 * flapperSpringVel * dt;
+          // Kararlı sönümlü harmonik osilatör: k=420, gamma=26 (dt <= 0.016s kararlılık garantili)
+          flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
           flapperDeflection += flapperSpringVel * dt;
-          if (Math.abs(flapperDeflection) < 0.1) flapperDeflection = 0;
+          // Stoper pimi geri sekmesi (ileriye doğru maksimum 5 dereceye kadar hafif sekip durur)
+          if (flapperDeflection > 5.0) {
+            flapperDeflection = 5.0;
+            flapperSpringVel = -flapperSpringVel * 0.25;
+          }
+          if (Math.abs(flapperDeflection) < 0.08 && Math.abs(flapperSpringVel) < 1.0) {
+            flapperDeflection = 0;
+            flapperSpringVel = 0;
+          }
         }
 
         if (pointerEl) {
@@ -1283,7 +1292,7 @@
           // DOPAMİN: Son makara (idx === 2) yüksek dopaminde önce 1 hücre yukarıda (sahte hedefte) durur!
           const fakeY = (idx === 2 && isHighDopamine) ? (finalY + CELL_HEIGHT) : finalY;
 
-          cfg.col.style.transition = `transform ${cfg.duration}ms cubic-bezier(0.12, 0.84, 0.35, 1.14)`;
+          cfg.col.style.transition = `transform ${cfg.duration}ms cubic-bezier(0.22, 0.61, 0.36, 1.06)`;
           cfg.col.style.transform = `translateY(${fakeY}px)`;
 
           setTimeout(() => {
@@ -1296,18 +1305,18 @@
               clearInterval(spinTickInterval);
 
               if (isHighDopamine) {
-                // SON SANİYEDE DÜŞÜŞ (NUDGE DROP):
-                // 380ms bekleyip makara 3'ü hedeflenen asıl satıra kaydır!
+                // SON SANİYEDE DÜŞÜŞ (NUDGE DROP - DEEPSEEK FORMÜLÜ):
+                // Mekanik mandal duraksaması (320ms) ardından 280ms yerçekimi düşüşü ve %8 kontrollü sekme
                 if (meter) meter.textContent = `AZ DAHA: ${fakeTarget}?!`;
                 setTimeout(() => {
-                  cfg.col.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.25)';
+                  cfg.col.style.transition = 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1.10)';
                   cfg.col.style.transform = `translateY(${finalY}px)`;
                   playReelStopSound();
                   playIvoryBallClick(1100, 0.3);
 
                   // Yan yana 3x eşleşmeyi kutla
                   finalizeSlotWin(target, targetName, meter);
-                }, 400);
+                }, 320);
               } else {
                 finalizeSlotWin(target, targetName, meter);
               }
@@ -1710,15 +1719,27 @@
       const totalWheelTurns = (3.5 + (duration / 2500)) * Math.PI;
       const finalWheelAngle = startWheelAngle + totalWheelTurns;
       
-      const targetPocketAngle = finalWheelAngle + targetIndex * arc + arc / 2;
-      const fakePocketAngle = finalWheelAngle + fakeTargetIndex * arc + arc / 2;
+      // DEEPSEEK FİZİK FORMÜLÜ: Çark Koordinat Sistemi & Sıfır Işınlanma Bağıl Hız Çözümü
+      const targetRel = targetIndex * arc + arc / 2;
+      const fakeRel = fakeTargetIndex * arc + arc / 2;
+      let relDiff = targetRel - fakeRel;
+      while (relDiff > Math.PI) relDiff -= 2 * Math.PI;
+      while (relDiff < -Math.PI) relDiff += 2 * Math.PI;
+      const entryRel = targetRel - relDiff; // Sahte hedeften başlayıp hedefe sönümlenecek bağıl açı
+
+      const pDrop = 0.76; // Ceplere düşüş ve çarkın referans sistemine kilitlenme eşiği
+      const wheelAtDrop = startWheelAngle + totalWheelTurns * (1 - Math.pow(1 - pDrop, 2.5));
+      const dropBallAngle = wheelAtDrop + entryRel;
+
+      const targetPocketAngle = finalWheelAngle + targetRel;
+      const fakePocketAngle = finalWheelAngle + fakeRel;
 
       const startBallAngle = ballAngle;
-      const desiredMod = ((targetPocketAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-      const currentMod = ((startBallAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-      let ballDiff = currentMod - desiredMod;
-      if (ballDiff < 0) ballDiff += 2 * Math.PI;
-      const totalBackwardTurns = (Math.max(6, Math.floor(duration / 700)) * 2 * Math.PI) + ballDiff;
+      const desiredDropMod = ((dropBallAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const currentBallMod = ((startBallAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      let trackDiff = currentBallMod - desiredDropMod;
+      if (trackDiff < 0) trackDiff += 2 * Math.PI;
+      const totalTrackTurns = (Math.max(5, Math.floor(duration / 750)) * 2 * Math.PI) + trackDiff;
 
       let lastPipTime = 0;
       let hitRim1 = false;
@@ -1730,13 +1751,27 @@
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
 
-        // Çark Dönüşü
+        // Çark Dönüşü (Monotonik Azalan Sönüm)
         const wheelEase = 1 - Math.pow(1 - progress, 2.5);
         rouletteAngle = startWheelAngle + totalWheelTurns * wheelEase;
 
-        // Top Açısal Hızı
-        const ballEase = 1 - Math.pow(1 - progress, 3.2);
-        let currentBallAngle = startBallAngle - totalBackwardTurns * ballEase;
+        // Top Açısal Hızı & Bağıl Çark Kilitlenmesi (DeepSeek Kesintisiz C^0 Fizik Sürekliliği)
+        let currentBallAngle;
+        if (progress < pDrop) {
+          // Serbest parkur: Ters yönde azalan açısal hızla dönüş
+          const pNorm = progress / pDrop;
+          const trackEase = 1 - Math.pow(1 - pNorm, 1.8);
+          currentBallAngle = startBallAngle - totalTrackTurns * trackEase;
+        } else if (progress < 0.92) {
+          // Cebe iniş: Çarkla birlikte ileri dönüş + sahte cepten asıl cebe perde atlama
+          const pSub = (progress - pDrop) / (0.92 - pDrop);
+          const hopEase = 1 - Math.pow(1 - pSub, 2.0);
+          const currentRel = entryRel + (targetRel - entryRel) * hopEase;
+          currentBallAngle = rouletteAngle + currentRel;
+        } else {
+          // Cebe kilitlenme: Çarkla %100 senkron dönüş (bağıl hız = 0, sıfır kayma)
+          currentBallAngle = rouletteAngle + targetRel;
+        }
 
         // --- ÇOK AŞAMALI FİZİK: DÜŞÜŞ, KENARA ÇARPMA, VE DOPAMİN FAKEOUT SEKME SİMÜLASYONU ---
         let ballDist = rMahoganyInner - 4.5;
