@@ -280,6 +280,22 @@
       } catch (e) {}
     }
 
+    function sendRemote(msg) {
+      let sent = false;
+      if (conn && conn.open) {
+        try { conn.send(msg); sent = true; } catch (e) {}
+      }
+      let targetRoom = (document.getElementById('roomIdInput').value.trim() || localStorage.getItem('cark_last_room') || '');
+      if (/^\d{4,5}$/.test(targetRoom)) targetRoom = 'cark-' + targetRoom;
+      if (targetRoom && mqttClient && mqttClient.connected) {
+        try {
+          mqttClient.publish('cark_cmd_' + targetRoom, JSON.stringify(msg));
+          sent = true;
+        } catch (e) {}
+      }
+      return sent;
+    }
+
     function changeGameMode(mode) {
       currentGameMode = mode;
       const modes = ['wheel', 'slot', 'roulette', 'cards'];
@@ -293,7 +309,7 @@
       });
 
       updateTriggerBtnText();
-      if (conn && conn.open) conn.send({ type: 'set_game_mode', mode: mode });
+      sendRemote({ type: 'set_game_mode', mode: mode });
     }
 
     function updateTriggerBtnText() {
@@ -306,7 +322,7 @@
       document.getElementById('triggerBtnText').textContent = textMap[currentGameMode] || 'OYNA';
     }
 
-    // --- Güvenli MQTT Lobi Keşfi ---
+    // --- Güvenli MQTT Lobi Keşfi & Çift Kanallı İletişim ---
     function initLobbyDiscovery() {
       try {
         mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
@@ -314,13 +330,34 @@
           clean: true, connectTimeout: 4000
         });
 
-        mqttClient.on('connect', () => mqttClient.subscribe('carkifelek_public_rooms'));
+        mqttClient.on('connect', () => {
+          mqttClient.subscribe('carkifelek_public_rooms');
+          let currentTarget = document.getElementById('roomIdInput').value.trim() || localStorage.getItem('cark_last_room') || '';
+          if (/^\d{4,5}$/.test(currentTarget)) currentTarget = 'cark-' + currentTarget;
+          if (currentTarget) {
+            mqttClient.subscribe('cark_state_' + currentTarget);
+            mqttClient.publish('cark_cmd_' + currentTarget, JSON.stringify({ type: 'request_sync' }));
+          }
+        });
+
         mqttClient.on('message', (topic, message) => {
           try {
-            const data = JSON.parse(message.toString());
-            if (data.roomId && data.lastSeen) {
-              discoveredRooms.set(data.roomId, data);
-              renderActiveRoomsList();
+            if (topic === 'carkifelek_public_rooms') {
+              const data = JSON.parse(message.toString());
+              if (data.roomId && data.lastSeen) {
+                discoveredRooms.set(data.roomId, data);
+                renderActiveRoomsList();
+              }
+            } else if (topic.startsWith('cark_state_')) {
+              const data = JSON.parse(message.toString());
+              handleIncomingData(data);
+              // MQTT üzerinden mesaj alındığında bağlantıyı açık olarak işaretle
+              if (!isConnected) {
+                isConnected = true;
+                const roomName = document.getElementById('roomIdInput').value.trim() || topic.replace('cark_state_', '');
+                setConnectionStatus('connected', 'Bağlandı (' + roomName + ')');
+                document.getElementById('triggerSpinBtn').disabled = false;
+              }
             }
           } catch (e) {}
         });
@@ -463,13 +500,11 @@
 
           updateTargetUI();
           renderGrid(document.getElementById('searchInput').value);
-          if (conn && conn.open) {
-            conn.send({
-              type: 'set_target',
-              target: selectedTarget,
-              fakeTarget: selectedFakeTarget
-            });
-          }
+          sendRemote({
+            type: 'set_target',
+            target: selectedTarget,
+            fakeTarget: selectedFakeTarget
+          });
         });
         grid.appendChild(btn);
       });
@@ -521,101 +556,134 @@
       if (navigator.vibrate) navigator.vibrate(20);
     }
 
+    function handleIncomingData(data) {
+      if (!data || !data.type) return;
+      if (data.type === 'init') {
+        if (data.history) history = data.history;
+        if (data.names && data.names.length) names = data.names;
+        if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
+        if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
+        updateTargetUI();
+        if (data.gameMode) changeGameMode(data.gameMode);
+        saveStorage(); renderGrid(); renderHistoryUI(); setSpinningState(data.isSpinning);
+        isConnected = true;
+        document.getElementById('triggerSpinBtn').disabled = false;
+        const targetRoom = document.getElementById('roomIdInput').value.trim() || localStorage.getItem('cark_last_room') || '';
+        setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
+      } else if (data.type === 'sync_names') {
+        if (data.names && data.names.length) {
+          names = data.names;
+          if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
+          if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
+          updateTargetUI();
+          saveStorage();
+          renderGrid(document.getElementById('searchInput').value);
+        }
+      } else if (data.type === 'spin_start') {
+        setSpinningState(true);
+      } else if (data.type === 'spin_end') {
+        setSpinningState(false);
+        lastWinner = data.winner;
+        document.getElementById('lastWinnerCard').classList.remove('hidden');
+        document.getElementById('lastWinnerName').textContent = lastWinner;
+        if (data.history) history = data.history;
+        saveStorage(); renderHistoryUI();
+
+        if (document.getElementById('autoRemoveToggle').checked) {
+          removeStudent(lastWinner);
+        }
+
+        showToast('Kazanan: ' + data.winner);
+        selectedTarget = null;
+        selectedFakeTarget = null;
+        updateTargetUI();
+        renderGrid(document.getElementById('searchInput').value);
+      } else if (data.type === 'game_mode_changed') {
+        changeGameMode(data.mode);
+      }
+    }
+
     function initConnection() {
-      const targetRoom = document.getElementById('roomIdInput').value.trim();
+      let targetRoom = document.getElementById('roomIdInput').value.trim();
       if (!targetRoom) { showToast('Geçerli Oda Kodu girin'); return; }
+      if (/^\d{4,5}$/.test(targetRoom)) {
+        targetRoom = 'cark-' + targetRoom;
+        document.getElementById('roomIdInput').value = targetRoom;
+      }
 
       localStorage.setItem('cark_last_room', targetRoom);
       setConnectionStatus('connecting', 'Bağlanıyor...');
 
+      // 1. MQTT ile anında kanala abone ol ve masadan sync iste
+      if (mqttClient && mqttClient.connected) {
+        mqttClient.subscribe('cark_state_' + targetRoom);
+        mqttClient.publish('cark_cmd_' + targetRoom, JSON.stringify({ type: 'request_sync' }));
+      }
+
+      // 2. PeerJS ile WebRTC P2P başlat
       if (peer) { try { peer.destroy(); } catch (e) {} }
-      peer = new Peer();
-
-      peer.on('open', () => {
-        conn = peer.connect(targetRoom, { reliable: true });
-
-        conn.on('open', () => {
-          isConnected = true;
-          setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
-          showToast('Masaya bağlandı!');
-          document.getElementById('triggerSpinBtn').disabled = false;
-          conn.send({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
-        });
-
-        conn.on('data', (data) => {
-          if (!data || !data.type) return;
-          if (data.type === 'init') {
-            if (data.history) history = data.history;
-            if (data.names && data.names.length) names = data.names;
-            if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
-            if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
-            updateTargetUI();
-            if (data.gameMode) changeGameMode(data.gameMode);
-            saveStorage(); renderGrid(); renderHistoryUI(); setSpinningState(data.isSpinning);
-          } else if (data.type === 'sync_names') {
-            if (data.names && data.names.length) {
-              names = data.names;
-              if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
-              if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
-              updateTargetUI();
-              saveStorage();
-              renderGrid(document.getElementById('searchInput').value);
-            }
-          } else if (data.type === 'spin_start') {
-            setSpinningState(true);
-          } else if (data.type === 'spin_end') {
-            setSpinningState(false);
-            lastWinner = data.winner;
-            document.getElementById('lastWinnerCard').classList.remove('hidden');
-            document.getElementById('lastWinnerName').textContent = lastWinner;
-            if (data.history) history = data.history;
-            saveStorage(); renderHistoryUI();
-
-            if (document.getElementById('autoRemoveToggle').checked) {
-              removeStudent(lastWinner);
-            }
-
-            showToast('Kazanan: ' + data.winner);
-            selectedTarget = null;
-            selectedFakeTarget = null;
-            updateTargetUI();
-            renderGrid(document.getElementById('searchInput').value);
-          } else if (data.type === 'game_mode_changed') {
-            changeGameMode(data.mode);
+      try {
+        peer = new Peer(undefined, {
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
           }
         });
 
-        let reconnectTimer = null;
-        function tryReconnect() {
-          if (isConnected) return;
-          if (reconnectTimer) clearTimeout(reconnectTimer);
-          const lastRoom = localStorage.getItem('cark_last_room');
-          if (lastRoom) {
-            setConnectionStatus('connecting', 'Yeniden bağlanılıyor...');
-            reconnectTimer = setTimeout(() => {
-              if (!isConnected) initConnection();
-            }, 3500);
+        peer.on('open', () => {
+          conn = peer.connect(targetRoom, { reliable: true });
+
+          conn.on('open', () => {
+            isConnected = true;
+            setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
+            showToast('Masaya bağlandı!');
+            document.getElementById('triggerSpinBtn').disabled = false;
+            sendRemote({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
+          });
+
+          conn.on('data', handleIncomingData);
+
+          conn.on('close', () => {
+            if (!mqttClient || !mqttClient.connected) {
+              isConnected = false;
+              setConnectionStatus('disconnected', 'Bağlantı Kesildi (Yeniden deneniyor...)');
+              document.getElementById('triggerSpinBtn').disabled = true;
+              tryReconnect();
+            }
+          });
+
+          conn.on('error', () => {
+            if (!mqttClient || !mqttClient.connected) {
+              isConnected = false;
+              setConnectionStatus('disconnected', 'Bağlantı Hatası');
+              document.getElementById('triggerSpinBtn').disabled = true;
+              tryReconnect();
+            }
+          });
+        });
+
+        peer.on('error', (err) => {
+          console.warn('Peer uyarısı:', err);
+          if (mqttClient && mqttClient.connected) {
+            isConnected = true;
+            setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
+            document.getElementById('triggerSpinBtn').disabled = false;
+          } else {
+            setConnectionStatus('disconnected', 'Masa Bulunamadı');
           }
-        }
-
-        conn.on('close', () => {
-          isConnected = false;
-          setConnectionStatus('disconnected', 'Bağlantı Kesildi (Yeniden deneniyor...)');
-          document.getElementById('triggerSpinBtn').disabled = true;
-          tryReconnect();
         });
+      } catch (e) {}
+    }
 
-        conn.on('error', () => {
-          isConnected = false;
-          setConnectionStatus('disconnected', 'Bağlantı Hatası');
-          document.getElementById('triggerSpinBtn').disabled = true;
-          tryReconnect();
-        });
-      });
-
-      peer.on('error', () => {
-        setConnectionStatus('disconnected', 'Masa Bulunamadı');
-      });
+    let reconnectTimer = null;
+    function tryReconnect() {
+      if (isConnected) return;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(() => {
+        if (!isConnected) initConnection();
+      }, 4000);
     }
 
     window.addEventListener('visibilitychange', () => {
@@ -678,7 +746,7 @@
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);
       document.getElementById('lastWinnerCard').classList.add('hidden');
-      if (conn && conn.open) conn.send({ type: 'remove_name', name: studentName });
+      sendRemote({ type: 'remove_name', name: studentName });
       showToast(studentName + ' elendi');
     }
 
@@ -728,7 +796,7 @@
           currentDuration = parseFloat(e.target.value);
           saveStorage();
           updateSliderUI();
-          if (conn && conn.open) conn.send({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
+          sendRemote({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
         });
       }
 
@@ -737,7 +805,7 @@
           currentDopamine = parseInt(e.target.value);
           saveStorage();
           updateSliderUI();
-          if (conn && conn.open) conn.send({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
+          sendRemote({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
         });
       }
     }
@@ -746,10 +814,10 @@
     document.getElementById('triggerSpinBtn').addEventListener('click', () => {
       const now = Date.now();
       if (now - lastTriggerTime < 1000) return;
-      if (!isConnected || !conn || !conn.open || isGameRunning) return;
+      if (!isConnected || isGameRunning) return;
       lastTriggerTime = now;
       vibrate();
-      conn.send({
+      sendRemote({
         type: 'spin',
         target: selectedTarget,
         fakeTarget: selectedFakeTarget,
@@ -767,13 +835,11 @@
     document.getElementById('shuffleListBtn')?.addEventListener('click', () => {
       if (isGameRunning) return;
       vibrate();
-      if (conn && conn.open) {
-        conn.send({
-          type: 'shuffle',
-          target: selectedTarget,
-          fakeTarget: selectedFakeTarget
-        });
-      }
+      sendRemote({
+        type: 'shuffle',
+        target: selectedTarget,
+        fakeTarget: selectedFakeTarget
+      });
       showToast("İsimler 0'dan karıştırıldı! (Hedef & Yem yan yana)");
     });
 
@@ -782,7 +848,7 @@
       selectedTarget = null;
       updateTargetUI();
       renderGrid(document.getElementById('searchInput').value);
-      if (conn && conn.open) conn.send({ type: 'set_target', target: null, fakeTarget: selectedFakeTarget });
+      sendRemote({ type: 'set_target', target: null, fakeTarget: selectedFakeTarget });
       showToast('Asıl hedef sıfırlandı');
     });
 
@@ -791,7 +857,7 @@
       selectedFakeTarget = null;
       updateTargetUI();
       renderGrid(document.getElementById('searchInput').value);
-      if (conn && conn.open) conn.send({ type: 'set_target', target: selectedTarget, fakeTarget: null });
+      sendRemote({ type: 'set_target', target: selectedTarget, fakeTarget: null });
       showToast('Yem hedef sıfırlandı');
     });
 
@@ -857,9 +923,11 @@
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);
       closeEditor();
-      if (conn && conn.open) {
-        conn.send({ type: 'sync_names', names: names });
-        showToast('Liste gönderildi (' + names.length + ' kişi)');
+      const sent = sendRemote({ type: 'sync_names', names: names });
+      if (sent) {
+        showToast('Liste tahtaya aktarıldı (' + names.length + ' kişi)');
+      } else {
+        showToast('Liste kaydedildi (Masa bağlı değil)');
       }
     });
 
@@ -870,7 +938,7 @@
       setTimeout(() => toast.classList.add('opacity-0'), 2000);
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
+    function initControlApp() {
       loadStorage();
       renderGrid();
       renderHistoryUI();
@@ -886,7 +954,13 @@
         document.getElementById('roomIdInput').value = roomParam;
         if (urlParams.get('room')) setTimeout(initConnection, 300);
       }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initControlApp);
+    } else {
+      initControlApp();
+    }
   </script>
 </body>
 </html>

@@ -525,6 +525,7 @@
         <img id="qrImage" src="" alt="QR Kod" class="w-48 h-48 block">
       </div>
       <div class="text-[11px] text-zinc-400 font-mono bg-zinc-900 py-1 px-3 rounded border border-zinc-800 truncate w-full" id="qrRoomCode">Oda: ...</div>
+      <button id="copyControlLinkBtn" class="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition active:scale-95 shadow">Kumanda Linkini Kopyala</button>
       <button id="closeQrBtn" class="w-full py-2 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold">Kapat</button>
     </div>
   </div>
@@ -2566,12 +2567,31 @@
       }
     });
 
-    function showQrModal() {
+    function getRemoteControlUrl() {
       try {
         const urlObj = new URL(window.location.href);
-        urlObj.pathname = urlObj.pathname.replace('index.html', 'control.html');
+        let pathname = urlObj.pathname;
+        if (pathname.endsWith('/index.html')) {
+          pathname = pathname.replace(/\/index\.html$/, '/control.html');
+        } else if (pathname.endsWith('/')) {
+          pathname += 'control.html';
+        } else if (/\/[^\/]+\.[a-z0-9]+$/i.test(pathname)) {
+          pathname = pathname.replace(/\/[^\/]+$/, '/control.html');
+        } else {
+          pathname += '/control.html';
+        }
+        urlObj.pathname = pathname;
         urlObj.searchParams.set('room', roomId);
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(urlObj.toString())}&bgcolor=ffffff&color=000000`;
+        return urlObj.toString();
+      } catch (e) {
+        return window.location.origin + '/control.html?room=' + roomId;
+      }
+    }
+
+    function showQrModal() {
+      try {
+        const controlUrl = getRemoteControlUrl();
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(controlUrl)}&bgcolor=ffffff&color=000000`;
         document.getElementById('qrImage').src = qrUrl;
         document.getElementById('qrRoomCode').textContent = 'Oda: ' + roomId;
         document.getElementById('qrModal').classList.remove('opacity-0', 'pointer-events-none');
@@ -2580,6 +2600,16 @@
     document.getElementById('openQrBtn').addEventListener('click', showQrModal);
     document.getElementById('roomBadge').addEventListener('click', showQrModal);
     document.getElementById('closeQrBtn').addEventListener('click', () => document.getElementById('qrModal').classList.add('opacity-0', 'pointer-events-none'));
+    document.getElementById('copyControlLinkBtn')?.addEventListener('click', () => {
+      const url = getRemoteControlUrl();
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          const btn = document.getElementById('copyControlLinkBtn');
+          btn.textContent = '✓ Link Kopyalandı!';
+          setTimeout(() => { btn.textContent = 'Kumanda Linkini Kopyala'; }, 2000);
+        }).catch(() => {});
+      }
+    });
 
     document.getElementById('soundToggleBtn').addEventListener('click', () => {
       soundEnabled = !soundEnabled;
@@ -2608,21 +2638,106 @@
       });
     }
 
-    // --- PeerJS & MQTT ---
+    // --- PeerJS & MQTT Çift Kanallı Güvenli Bağlantı (Dual-Channel Signaling) ---
     let peer = null, connections = [], mqttClient = null, heartbeatInterval = null;
     const randomCode = Math.floor(1000 + Math.random() * 9000);
-    const roomId = 'cark-' + randomCode;
+    let roomId = 'cark-' + randomCode;
+
+    function handleRemoteCommand(data) {
+      if (!data || !data.type) return;
+
+      if (data.type === 'request_sync') {
+        broadcast({
+          type: 'init',
+          names: names,
+          history: history,
+          gameMode: activeGameMode,
+          isSpinning: isPlaying
+        });
+        return;
+      }
+
+      if (data.type === 'set_settings') {
+        if (data.duration) spinDuration = parseFloat(data.duration);
+        if (data.dopamine !== undefined) dopamineLevel = parseInt(data.dopamine);
+      } else if (data.type === 'sync_names') {
+        if (Array.isArray(data.names) && data.names.length) {
+          names = data.names;
+          saveStorage();
+          updateRoundUI();
+          if (activeGameMode === 'wheel') drawWheel();
+          else if (activeGameMode === 'cards') renderFullCardsShowcase();
+          else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
+          else if (activeGameMode === 'slot') initSlotDisplay();
+        }
+      } else if (data.type === 'shuffle') {
+        if (!isPlaying) {
+          playCardShuffleSound();
+          smartShuffleNames(data.target, data.fakeTarget);
+        }
+      } else if (data.type === 'spin') {
+        closeModal();
+        if (data.duration) spinDuration = parseFloat(data.duration);
+        if (data.dopamine !== undefined) dopamineLevel = parseInt(data.dopamine);
+        if (data.mode && data.mode !== activeGameMode) {
+          setGameMode(data.mode, false);
+        }
+        let validTarget = data.target;
+        if (validTarget && !names.some(n => trNormalize(n) === trNormalize(validTarget))) {
+          validTarget = null;
+        }
+        let validFakeTarget = data.fakeTarget;
+        if (validFakeTarget && !names.some(n => trNormalize(n) === trNormalize(validFakeTarget))) {
+          validFakeTarget = null;
+        }
+        triggerGame(validTarget, validFakeTarget);
+      } else if (data.type === 'set_target') {
+        let validTarget = data.target;
+        if (validTarget && !names.some(n => trNormalize(n) === trNormalize(validTarget))) {
+          validTarget = null;
+        }
+        pendingTarget = validTarget;
+        let validFakeTarget = data.fakeTarget;
+        if (validFakeTarget && !names.some(n => trNormalize(n) === trNormalize(validFakeTarget))) {
+          validFakeTarget = null;
+        }
+        pendingFakeTarget = validFakeTarget;
+      } else if (data.type === 'set_game_mode') {
+        setGameMode(data.mode, false);
+      } else if (data.type === 'remove_name') {
+        names = names.filter(n => trNormalize(n) !== trNormalize(data.name));
+        if (names.length === 0) names = ["Ahmet", "Ayşe", "Mehmet"];
+        saveStorage();
+        updateRoundUI();
+        if (activeGameMode === 'wheel') drawWheel();
+        else if (activeGameMode === 'cards') renderFullCardsShowcase();
+        else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
+        else if (activeGameMode === 'slot') initSlotDisplay();
+      }
+    }
 
     function initLobbyBroadcast() {
       try {
+        if (mqttClient && mqttClient.connected) return;
         mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
           clientId: 'host_' + roomId + '_' + Math.random().toString(16).substring(2, 8),
           clean: true, connectTimeout: 4000
         });
         mqttClient.on('connect', () => {
+          mqttClient.subscribe('cark_cmd_' + roomId);
           sendHeartbeat();
           if (heartbeatInterval) clearInterval(heartbeatInterval);
           heartbeatInterval = setInterval(sendHeartbeat, 3000);
+          document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+          document.getElementById('roomIdDisplay').textContent = roomId;
+        });
+        mqttClient.on('message', (topic, message) => {
+          if (topic === 'cark_cmd_' + roomId) {
+            try {
+              const data = JSON.parse(message.toString());
+              handleRemoteCommand(data);
+            } catch (e) {}
+          }
         });
       } catch (e) {}
     }
@@ -2640,106 +2755,117 @@
     }
 
     function initPeer() {
-      peer = new Peer(roomId);
-      peer.on('open', (id) => {
-        document.getElementById('roomIdDisplay').textContent = id;
-        document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-emerald-400';
-        initLobbyBroadcast();
-      });
-
-      peer.on('connection', (conn) => {
-        connections.push(conn);
-        conn.on('open', () => {
-          conn.send({
-            type: 'init',
-            names: names,
-            history: history,
-            gameMode: activeGameMode,
-            isSpinning: isPlaying
-          });
-        });
-
-        conn.on('data', (data) => {
-          if (!data || !data.type) return;
-          if (data.type === 'set_settings') {
-            if (data.duration) spinDuration = parseFloat(data.duration);
-            if (data.dopamine !== undefined) dopamineLevel = parseInt(data.dopamine);
-          } else if (data.type === 'sync_names') {
-            if (Array.isArray(data.names) && data.names.length) {
-              names = data.names;
-              saveStorage();
-              updateRoundUI();
-              if (activeGameMode === 'wheel') drawWheel();
-              else if (activeGameMode === 'cards') renderFullCardsShowcase();
-              else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
-              else if (activeGameMode === 'slot') initSlotDisplay();
-            }
-          } else if (data.type === 'shuffle') {
-            if (!isPlaying) {
-              playCardShuffleSound();
-              smartShuffleNames(data.target, data.fakeTarget);
-            }
-          } else if (data.type === 'spin') {
-            closeModal();
-            if (data.duration) spinDuration = parseFloat(data.duration);
-            if (data.dopamine !== undefined) dopamineLevel = parseInt(data.dopamine);
-            if (data.mode && data.mode !== activeGameMode) {
-              setGameMode(data.mode, false);
-            }
-            let validTarget = data.target;
-            if (validTarget && !names.some(n => trNormalize(n) === trNormalize(validTarget))) {
-              validTarget = null;
-            }
-            let validFakeTarget = data.fakeTarget;
-            if (validFakeTarget && !names.some(n => trNormalize(n) === trNormalize(validFakeTarget))) {
-              validFakeTarget = null;
-            }
-            triggerGame(validTarget, validFakeTarget);
-          } else if (data.type === 'set_target') {
-            let validTarget = data.target;
-            if (validTarget && !names.some(n => trNormalize(n) === trNormalize(validTarget))) {
-              validTarget = null;
-            }
-            pendingTarget = validTarget;
-            let validFakeTarget = data.fakeTarget;
-            if (validFakeTarget && !names.some(n => trNormalize(n) === trNormalize(validFakeTarget))) {
-              validFakeTarget = null;
-            }
-            pendingFakeTarget = validFakeTarget;
-          } else if (data.type === 'set_game_mode') {
-            setGameMode(data.mode, false);
-          } else if (data.type === 'remove_name') {
-            names = names.filter(n => trNormalize(n) !== trNormalize(data.name));
-            if (names.length === 0) names = ["Ahmet", "Ayşe", "Mehmet"];
-            saveStorage();
-            updateRoundUI();
-            if (activeGameMode === 'wheel') drawWheel();
-            else if (activeGameMode === 'cards') renderFullCardsShowcase();
-            else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
-            else if (activeGameMode === 'slot') initSlotDisplay();
+      try {
+        if (peer) { try { peer.destroy(); } catch (e) {} }
+        peer = new Peer(roomId, {
+          debug: 1,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
           }
         });
 
-        conn.on('close', () => { connections = connections.filter(c => c !== conn); });
-      });
+        peer.on('open', (id) => {
+          roomId = id;
+          document.getElementById('roomIdDisplay').textContent = id;
+          document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+          initLobbyBroadcast();
+        });
+
+        peer.on('connection', (conn) => {
+          connections.push(conn);
+          conn.on('open', () => {
+            conn.send({
+              type: 'init',
+              names: names,
+              history: history,
+              gameMode: activeGameMode,
+              isSpinning: isPlaying
+            });
+          });
+
+          conn.on('data', handleRemoteCommand);
+          conn.on('close', () => { connections = connections.filter(c => c !== conn); });
+          conn.on('error', () => { connections = connections.filter(c => c !== conn); });
+        });
+
+        peer.on('error', (err) => {
+          console.warn('Peer uyarısı:', err);
+          if (err.type === 'unavailable-id') {
+            roomId = 'cark-' + Math.floor(1000 + Math.random() * 9000);
+            initPeer();
+          } else {
+            // PeerJS bulut sunucusu yanıt vermese bile MQTT hemen devreye girer
+            initLobbyBroadcast();
+          }
+        });
+      } catch (e) {
+        initLobbyBroadcast();
+      }
     }
 
     function broadcast(data) {
       connections.forEach(conn => {
         if (conn && conn.open) try { conn.send(data); } catch (e) {}
       });
+      if (mqttClient && mqttClient.connected) {
+        try {
+          mqttClient.publish('cark_state_' + roomId, JSON.stringify(data));
+        } catch (e) {}
+      }
     }
+
+    // Çark ve Rulet çanağına doğrudan dokunulduğunda da oyunu tetikle
+    wheelCanvas?.addEventListener('click', () => {
+      if (!isPlaying) triggerGame(pendingTarget, pendingFakeTarget);
+    });
+    rouletteCanvas?.addEventListener('click', () => {
+      if (!isPlaying) triggerGame(pendingTarget, pendingFakeTarget);
+    });
 
     window.addEventListener('resize', () => {
       if (activeGameMode === 'wheel') resizeWheelCanvas();
       else if (activeGameMode === 'roulette') resizeRouletteCanvas();
     });
 
-    window.addEventListener('DOMContentLoaded', () => {
+    // İlk kullanıcı etkileşiminde ses motorunu uyandır
+    ['pointerdown', 'touchstart', 'click'].forEach(evt => {
+      window.addEventListener(evt, () => {
+        initAudio();
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+      }, { passive: true });
+    });
+
+    function initApp() {
       loadStorage();
       setGameMode(activeGameMode, false);
       initPeer();
-    });
+      initLobbyBroadcast();
+
+      // Ekran boyutunu ve canvas çizimini açılışta hemen garantile
+      requestAnimationFrame(() => {
+        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        else if (activeGameMode === 'roulette') resizeRouletteCanvas();
+      });
+      setTimeout(() => {
+        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        else if (activeGameMode === 'roulette') resizeRouletteCanvas();
+      }, 80);
+      setTimeout(() => {
+        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        else if (activeGameMode === 'roulette') resizeRouletteCanvas();
+      }, 300);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
   </script>
 </body>
 </html>
