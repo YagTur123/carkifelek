@@ -231,7 +231,7 @@
     }
   </style>
 </head>
-<body id="mainBody" class="casino-felt text-zinc-100 min-h-screen flex flex-col items-center justify-between overflow-hidden select-none font-sans antialiased">
+<body id="mainBody" class="casino-felt text-zinc-100 min-h-screen flex flex-col items-center justify-between overflow-x-hidden select-none font-sans antialiased">
 
   <!-- Üst Bar -->
   <header class="w-full flex items-center justify-between px-4 md:px-8 py-3.5 z-30 bg-zinc-950/90 border-b border-zinc-800/80 backdrop-blur shadow-md">
@@ -273,10 +273,10 @@
   </header>
 
   <!-- OYUN SAHNESİ -->
-  <main class="relative flex-1 w-full flex items-center justify-center p-3 perspective-stage">
+  <main class="relative flex-1 w-full flex items-center justify-center p-2 md:p-3 perspective-stage overflow-y-auto max-h-[calc(100vh-56px)]">
 
     <!-- 1. 3D ÇARKIFELEK -->
-    <div id="gameWheelView" class="game-view relative flex items-center justify-center">
+    <div id="gameWheelView" class="game-view relative flex items-center justify-center my-auto py-4">
       <div id="wheel3DStage" class="relative wheel-3d">
         <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none filter drop-shadow-[0_8px_14px_rgba(0,0,0,0.85)]" id="pointerEl" style="transform-origin: 50% 6px;">
           <!-- 3D Lüks Şevli İbre (Bevelled Needle) -->
@@ -857,14 +857,16 @@
     const casinoPalette = ['#8f1d1d', '#18201d', '#155234', '#18201d', '#b3822a', '#18201d'];
 
     function resizeWheelCanvas() {
-      // Çark ekranı daha çok kaplasın (Akıllı tahta ve tabletlerde 760px'e kadar lüks dev boyut)
-      const size = Math.min(window.innerWidth * 0.95, window.innerHeight * 0.84, 760);
+      // Çark ekranı akıllı tahta ve tabletlerde devasa, mobilde taşmayacak şekilde tam sığsın
+      const maxW = Math.max(260, window.innerWidth - 32);
+      const maxH = Math.max(260, window.innerHeight - 110);
+      const size = Math.min(maxW, maxH, 720);
       const dpr = window.devicePixelRatio || 1;
       wheelCanvas.width = size * dpr;
       wheelCanvas.height = size * dpr;
       wheelCanvas.style.width = size + 'px';
       wheelCanvas.style.height = size + 'px';
-      wheelCtx.scale(dpr, dpr);
+      wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       wheelRadius = size / 2;
       drawWheel();
     }
@@ -1135,11 +1137,14 @@
 
       // Kazanan ile Yem artık yan yana olduğundan, sahte hedefin duraklama açısı tam olarak finalRotation - arc'tır!
       // Sahte dilim ile hedef arasındaki pim çentiği açısı: finalRotation - 0.5 * arc
+      // GERÇEK FİZİKSEL SÖNÜM & C^1 KESİNTİSİZ SÜREKLİ NEAR-MISS MODELİ (SIFIR TP / SIFIR HIZ SIÇRAMASI)
       const pegRatio = (totalDelta - 0.5 * arc) / totalDelta;
-      const pStart = 0.72;
-      const pEnd = 0.91;
-      const lingerStartVal = pegRatio - (0.28 * arc) / totalDelta;
-      const lingerEndVal = pegRatio + (0.04 * arc) / totalDelta;
+      const pPeg = 0.84;
+      const crawlC = isHighDopamine ? (0.04 + (dopamineLevel / 100) * 0.04) : 0.08;
+      const span2 = 1 - pPeg;
+      const vPeg = pegRatio * crawlC / pPeg;
+      const m0 = vPeg * span2;
+      const m1 = 0; // Hedef merkezine 0 hızla pürüzsüzce oturur
       let hasOvercomePeg = false;
 
       const startTime = performance.now();
@@ -1161,39 +1166,35 @@
         lastFrameTime = now;
         if (dt > 0.05) dt = 0.016;
 
-        // %100 GERÇEK FİZİKSEL SÖNÜM & ÇARKIFELEK GERİLİM PLATOSU (HESITATION ON FAKE PEG)
-        // Sahte hedef çentiğinde gerilimi tırmandıran duraksama, ardından pimi aşıp hedefe oturma
+        // %100 GERÇEK FİZİKSEL SÖNÜM & MONOTONİK ÇARKIFELEK GERİLİM PLATOSU
         let easeP;
         let currentSpeed;
 
         if (isHighDopamine) {
-          if (progress < pStart) {
-            const pn = progress / pStart;
-            const shape = 1 - Math.pow(1 - pn, 3.0);
-            easeP = lingerStartVal * shape;
-            currentSpeed = (lingerStartVal * totalDelta / (pStart * (duration / 1000))) * 3.0 * Math.pow(1 - pn, 2.0);
-          } else if (progress < pEnd) {
-            // ÇENTİKTE GERİLİM PLATOSU: Çark yem dilimi ve pim çentiğinde aşırı yavaşlar (~1.2-1.5 sn)
-            const ps = (progress - pStart) / (pEnd - pStart);
-            const creep = 0.5 - 0.5 * Math.cos(ps * Math.PI);
-            easeP = lingerStartVal + (lingerEndVal - lingerStartVal) * creep;
-            const plateauSpanSec = (pEnd - pStart) * (duration / 1000);
-            currentSpeed = ((lingerEndVal - lingerStartVal) * totalDelta / plateauSpanSec) * (Math.PI / 2) * Math.sin(ps * Math.PI);
+          if (progress < pPeg) {
+            const pn = progress / pPeg;
+            const a = 2.4;
+            easeP = pegRatio * ((1 - Math.pow(1 - pn, a)) * (1 - crawlC) + crawlC * pn);
+            currentSpeed = (pegRatio * totalDelta / (pPeg * (duration / 1000))) * (a * Math.pow(Math.max(0, 1 - pn), a - 1) * (1 - crawlC) + crawlC);
           } else {
             // PİMİ AŞMA VE KAZANANIN MERKEZİNE YERLEŞME
             if (!hasOvercomePeg) {
               hasOvercomePeg = true;
-              playTick(820);
-              flapperSpringVel = 140; // Pimi aşınca ibreye fırlama ivmesi
+              playTick(840);
+              flapperSpringVel = 135; // Pimi aşınca ibreye fırlama ivmesi
             }
-            const ps = (progress - pEnd) / (1 - pEnd);
-            const shape = 1 - Math.pow(1 - ps, 2.4);
-            easeP = lingerEndVal + (1.0 - lingerEndVal) * shape;
-            const exitSpanSec = (1 - pEnd) * (duration / 1000);
-            currentSpeed = ((1.0 - lingerEndVal) * totalDelta / exitSpanSec) * 2.4 * Math.pow(Math.max(0, 1 - ps), 1.4);
+            const tRatio = (progress - pPeg) / span2;
+            const t2 = tRatio * tRatio, t3 = t2 * tRatio;
+            const h00 = 2*t3 - 3*t2 + 1;
+            const h10 = t3 - 2*t2 + tRatio;
+            const h01 = -2*t3 + 3*t2;
+            const h11 = t3 - t2;
+            easeP = h00 * pegRatio + h01 * 1.0 + h10 * m0 + h11 * m1;
+            const dh = (6*t2 - 6*tRatio)*pegRatio + (-6*t2 + 6*tRatio)*1.0 + (3*t2 - 4*tRatio + 1)*m0 + (3*t2 - 2*tRatio)*m1;
+            currentSpeed = Math.max(0, (dh * totalDelta) / (span2 * (duration / 1000)));
           }
         } else {
-          const pExp = 4.0;
+          const pExp = 3.6;
           easeP = 1 - Math.pow(1 - progress, pExp);
           currentSpeed = (totalDelta / duration) * (pExp * Math.pow(Math.max(0, 1 - progress), pExp - 1));
         }
@@ -1205,12 +1206,13 @@
         const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
         const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
 
-        if (isHighDopamine && progress >= pStart && progress < pEnd) {
-          // Çentik gerilim titremesi: İbre tam pime yaslanmış bükük vaziyette gerilimle titrer
-          flapperDeflection = -16.5 - Math.sin(now * 0.045) * 1.8;
+        if (isHighDopamine && progress >= pPeg - 0.08 && progress < pPeg) {
+          // Pim çentiğinde maksimum bükülme gerilimi ve gerilim titremesi (tremor)
+          const tensionProgress = (progress - (pPeg - 0.08)) / 0.08;
+          flapperDeflection = -16.0 * tensionProgress - Math.sin(now * 0.045) * 1.5;
           flapperSpringVel = 0;
-        } else if (phaseInSlice < 0.26) {
-          const pushFraction = phaseInSlice / 0.26;
+        } else if (phaseInSlice < 0.24) {
+          const pushFraction = phaseInSlice / 0.24;
           flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
           if (curIdx !== lastPegIdx) {
             lastPegIdx = curIdx;
@@ -1485,18 +1487,20 @@
               clearInterval(spinTickInterval);
 
               if (isHighDopamine) {
-                // SON SANİYEDE DÜŞÜŞ (NUDGE DROP - DEEPSEEK FORMÜLÜ):
-                // Mekanik mandal duraksaması (320ms) ardından 280ms yerçekimi düşüşü ve %8 kontrollü sekme
+                // SON SANİYEDE DÜŞÜŞ (NUDGE DROP - GERÇEK MEKANİK MANDAL):
+                // Mekanik mandal duraksaması (360ms) ardından 320ms yerçekimi düşüşü ve %8 kontrollü sekme
                 if (meter) meter.textContent = `AZ DAHA: ${fakeTarget}?!`;
                 setTimeout(() => {
-                  cfg.col.style.transition = 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1.10)';
+                  cfg.col.style.transition = 'transform 0.32s cubic-bezier(0.25, 1, 0.5, 1.10)';
                   cfg.col.style.transform = `translateY(${finalY}px)`;
                   playReelStopSound();
                   playIvoryBallClick(1100, 0.3);
 
-                  // Yan yana 3x eşleşmeyi kutla
-                  finalizeSlotWin(target, targetName, meter);
-                }, 320);
+                  // Makara 3'ün orta sıraya (Row 1) oturmasını bekle, ardından kutlamayı başlat
+                  setTimeout(() => {
+                    finalizeSlotWin(target, targetName, meter);
+                  }, 340);
+                }, 360);
               } else {
                 finalizeSlotWin(target, targetName, meter);
               }
@@ -1542,14 +1546,19 @@
     let rouletteWinningIndex = null;
 
     function resizeRouletteCanvas() {
-      // Rulet çanağı ekranı daha çok kaplasın (Akıllı tahta ve geniş ekranlarda 720px'e kadar lüks dev boyut)
-      const size = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.72, 720);
+      // Rulet çanağı akıllı tahtalarda geniş, masayla birlikte ekrana tam sığsın
+      const maxW = Math.max(260, window.innerWidth - 32);
+      let maxH = window.innerHeight - 310;
+      if (maxH < 280) {
+        maxH = Math.max(260, (window.innerHeight - 70) * 0.54);
+      }
+      const size = Math.min(maxW, maxH, 580);
       const dpr = window.devicePixelRatio || 1;
       rouletteCanvas.width = size * dpr;
       rouletteCanvas.height = size * dpr;
       rouletteCanvas.style.width = size + 'px';
       rouletteCanvas.style.height = size + 'px';
-      rouletteCtx.scale(dpr, dpr);
+      rouletteCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       rouletteRadius = size / 2;
       drawRoulette();
       renderRouletteTable();
@@ -1966,7 +1975,8 @@
       let relDiff = targetRel - fakeRel;
       while (relDiff > Math.PI) relDiff -= 2 * Math.PI;
       while (relDiff < -Math.PI) relDiff += 2 * Math.PI;
-      const entryRel = targetRel - relDiff; // Sahte hedeften başlayıp hedefe sönümlenecek bağıl açı
+      // Yüksek dopaminde sahte komşu cepten başlar, standart modda doğrudan hedefe sönümlenir
+      const entryRel = isHighDopamine ? (targetRel - relDiff) : targetRel;
 
       const pDrop = 0.76; // Ceplere düşüş ve çarkın referans sistemine kilitlenme eşiği
       const wheelAtDrop = startWheelAngle + totalWheelTurns * (1 - Math.pow(1 - pDrop, 2.5));
@@ -2003,13 +2013,19 @@
         if (progress < pDrop) {
           // Serbest parkur: Ters yönde azalan açısal hızla dönüş
           const pNorm = progress / pDrop;
-          const trackEase = 1 - Math.pow(1 - pNorm, 1.8);
+          const trackEase = 1 - Math.pow(1 - pNorm, 2.0);
           currentBallAngle = startBallAngle - totalTrackTurns * trackEase;
         } else if (progress < 0.92) {
           // Cebe iniş: Çarkla birlikte ileri dönüş + sahte cepten asıl cebe perde atlama
           const pSub = (progress - pDrop) / (0.92 - pDrop);
-          const hopEase = 1 - Math.pow(1 - pSub, 2.0);
-          const currentRel = entryRel + (targetRel - entryRel) * hopEase;
+          let currentRel;
+          if (isHighDopamine) {
+            const hopEase = 1 - Math.pow(1 - pSub, 2.0);
+            currentRel = entryRel + (targetRel - entryRel) * hopEase;
+          } else {
+            const directEase = 1 - Math.pow(1 - pSub, 2.0);
+            currentRel = entryRel + (targetRel - entryRel) * directEase;
+          }
           currentBallAngle = rouletteAngle + currentRel;
         } else {
           // Cebe kilitlenme: Çarkla %100 senkron dönüş (bağıl hız = 0, sıfır kayma)
@@ -2391,6 +2407,9 @@
       playWinSound();
       triggerCelebration(winner, gameLabel);
 
+      pendingTarget = null;
+      pendingFakeTarget = null;
+
       broadcast({
         type: 'spin_end',
         winner: winner,
@@ -2520,12 +2539,12 @@
       if (e.target === document.getElementById('winnerModal')) closeModal();
     });
 
-    document.getElementById('centerSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
-    document.getElementById('slotSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
-    document.getElementById('slotLeverControl').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
-    document.getElementById('rouletteSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
+    document.getElementById('centerSpinBtn').addEventListener('click', () => triggerGame(pendingTarget, pendingFakeTarget));
+    document.getElementById('slotSpinBtn').addEventListener('click', () => triggerGame(pendingTarget, pendingFakeTarget));
+    document.getElementById('slotLeverControl').addEventListener('click', () => triggerGame(pendingTarget, pendingFakeTarget));
+    document.getElementById('rouletteSpinBtn').addEventListener('click', () => triggerGame(pendingTarget, pendingFakeTarget));
     document.getElementById('cardsShuffleBtn').addEventListener('click', shuffleCardsDeck);
-    document.getElementById('cardsPickRandomBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
+    document.getElementById('cardsPickRandomBtn').addEventListener('click', () => triggerGame(pendingTarget, pendingFakeTarget));
     document.getElementById('shuffleNamesBtn')?.addEventListener('click', () => {
       if (isPlaying) return;
       playCardShuffleSound();

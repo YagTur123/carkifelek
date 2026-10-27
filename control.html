@@ -539,7 +539,6 @@
           setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
           showToast('Masaya bağlandı!');
           document.getElementById('triggerSpinBtn').disabled = false;
-          conn.send({ type: 'sync_names', names: names });
           conn.send({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
         });
 
