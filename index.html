@@ -1020,30 +1020,13 @@
         lastFrameTime = now;
         if (dt > 0.05) dt = 0.016;
 
-        let easeP = 0;
-        if (isHighDopamine && N > 1) {
-          // YÜKSEK DOPAMİN: Tam yanındaki komşu yem diliminde gerilimle asılı kalma ve son anda hedefe sıçrama!
-          if (progress < 0.84) {
-            const pSub = progress / 0.84;
-            easeP = fakeStopRatio * (1 - Math.pow(1 - pSub, 3.5));
-          } else if (progress >= 0.84 && progress < 0.93) {
-            // Yem diliminin pimin ucunda nefes kesen duraklama (tam yanındaki isimde!)
-            const pSub = (progress - 0.84) / 0.09;
-            const creep = Math.sin(pSub * Math.PI * 0.5) * (1.0 - fakeStopRatio) * 0.25;
-            easeP = fakeStopRatio + creep;
-          } else {
-            // Son anda tırnak tek pimi aşar ve asıl hedefin merkezine oturur!
-            const pSub = (progress - 0.93) / 0.07;
-            const easeOutSub = Math.sin(pSub * Math.PI * 0.5);
-            const remain = 1.0 - (fakeStopRatio + (1.0 - fakeStopRatio) * 0.25);
-            easeP = (fakeStopRatio + (1.0 - fakeStopRatio) * 0.25) + remain * easeOutSub;
-          }
-        } else {
-          // STANDART / İPEKSİ MOD: Kesintisiz pürüzsüz quintic sönüm
-          easeP = 1 - Math.pow(1 - progress, 4.5);
-        }
+        // %100 GERÇEK FİZİKSEL SÖNÜM (MONOTONİK AZALAN HIZ - ASLA GERİYE VE İLERİYE SIÇRAMA YOK)
+        // Standart mod: p = 4.0 (Akıcı pürüzsüz sönüm)
+        // Yüksek dopamin: p = 5.2 (Son metrelerde kalp durduran ultra-yavaş sürünme; durup tekrar hızlanma YOK!)
+        const pExp = isHighDopamine ? (4.0 + (dopamineLevel / 100) * 1.4) : 4.0;
+        const easeP = 1 - Math.pow(1 - progress, pExp);
 
-        // Çark rotasyonunu güncelle
+        // Çark rotasyonunu güncelle (Kesintisiz, sürekli ve analitik)
         wheelRotation = startRotation + totalDelta * easeP;
 
         // Tırnak (Pointer Flapper) Fiziksel Temas ve Titreşim Dinamiği
@@ -1232,19 +1215,8 @@
       const meter = document.getElementById('slotWinMeter');
       if (meter) meter.textContent = 'ÇEVRİLİYOR...';
 
-      // 3x3 KAZANMA HATTI SEÇİMİ (Çapraz SOS veya Yatay Hat)
-      // %80 ihtimalle çapraz (diag_down veya diag_up), %20 ihtimalle orta düz
-      const patterns = ['diag_down', 'diag_up', 'center'];
-      const chosenPattern = (Math.random() < 0.45) ? 'diag_down' : ((Math.random() < 0.8) ? 'diag_up' : 'center');
-
-      // Her makaranın son 3 hücresinde (Row 0: Üst, Row 1: Orta, Row 2: Alt) kazanan hedef kişinin satır indeksi:
-      // diag_down: Col 0 -> Row 0, Col 1 -> Row 1, Col 2 -> Row 2
-      // diag_up:   Col 0 -> Row 2, Col 1 -> Row 1, Col 2 -> Row 0
-      // center:    Col 0 -> Row 1, Col 1 -> Row 1, Col 2 -> Row 1
-      let targetRowPerCol = [1, 1, 1];
-      if (chosenPattern === 'diag_down') targetRowPerCol = [0, 1, 2];
-      else if (chosenPattern === 'diag_up') targetRowPerCol = [2, 1, 0];
-      else if (chosenPattern === 'center') targetRowPerCol = [1, 1, 1];
+      // KLASİK VEGAS SLOT: KAZANMA HATTI DAİMA ORTADA YAN YANA (ROW 1 - MERKEZ YATAY HAT)
+      const targetRowPerCol = [1, 1, 1];
 
       // Diğer katılımcıların isim havuzu (kazanan hariç diğer kişiler)
       const otherNames = names.filter(n => trNormalize(n) !== trNormalize(target));
@@ -1258,9 +1230,9 @@
       const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
 
       const reelConfigs = [
-        { col: col1, count: 26, duration: Math.floor(slotDuration * 0.65), targetRow: targetRowPerCol[0], colIdx: 0 },
-        { col: col2, count: 34, duration: Math.floor(slotDuration * 0.82), targetRow: targetRowPerCol[1], colIdx: 1 },
-        { col: col3, count: 42, duration: Math.floor(slotDuration * 1.00), targetRow: targetRowPerCol[2], colIdx: 2 }
+        { col: col1, count: 26, duration: Math.floor(slotDuration * 0.65), targetRow: 1, colIdx: 0 },
+        { col: col2, count: 34, duration: Math.floor(slotDuration * 0.82), targetRow: 1, colIdx: 1 },
+        { col: col3, count: 42, duration: Math.floor(slotDuration * 1.00), targetRow: 1, colIdx: 2 }
       ];
 
       reelConfigs.forEach((cfg) => {
@@ -1274,18 +1246,14 @@
           cellNames[i] = names[Math.floor(Math.random() * names.length)];
         }
 
-        // Asıl kazanan hücre indeksi (final duruşta tam pencereye oturacak hücre)
+        // Asıl kazanan hücre indeksi (orta sıra: Row 1 = count - 2)
         const realWinnerIdx = cfg.count - 3 + cfg.targetRow;
         cellNames[realWinnerIdx] = target;
 
-        // Sahte kazanan hücre indeksi (Makara 3 ilk sahteY'de durduğunda tam pencereye oturacak hücre)
+        // Sahte kazanan hücre indeksi (Makara 3 ilk sahte duruşunda orta sıraya oturacak hücre: count - 3)
         const fakeWinnerIdx = cfg.count - 4 + cfg.targetRow;
         if (cfg.colIdx === 2 && isHighDopamine) {
           cellNames[fakeWinnerIdx] = fakeTarget;
-        } else if (cfg.colIdx < 2 && isHighDopamine && Math.random() < 0.4) {
-          // Makara 1 ve 2'nin diğer hücrelerine de sahte hedefi serpiştir
-          const otherRow = (cfg.targetRow + 1) % 3;
-          cellNames[cfg.count - 3 + otherRow] = fakeTarget;
         }
 
         let html = '';
@@ -1337,11 +1305,11 @@
                   playReelStopSound();
                   playIvoryBallClick(1100, 0.3);
 
-                  // Çapraz SOS çizgisini çiz ve kutla
-                  finalizeSlotWin(target, targetName, chosenPattern, meter);
+                  // Yan yana 3x eşleşmeyi kutla
+                  finalizeSlotWin(target, targetName, meter);
                 }, 400);
               } else {
-                finalizeSlotWin(target, targetName, chosenPattern, meter);
+                finalizeSlotWin(target, targetName, meter);
               }
             }
           }, cfg.duration);
@@ -1349,17 +1317,20 @@
       });
     }
 
-    function finalizeSlotWin(target, targetName, chosenPattern, meter) {
+    function finalizeSlotWin(target, targetName, meter) {
       isPlaying = false;
-      if (meter) meter.textContent = 'EŞLEŞTİ!';
-      drawSlotSosLine(chosenPattern);
+      if (meter) meter.textContent = '3x YAN YANA EŞLEŞTİ!';
+      
+      // Ortadaki varsayılan payline çizgisini parlat
+      const defaultPayline = document.getElementById('slotDefaultPayline');
+      if (defaultPayline) {
+        defaultPayline.style.opacity = '1';
+        defaultPayline.classList.add('scale-y-125');
+      }
 
-      // Kazanan 3 hücreyi tam bu anda SOS çizgisiyle birlikte kutlama efektiyle parlat
-      let targetRows = [1, 1, 1];
-      if (chosenPattern === 'diag_down') targetRows = [0, 1, 2];
-      else if (chosenPattern === 'diag_up') targetRows = [2, 1, 0];
-      targetRows.forEach((r, colIdx) => {
-        const cell = document.getElementById(`slotCell_${colIdx}_${r}`);
+      // Ortadaki 3 hücreyi (Row 1) altın kutlama efektiyle parlat
+      [0, 1, 2].forEach(colIdx => {
+        const cell = document.getElementById(`slotCell_${colIdx}_1`);
         if (cell) {
           cell.classList.add('slot-winner-cell');
           const nameSpan = cell.querySelector('span:nth-child(2)');
@@ -1368,9 +1339,10 @@
           }
         }
       });
+      playWinSound();
 
       setTimeout(() => {
-        finishGame(target, targetName !== null, 'Vegas Çekilişi (3x3)');
+        finishGame(target, targetName !== null, 'Vegas Slots (3x Yan Yana)');
       }, 1000);
     }
 
@@ -1819,7 +1791,7 @@
           ballZ = baseZ;
 
         } else if (progress >= 0.76 && progress < 0.92) {
-          // AŞAMA 4: Ceplere İniş & Pirinç Perdeler Arasında Sekerek İlerleme
+          // AŞAMA 4: Ceplere İniş & Pirinç Perdeler Arasında Gerçek Sekerek İlerleme
           const pSub = (progress - 0.76) / 0.16;
           const hops = 5;
           const hopPhase = pSub * hops * Math.PI;
@@ -1832,11 +1804,11 @@
           const baseDist = rDeflector - pSub * (rDeflector - rPocketCenter);
           ballDist = baseDist + radialHop;
 
-          // YÜKSEK DOPAMİN: Top bu aşamada komşu sahte cepte duracak gibi yavaşlar!
-          if (isHighDopamine && pSub > 0.60) {
-            currentBallAngle = fakePocketAngle - (1 - pSub) * arc * 0.7;
+          // Topun o an üstünden geçtiği cebi doğal fiziksel açısıyla tespit et
+          const curPocket = Math.floor((((currentBallAngle - rouletteAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)) / arc) % N;
+          if (curPocket === fakeTargetIndex) {
             const fakeName = names[fakeTargetIndex];
-            if (statusBadge) statusBadge.textContent = `⚡ Krupiye: Top ${fakeName} cebinde duruyor mu?!`;
+            if (statusBadge) statusBadge.textContent = `⚡ Krupiye: Top ${fakeName} cebinde sekiyor!`;
             const fakeCell = document.getElementById(`rouletteCell_${fakeTargetIndex}`);
             if (fakeCell) fakeCell.classList.add('ring-2', 'ring-amber-400', 'bg-amber-500/20');
           }
@@ -1848,29 +1820,18 @@
           }
 
         } else {
-          // AŞAMA 5: SON SANİYE YER DEĞİŞTİRME VEYA HEDEFE KİLİTLENME
+          // AŞAMA 5: CEBE PÜRÜZSÜZ YERLEŞME (SIFIR TELEPORT - %100 KESİNTİSİZ FİZİK)
           const pSub = (progress - 0.92) / 0.08;
+          const settleDecay = 1 - pSub;
+          ballDist = rPocketCenter + settleDecay * 1.5 * Math.sin(pSub * Math.PI * 3);
+          ballZ = Math.max(0, settleDecay * 0.06);
 
-          if (isHighDopamine) {
-            // SON SANİYE PERDEDEN SEKTİRME (FAKEOUT KICK!)
-            if (!fakeoutTriggered) {
-              fakeoutTriggered = true;
-              playIvoryBallClick(1700, 0.35); // Sert pirinç perdeye çarpış
-              const fakeCell = document.getElementById(`rouletteCell_${fakeTargetIndex}`);
-              if (fakeCell) fakeCell.classList.remove('ring-2', 'ring-amber-400', 'bg-amber-500/20');
-              if (statusBadge) statusBadge.textContent = `⚡ DİKKAT! Top perdeden sekti ➔ ${names[targetIndex]}!`;
-            }
-            // Zıplama yüksekliği ve hedefe atlama kavis eğrisi
-            const kickZ = Math.sin(pSub * Math.PI) * 0.38;
-            ballZ = Math.max(0, kickZ);
-            ballDist = rPocketCenter + Math.sin(pSub * Math.PI) * 2.2;
-            currentBallAngle = fakePocketAngle + (targetPocketAngle - fakePocketAngle) * Math.sin(pSub * Math.PI * 0.5);
-          } else {
-            // Normal yumuşak yerleşme
-            const settleDecay = 1 - pSub;
-            ballDist = rPocketCenter + settleDecay * 1.5 * Math.sin(pSub * Math.PI * 3);
-            ballZ = Math.max(0, settleDecay * 0.04);
-            currentBallAngle = targetPocketAngle;
+          if (!fakeoutTriggered && pSub > 0.3) {
+            fakeoutTriggered = true;
+            playIvoryBallClick(1600, 0.28);
+            const fakeCell = document.getElementById(`rouletteCell_${fakeTargetIndex}`);
+            if (fakeCell) fakeCell.classList.remove('ring-2', 'ring-amber-400', 'bg-amber-500/20');
+            if (statusBadge) statusBadge.textContent = `👑 KAZANAN: ${names[targetIndex]}!`;
           }
         }
 
