@@ -23,44 +23,36 @@
       transform-style: preserve-3d;
     }
 
-    /* 3D Çark & Rulet Derinliği */
+    /* 3D Çark Derinliği */
     .wheel-3d {
       transform: rotateX(22deg) scale(0.96);
       box-shadow: 0 45px 65px -15px rgba(0, 0, 0, 0.95), 0 0 45px rgba(212, 175, 55, 0.2);
     }
-    .roulette-wheel-3d {
-      transform: rotateX(24deg) scale(0.95);
-      box-shadow: 0 45px 75px -15px rgba(0, 0, 0, 0.98), 0 0 50px rgba(212, 175, 55, 0.25);
-      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    /* Derin 3D Monte Carlo Rulet Çanağı & Kasa */
+    .roulette-stage-3d {
+      perspective: 1100px;
+      transform-style: preserve-3d;
+      transform: rotateX(38deg) scale(0.96);
+      transition: transform 0.8s cubic-bezier(0.2, 0.85, 0.25, 1);
     }
-    .roulette-felt-board {
-      background: radial-gradient(circle at 50% 25%, #0d381e 0%, #062413 80%, #03140a 100%);
-      box-shadow: inset 0 2px 5px rgba(255,255,255,0.1), 0 20px 45px rgba(0,0,0,0.85);
-      border: 3px solid #854d0e;
+    .roulette-stage-3d.roulette-spinning-cam {
+      transform: rotateX(44deg) scale(1.05);
     }
-    .chip-item {
-      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+    .roulette-stage-3d.roulette-zoom-winner {
+      transform: rotateX(40deg) scale(1.15);
     }
-    .chip-item:hover {
-      transform: translateY(-3px) scale(1.04);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.6);
-    }
-    .chip-winning {
-      animation: chip-pulse 1.2s infinite alternate ease-in-out;
-      transform: scale(1.08) !important;
-      border-color: #f59e0b !important;
-      z-index: 30 !important;
-    }
-    @keyframes chip-pulse {
-      0% { box-shadow: 0 0 12px rgba(245, 158, 11, 0.6), 0 0 25px rgba(245, 158, 11, 0.3); }
-      100% { box-shadow: 0 0 25px rgba(245, 158, 11, 1), 0 0 45px rgba(245, 158, 11, 0.6); }
-    }
-    .dolly-marker {
-      animation: dolly-drop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-    }
-    @keyframes dolly-drop {
-      0% { transform: translateY(-35px) scale(1.5); opacity: 0; }
-      100% { transform: translateY(0) scale(1); opacity: 1; }
+    .roulette-cylinder-skirt {
+      transform: translateZ(-35px);
+      box-shadow: 
+        0 12px 0 #201007,
+        0 24px 0 #180c05,
+        0 36px 0 #28150a,
+        0 46px 0 #120904,
+        0 56px 0 #080402,
+        0 80px 85px 25px rgba(0, 0, 0, 0.98),
+        0 0 70px rgba(212, 175, 55, 0.35);
+      border-radius: 50%;
     }
 
     /* 3D Slot Kavisli Silindir Derinliği */
@@ -226,58 +218,33 @@
       </div>
     </div>
 
-    <!-- 3. 3D LÜKS MONTE CARLO RULET MASASI -->
-    <div id="gameRouletteView" class="game-view hidden flex flex-col xl:flex-row items-center justify-center gap-6 w-full max-w-6xl px-2">
+    <!-- 3. DERİN 3D MONTE CARLO RULET (SEÇİM SADECE KUMANDADAN) -->
+    <div id="gameRouletteView" class="game-view hidden flex flex-col items-center justify-center gap-7 w-full max-w-4xl px-4 perspective-stage">
       
-      <!-- Sol: 3D Rulet Çarkı & Fırlatma Butonu -->
-      <div class="flex flex-col items-center gap-4">
-        <div class="relative roulette-wheel-3d">
-          <canvas id="rouletteCanvas" class="rounded-full shadow-2xl border-4 border-amber-600/90"></canvas>
-          <button id="rouletteSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-950 border-2 border-amber-500 text-amber-300 font-black text-xs md:text-sm uppercase tracking-wider hover:border-amber-400 active:scale-95 shadow-2xl flex flex-col items-center justify-center">
-            <span>FIRLAT</span>
-          </button>
-        </div>
+      <!-- Derin 3D Rulet Çanağı & Kasa Yapısı -->
+      <div id="roulette3DStage" class="roulette-stage-3d relative flex items-center justify-center transition-all duration-700 ease-out">
+        
+        <!-- Ahşap Kasa 3D Yan Kenarlık / Silindir Katmanı -->
+        <div class="roulette-cylinder-skirt absolute inset-0 rounded-full pointer-events-none"></div>
 
-        <!-- Canlı Krupiye Durum Rozeti -->
-        <div id="rouletteCurrentNumber" class="text-xs md:text-sm text-amber-200 bg-zinc-950/90 px-6 py-2 rounded-full border border-amber-600/50 backdrop-blur shadow-lg font-serif tracking-wide text-center">
-          Krupiye: "Faites vos jeux! (Bahisler açık)"
-        </div>
+        <!-- 3D Canvas Çark -->
+        <canvas id="rouletteCanvas" class="rounded-full cursor-pointer relative z-10 border-4 border-amber-600/90 shadow-2xl"></canvas>
+
+        <!-- Merkez Fırlat Butonu (Tahtadan da rastgele çevrilebilir) -->
+        <button id="rouletteSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-950 border-4 border-amber-500 text-amber-300 font-black text-xs md:text-sm uppercase tracking-widest hover:border-amber-400 active:scale-95 shadow-[0_0_35px_rgba(212,175,55,0.45)] flex flex-col items-center justify-center z-20">
+          <span class="font-serif drop-shadow">FIRLAT</span>
+        </button>
+
       </div>
 
-      <!-- Sağ: Monte Carlo Yeşil Çuha Masası (Bahis Fişleri & Dolly) -->
-      <div class="roulette-felt-board rounded-2xl p-4 md:p-5 flex flex-col gap-3 w-full max-w-lg shadow-2xl border-2 border-amber-700/70">
-        <div class="flex items-center justify-between border-b border-emerald-800/80 pb-2">
-          <div class="flex items-center gap-2">
-            <span class="text-amber-400 text-sm md:text-base font-serif font-bold tracking-wide">♠ MONTE CARLO FELT</span>
-            <span class="text-[10px] text-emerald-400 font-mono uppercase bg-emerald-900/60 px-2 py-0.5 rounded border border-emerald-700/60">Canlı Masa</span>
-          </div>
-          <span class="text-xs text-zinc-300 font-mono">Bahisler: <span id="rouletteChipsCount" class="text-amber-400 font-bold">0</span></span>
+      <!-- Canlı Krupiye & Durum Paneli -->
+      <div class="flex flex-col items-center gap-2 z-20">
+        <div id="rouletteCurrentNumber" class="text-xs md:text-sm text-amber-200 bg-zinc-950/95 px-8 py-2.5 rounded-full border border-amber-600/60 backdrop-blur-md shadow-2xl font-serif tracking-wider text-center">
+          Krupiye: "Faites vos jeux! (Bahisler açık)"
         </div>
-
-        <!-- Kırmızı & Siyah Bahis Alanları -->
-        <div class="grid grid-cols-2 gap-2 text-center text-xs font-bold font-serif">
-          <div class="py-2 px-3 rounded-lg bg-red-900/80 border border-red-700 text-red-100 shadow flex items-center justify-center gap-1.5">
-            <span class="w-3 h-3 rounded-full bg-red-500 inline-block shadow"></span>
-            <span>KIRMIZI (RED)</span>
-          </div>
-          <div class="py-2 px-3 rounded-lg bg-zinc-950/90 border border-zinc-700 text-zinc-100 shadow flex items-center justify-center gap-1.5">
-            <span class="w-3 h-3 rounded-full bg-zinc-400 inline-block shadow"></span>
-            <span>SİYAH (BLACK)</span>
-          </div>
-        </div>
-
-        <!-- Öğrenci Poker Fişleri Izgarası -->
-        <div class="text-[10px] text-emerald-300 uppercase tracking-wider font-semibold">Öğrenci Bahis Fişleri:</div>
-        <div id="rouletteChipsGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[260px] md:max-h-[300px] overflow-y-auto custom-scroll p-1">
-          <!-- JS ile doldurulacak -->
-        </div>
-
-        <!-- Masa Aksiyonu -->
-        <div class="flex items-center justify-between pt-1 border-t border-emerald-800/80 text-[11px] text-emerald-300">
-          <span>* Fişe tıklayarak da topu fırlatabilirsiniz.</span>
-          <button id="rouletteTableSpinBtn" class="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-black font-black text-xs uppercase tracking-wider transition active:scale-95 shadow-md">
-            TOPU FIRLAT
-          </button>
+        <div class="text-[11px] text-zinc-400 flex items-center gap-2 font-mono">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span>Hedef ve Kontrol: Gizli Mobil Kumanda</span>
         </div>
       </div>
 
@@ -639,7 +606,7 @@
 
       if (mode === 'wheel') resizeWheelCanvas();
       else if (mode === 'slot') initSlotDisplay();
-      else if (mode === 'roulette') { resizeRouletteCanvas(); renderRouletteFeltBoard(); }
+      else if (mode === 'roulette') resizeRouletteCanvas();
       else if (mode === 'cards') renderFullCardsShowcase();
 
       if (broadcastSync) broadcast({ type: 'game_mode_changed', mode: mode });
@@ -840,14 +807,14 @@
       }, 3700);
     }
 
-    // --- 3. 3D MONTE CARLO RULET MASASI (LÜKS ÇUHA & FİLDİŞİ TOP) ---
+    // --- 3. 3D MONTE CARLO RULET MASASI (DERİN 3D ÇANAK & FİLDİŞİ TOP) ---
     const rouletteCanvas = document.getElementById('rouletteCanvas');
     const rouletteCtx = rouletteCanvas.getContext('2d');
     let rouletteRadius = 0, rouletteAngle = 0, ballAngle = 0;
     let rouletteWinningIndex = null;
 
     function resizeRouletteCanvas() {
-      const size = Math.min(window.innerWidth * 0.82, window.innerHeight * 0.52, 450);
+      const size = Math.min(window.innerWidth * 0.88, window.innerHeight * 0.65, 520);
       const dpr = window.devicePixelRatio || 1;
       rouletteCanvas.width = size * dpr;
       rouletteCanvas.height = size * dpr;
@@ -858,57 +825,6 @@
       drawRoulette();
     }
 
-    function renderRouletteFeltBoard() {
-      const grid = document.getElementById('rouletteChipsGrid');
-      if (!grid) return;
-      grid.innerHTML = '';
-      const countEl = document.getElementById('rouletteChipsCount');
-      if (countEl) countEl.textContent = names.length;
-
-      const chipColors = [
-        { border: 'border-red-500', bg: 'bg-red-900', ring: 'ring-red-400' },
-        { border: 'border-amber-400', bg: 'bg-amber-950', ring: 'ring-amber-300' },
-        { border: 'border-emerald-500', bg: 'bg-emerald-950', ring: 'ring-emerald-400' },
-        { border: 'border-cyan-400', bg: 'bg-cyan-950', ring: 'ring-cyan-300' },
-        { border: 'border-purple-400', bg: 'bg-purple-950', ring: 'ring-purple-300' },
-        { border: 'border-zinc-400', bg: 'bg-zinc-900', ring: 'ring-zinc-300' }
-      ];
-
-      names.forEach((name, i) => {
-        const isRed = (i % 2 === 0);
-        const col = chipColors[i % chipColors.length];
-        const chip = document.createElement('div');
-        chip.id = 'rouletteChip_' + i;
-        chip.className = 'chip-item relative flex items-center gap-2 p-2 rounded-xl bg-zinc-950/80 border border-emerald-800/80 hover:border-amber-400 cursor-pointer transition select-none shadow';
-        
-        chip.innerHTML = `
-          <!-- Poker Fişi İkonu -->
-          <div class="relative w-7 h-7 rounded-full flex items-center justify-center font-bold text-[9px] text-white shadow-md border-2 ${col.border} ${col.bg} flex-shrink-0">
-            <div class="w-4 h-4 rounded-full border border-white/40 flex items-center justify-center font-mono text-[8px]">
-              ${i + 1}
-            </div>
-          </div>
-          <!-- Öğrenci İsmi & Rulet Rengi -->
-          <div class="flex flex-col min-w-0 flex-1">
-            <span class="text-xs font-bold text-white truncate tracking-tight">${name}</span>
-            <span class="text-[9px] ${isRed ? 'text-rose-400' : 'text-zinc-400'} font-serif">${isRed ? 'Kırmızı' : 'Siyah'} #${i + 1}</span>
-          </div>
-          <!-- Dolly Kazanan Belirteci -->
-          <div class="dolly-marker-container hidden absolute -top-3.5 -right-2 text-xl drop-shadow-xl z-30">
-            <span class="dolly-marker inline-block">👑</span>
-          </div>
-        `;
-
-        chip.addEventListener('click', () => {
-          if (!isPlaying) {
-            triggerGame(name);
-          }
-        });
-
-        grid.appendChild(chip);
-      });
-    }
-
     function drawRoulette(ballDist = null) {
       if (!names.length) return;
       const N = names.length;
@@ -917,45 +833,46 @@
       const R = rouletteRadius - 6;
 
       const rMahoganyOuter = R + 4;
-      const rMahoganyInner = R - 14;
-      const rPocketsOuter = R - 32;
-      const rPocketsInner = R * 0.46;
+      const rMahoganyInner = R - 16;
+      const rPocketsOuter = R - 36;
+      const rPocketsInner = R * 0.44;
 
       rouletteCtx.clearRect(0, 0, rouletteRadius * 2, rouletteRadius * 2);
 
-      // 1. Maun Ahşap Dış Çanak (Gradient)
+      // 1. Maun Ahşap Dış Çanak (Derin Lake Gradient)
       const woodGrad = rouletteCtx.createRadialGradient(cx, cy, rMahoganyInner, cx, cy, rMahoganyOuter);
-      woodGrad.addColorStop(0, '#2b170c');
-      woodGrad.addColorStop(0.5, '#4a2815');
-      woodGrad.addColorStop(1, '#1a0e07');
+      woodGrad.addColorStop(0, '#251208');
+      woodGrad.addColorStop(0.4, '#42200f');
+      woodGrad.addColorStop(0.8, '#2a1409');
+      woodGrad.addColorStop(1, '#150904');
 
       rouletteCtx.beginPath();
       rouletteCtx.arc(cx, cy, rMahoganyOuter, 0, 2 * Math.PI);
       rouletteCtx.fillStyle = woodGrad;
       rouletteCtx.fill();
       rouletteCtx.strokeStyle = '#d4af37';
-      rouletteCtx.lineWidth = 3.5;
+      rouletteCtx.lineWidth = 4;
       rouletteCtx.stroke();
 
-      // Maun İç Altın Şerit
+      // Maun Çanak İçi Yivli Altın Çember
       rouletteCtx.beginPath();
-      rouletteCtx.arc(cx, cy, rMahoganyInner + 3, 0, 2 * Math.PI);
+      rouletteCtx.arc(cx, cy, rMahoganyInner + 3.5, 0, 2 * Math.PI);
       rouletteCtx.strokeStyle = '#854d0e';
-      rouletteCtx.lineWidth = 1.5;
+      rouletteCtx.lineWidth = 2;
       rouletteCtx.stroke();
 
-      // 2. Fildişi Top Yolu (Koyu Parkur)
+      // 2. Fildişi Top Parkuru (Derin Yiv Kanalı)
       const trackGrad = rouletteCtx.createRadialGradient(cx, cy, rPocketsOuter, cx, cy, rMahoganyInner);
-      trackGrad.addColorStop(0, '#0c0805');
-      trackGrad.addColorStop(0.7, '#1f140c');
-      trackGrad.addColorStop(1, '#090503');
+      trackGrad.addColorStop(0, '#0a0604');
+      trackGrad.addColorStop(0.65, '#1e1109');
+      trackGrad.addColorStop(1, '#080402');
 
       rouletteCtx.beginPath();
       rouletteCtx.arc(cx, cy, rMahoganyInner, 0, 2 * Math.PI);
       rouletteCtx.fillStyle = trackGrad;
       rouletteCtx.fill();
 
-      // 3. 8 Pirinç Elmas Saptırıcı (Brass Deflectors)
+      // 3. 8 Pirinç Elmas Saptırıcı (3D Şevli Brass Deflectors)
       const rDeflector = (rMahoganyInner + rPocketsOuter) / 2;
       for (let d = 0; d < 8; d++) {
         const da = (d * Math.PI) / 4;
@@ -965,21 +882,34 @@
         rouletteCtx.save();
         rouletteCtx.translate(dx, dy);
         rouletteCtx.rotate(da);
+
+        // Elmas Gölgesi
         rouletteCtx.beginPath();
-        rouletteCtx.moveTo(0, -5.5);
-        rouletteCtx.lineTo(3.2, 0);
-        rouletteCtx.lineTo(0, 5.5);
-        rouletteCtx.lineTo(-3.2, 0);
+        rouletteCtx.moveTo(0, -6);
+        rouletteCtx.lineTo(4, 0);
+        rouletteCtx.lineTo(0, 6);
+        rouletteCtx.lineTo(-4, 0);
+        rouletteCtx.closePath();
+        rouletteCtx.fillStyle = 'rgba(0,0,0,0.45)';
+        rouletteCtx.fill();
+
+        // 3D Işık Açılı Elmas Gövde
+        rouletteCtx.beginPath();
+        rouletteCtx.moveTo(0, -6);
+        rouletteCtx.lineTo(3.5, 0);
+        rouletteCtx.lineTo(0, 6);
+        rouletteCtx.lineTo(-3.5, 0);
         rouletteCtx.closePath();
         rouletteCtx.fillStyle = '#fef08a';
         rouletteCtx.fill();
         rouletteCtx.strokeStyle = '#854d0e';
         rouletteCtx.lineWidth = 1;
         rouletteCtx.stroke();
+
         rouletteCtx.restore();
       }
 
-      // 4. Numaralı Cepler Halkası (Kırmızı & Siyah)
+      // 4. Çukur Numaralı Cepler Halkası (Kırmızı & Siyah)
       for (let i = 0; i < N; i++) {
         const a = rouletteAngle + i * arc;
         const isRed = (i % 2 === 0);
@@ -991,12 +921,24 @@
         rouletteCtx.arc(cx, cy, rPocketsInner, a + arc, a, true);
         rouletteCtx.closePath();
 
-        rouletteCtx.fillStyle = isRed ? '#8f1a1a' : '#141414';
+        // Derinlik Gradyanı (İçe doğru kararan kavis)
+        const pocketGrad = rouletteCtx.createRadialGradient(cx, cy, rPocketsInner, cx, cy, rPocketsOuter);
+        if (isRed) {
+          pocketGrad.addColorStop(0, '#5a0e0e');
+          pocketGrad.addColorStop(0.7, '#8f1a1a');
+          pocketGrad.addColorStop(1, '#a82323');
+        } else {
+          pocketGrad.addColorStop(0, '#0a0a0c');
+          pocketGrad.addColorStop(0.7, '#16161a');
+          pocketGrad.addColorStop(1, '#202026');
+        }
+
+        rouletteCtx.fillStyle = pocketGrad;
         rouletteCtx.fill();
 
         // Pirinç Ayırıcı Perdeler (Frets)
         rouletteCtx.strokeStyle = '#d4af37';
-        rouletteCtx.lineWidth = 1.2;
+        rouletteCtx.lineWidth = 1.3;
         rouletteCtx.stroke();
 
         // Cep İçi Yazılar
@@ -1007,15 +949,15 @@
         // Cep Numarası
         rouletteCtx.textAlign = 'right';
         rouletteCtx.fillStyle = '#fbbf24';
-        rouletteCtx.font = 'bold 8.5px monospace';
+        rouletteCtx.font = 'bold 9px monospace';
         rouletteCtx.fillText((i + 1).toString(), rPocketsOuter - 3, 3);
 
         // Öğrenci İsmi
         rouletteCtx.fillStyle = '#ffffff';
-        rouletteCtx.font = 'bold 9.5px sans-serif';
+        rouletteCtx.font = 'bold 10px sans-serif';
         let displayName = names[i];
-        if (displayName.length > 8) displayName = displayName.substring(0, 7) + '…';
-        rouletteCtx.fillText(displayName, rPocketsOuter - 17, 3);
+        if (displayName.length > 9) displayName = displayName.substring(0, 8) + '…';
+        rouletteCtx.fillText(displayName, rPocketsOuter - 18, 3.5);
 
         rouletteCtx.restore();
       }
@@ -1024,7 +966,7 @@
       const coneGrad = rouletteCtx.createRadialGradient(cx, cy, 0, cx, cy, rPocketsInner);
       coneGrad.addColorStop(0, '#fef08a');
       coneGrad.addColorStop(0.35, '#ca8a04');
-      coneGrad.addColorStop(0.7, '#854d0e');
+      coneGrad.addColorStop(0.65, '#854d0e');
       coneGrad.addColorStop(1, '#27170b');
 
       rouletteCtx.beginPath();
@@ -1032,70 +974,82 @@
       rouletteCtx.fillStyle = coneGrad;
       rouletteCtx.fill();
       rouletteCtx.strokeStyle = '#fef08a';
-      rouletteCtx.lineWidth = 2;
+      rouletteCtx.lineWidth = 2.5;
       rouletteCtx.stroke();
 
-      // Döner 4 Kollu Pirinç Fırıldak (Spindle Cross)
+      // Döner 4 Kollu Pirinç Fırıldak (Spindle Cross with 3D Float Shadow)
       for (let i = 0; i < 4; i++) {
         const ca = rouletteAngle + (i * Math.PI) / 2;
-        const hLen = rPocketsInner * 0.85;
+        const hLen = rPocketsInner * 0.88;
         const hx = cx + hLen * Math.cos(ca);
         const hy = cy + hLen * Math.sin(ca);
+
+        rouletteCtx.save();
+        rouletteCtx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        rouletteCtx.shadowBlur = 6;
+        rouletteCtx.shadowOffsetY = 4;
 
         rouletteCtx.beginPath();
         rouletteCtx.moveTo(cx, cy);
         rouletteCtx.lineTo(hx, hy);
         rouletteCtx.strokeStyle = '#fde047';
-        rouletteCtx.lineWidth = 3.5;
+        rouletteCtx.lineWidth = 4;
         rouletteCtx.stroke();
 
         rouletteCtx.beginPath();
-        rouletteCtx.arc(hx, hy, 4.5, 0, 2 * Math.PI);
+        rouletteCtx.arc(hx, hy, 5, 0, 2 * Math.PI);
         rouletteCtx.fillStyle = '#fef08a';
         rouletteCtx.fill();
         rouletteCtx.strokeStyle = '#854d0e';
-        rouletteCtx.lineWidth = 1;
+        rouletteCtx.lineWidth = 1.2;
         rouletteCtx.stroke();
+
+        rouletteCtx.restore();
       }
 
-      // Merkez Yakut Kubbe (Ruby Apex)
+      // Merkez Yakut Somun (Ruby Cap Apex)
       rouletteCtx.beginPath();
-      rouletteCtx.arc(cx, cy, 9, 0, 2 * Math.PI);
+      rouletteCtx.arc(cx, cy, 10, 0, 2 * Math.PI);
       rouletteCtx.fillStyle = '#991b1b';
       rouletteCtx.fill();
       rouletteCtx.strokeStyle = '#fef08a';
-      rouletteCtx.lineWidth = 2;
+      rouletteCtx.lineWidth = 2.5;
       rouletteCtx.stroke();
 
       // Yakut Işıltı Noktası
       rouletteCtx.beginPath();
-      rouletteCtx.arc(cx - 2.5, cy - 2.5, 2.5, 0, 2 * Math.PI);
-      rouletteCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      rouletteCtx.arc(cx - 3, cy - 3, 3, 0, 2 * Math.PI);
+      rouletteCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
       rouletteCtx.fill();
 
-      // 6. 3D Parlak Fildişi Top
+      // 6. 3D Parlak Fildişi Top (Dinamik Yükseklik & Gölge)
       if (ballDist !== null) {
         const bx = cx + ballDist * Math.cos(ballAngle);
         const by = cy + ballDist * Math.sin(ballAngle);
 
-        // Gölge
+        // Dinamik Yükseklik Oranı
+        const isOuter = (ballDist > rPocketsOuter);
+        const ballSize = isOuter ? 7.2 : 6.2;
+        const shadowOffset = isOuter ? 4 : 2.5;
+
+        // Gerçekçi Yumuşak Gölge
         rouletteCtx.beginPath();
-        rouletteCtx.arc(bx + 2.5, by + 3.5, 6, 0, 2 * Math.PI);
-        rouletteCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        rouletteCtx.arc(bx + 2, by + shadowOffset, ballSize, 0, 2 * Math.PI);
+        rouletteCtx.fillStyle = 'rgba(0, 0, 0, 0.55)';
         rouletteCtx.fill();
 
-        // 3D Küre
-        const ballGrad = rouletteCtx.createRadialGradient(bx - 2, by - 2, 0.5, bx, by, 6.5);
+        // 3D Küre Gövdesi
+        const ballGrad = rouletteCtx.createRadialGradient(bx - 2, by - 2, 0.5, bx, by, ballSize + 1);
         ballGrad.addColorStop(0, '#ffffff');
-        ballGrad.addColorStop(0.3, '#f9fafb');
-        ballGrad.addColorStop(0.7, '#e5e7eb');
+        ballGrad.addColorStop(0.35, '#f9fafb');
+        ballGrad.addColorStop(0.75, '#e5e7eb');
         ballGrad.addColorStop(1, '#9ca3af');
 
         rouletteCtx.beginPath();
-        rouletteCtx.arc(bx, by, 6, 0, 2 * Math.PI);
+        rouletteCtx.arc(bx, by, ballSize, 0, 2 * Math.PI);
         rouletteCtx.fillStyle = ballGrad;
-        rouletteCtx.shadowColor = 'rgba(255, 255, 255, 0.6)';
-        rouletteCtx.shadowBlur = 4;
+        rouletteCtx.shadowColor = 'rgba(255, 255, 255, 0.7)';
+        rouletteCtx.shadowBlur = 5;
         rouletteCtx.fill();
         rouletteCtx.shadowBlur = 0;
       }
@@ -1106,9 +1060,11 @@
       isPlaying = true;
       broadcast({ type: 'spin_start' });
 
-      // Çuhadaki eski kazanan belirteçlerini temizle
-      document.querySelectorAll('.chip-item').forEach(el => el.classList.remove('chip-winning'));
-      document.querySelectorAll('.dolly-marker-container').forEach(el => el.classList.add('hidden'));
+      const stage3D = document.getElementById('roulette3DStage');
+      if (stage3D) {
+        stage3D.classList.remove('roulette-zoom-winner');
+        stage3D.classList.add('roulette-spinning-cam');
+      }
 
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
       if (targetIndex === -1 && names.length > 0) targetIndex = Math.floor(Math.random() * names.length);
@@ -1116,9 +1072,9 @@
 
       const N = names.length, arc = (2 * Math.PI) / N;
       const R = rouletteRadius - 6;
-      const rMahoganyInner = R - 14;
-      const rPocketsOuter = R - 32;
-      const rPocketsInner = R * 0.46;
+      const rMahoganyInner = R - 16;
+      const rPocketsOuter = R - 36;
+      const rPocketsInner = R * 0.44;
       const rPocketCenter = (rPocketsOuter + rPocketsInner) / 2;
 
       const duration = 5600, startTime = performance.now();
@@ -1198,16 +1154,13 @@
           playIvoryBallClick(650, 0.22);
           playDollySound();
 
-          // Çuhada Kazanan Fişi Aydınlat ve Dolly İndir
+          if (stage3D) {
+            stage3D.classList.remove('roulette-spinning-cam');
+            stage3D.classList.add('roulette-zoom-winner');
+          }
+
           const isRed = (targetIndex % 2 === 0);
           const winnerName = names[targetIndex];
-          const chipEl = document.getElementById('rouletteChip_' + targetIndex);
-          if (chipEl) {
-            chipEl.classList.add('chip-winning');
-            const dolly = chipEl.querySelector('.dolly-marker-container');
-            if (dolly) dolly.classList.remove('hidden');
-            chipEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }
 
           if (statusLabel) {
             statusLabel.textContent = `Kazanan: ${winnerName}! (${isRed ? 'KIRMIZI' : 'SİYAH'} #${targetIndex + 1})`;
@@ -1215,7 +1168,7 @@
 
           setTimeout(() => {
             finishGame(winnerName, targetName !== null, '3D Monte Carlo Ruleti');
-          }, 1200);
+          }, 1400);
         }
       }
       requestAnimationFrame(anim);
@@ -1501,8 +1454,8 @@
       if (activeGameMode === 'cards' && cardsState === 'revealed') {
         renderFullCardsShowcase();
       } else if (activeGameMode === 'roulette') {
-        document.querySelectorAll('.chip-item').forEach(el => el.classList.remove('chip-winning'));
-        document.querySelectorAll('.dolly-marker-container').forEach(el => el.classList.add('hidden'));
+        const stage3D = document.getElementById('roulette3DStage');
+        if (stage3D) stage3D.classList.remove('roulette-spinning-cam', 'roulette-zoom-winner');
         const statusLabel = document.getElementById('rouletteCurrentNumber');
         if (statusLabel) statusLabel.textContent = 'Krupiye: "Faites vos jeux! (Bahisler açık)"';
       }
@@ -1515,7 +1468,7 @@
         updateRoundUI();
         if (activeGameMode === 'wheel') drawWheel();
         else if (activeGameMode === 'cards') renderFullCardsShowcase();
-        else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteFeltBoard(); }
+        else if (activeGameMode === 'roulette') drawRoulette();
         broadcast({ type: 'sync_names', names: names });
       }
       closeModal();
@@ -1531,8 +1484,6 @@
     document.getElementById('slotSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('slotLeverControl').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('rouletteSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
-    const rTableBtn = document.getElementById('rouletteTableSpinBtn');
-    if (rTableBtn) rTableBtn.addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('cardsShuffleBtn').addEventListener('click', shuffleCardsDeck);
     document.getElementById('cardsPickRandomBtn').addEventListener('click', pickRandomCard);
 
@@ -1625,7 +1576,7 @@
               updateRoundUI();
               if (activeGameMode === 'wheel') drawWheel();
               else if (activeGameMode === 'cards') renderFullCardsShowcase();
-              else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteFeltBoard(); }
+              else if (activeGameMode === 'roulette') drawRoulette();
             }
           } else if (data.type === 'spin') {
             closeModal();
@@ -1652,7 +1603,7 @@
             updateRoundUI();
             if (activeGameMode === 'wheel') drawWheel();
             else if (activeGameMode === 'cards') renderFullCardsShowcase();
-            else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteFeltBoard(); }
+            else if (activeGameMode === 'roulette') drawRoulette();
           }
         });
 
