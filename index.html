@@ -433,7 +433,7 @@
     </div>
 
     <!-- 3. 3D RULET (TAM YUKARIDAN BAKIŞ & MONTE CARLO RULET MASASI) -->
-    <div id="gameRouletteView" class="game-view hidden flex flex-col items-center justify-center w-full max-w-4xl px-4 perspective-stage">
+    <div id="gameRouletteView" class="game-view hidden flex flex-col items-center justify-center w-full max-w-5xl px-2 md:px-4 perspective-stage">
       
       <!-- Tam Yukarıdan 3D Rulet Çanağı & Kasa Yapısı -->
       <div id="roulette3DStage" class="roulette-stage-3d relative flex items-center justify-center transition-all duration-700 ease-out">
@@ -452,7 +452,7 @@
       </div>
 
       <!-- MONTE CARLO CASINO RULET MASASI (BAHİS IZGARASI & İSİMLER) -->
-      <div id="rouletteFeltTable" class="w-full max-w-3xl mt-5 p-3.5 md:p-4 rounded-2xl bg-gradient-to-b from-[#0a351b] via-[#062412] to-[#041a0d] border-2 border-amber-500/70 shadow-[0_15px_40px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.2)]">
+      <div id="rouletteFeltTable" class="w-full max-w-4xl mt-4 p-3.5 md:p-4 rounded-2xl bg-gradient-to-b from-[#0a351b] via-[#062412] to-[#041a0d] border-2 border-amber-500/70 shadow-[0_15px_40px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.2)]">
         
         <div class="flex items-center justify-between border-b border-amber-500/30 pb-2 mb-2.5">
           <div class="flex items-center gap-2">
@@ -857,7 +857,8 @@
     const casinoPalette = ['#8f1d1d', '#18201d', '#155234', '#18201d', '#b3822a', '#18201d'];
 
     function resizeWheelCanvas() {
-      const size = Math.min(window.innerWidth * 0.85, window.innerHeight * 0.65, 500);
+      // Çark ekranı daha çok kaplasın (Akıllı tahta ve tabletlerde 760px'e kadar lüks dev boyut)
+      const size = Math.min(window.innerWidth * 0.95, window.innerHeight * 0.84, 760);
       const dpr = window.devicePixelRatio || 1;
       wheelCanvas.width = size * dpr;
       wheelCanvas.height = size * dpr;
@@ -1133,8 +1134,13 @@
       const finalRotation = startRotation + totalDelta;
 
       // Kazanan ile Yem artık yan yana olduğundan, sahte hedefin duraklama açısı tam olarak finalRotation - arc'tır!
-      const fakeStopRotation = finalRotation - arc;
-      const fakeStopRatio = Math.max(0.85, (fakeStopRotation - startRotation) / totalDelta);
+      // Sahte dilim ile hedef arasındaki pim çentiği açısı: finalRotation - 0.5 * arc
+      const pegRatio = (totalDelta - 0.5 * arc) / totalDelta;
+      const pStart = 0.72;
+      const pEnd = 0.91;
+      const lingerStartVal = pegRatio - (0.28 * arc) / totalDelta;
+      const lingerEndVal = pegRatio + (0.04 * arc) / totalDelta;
+      let hasOvercomePeg = false;
 
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
@@ -1155,21 +1161,55 @@
         lastFrameTime = now;
         if (dt > 0.05) dt = 0.016;
 
-        // %100 GERÇEK FİZİKSEL SÖNÜM (MONOTONİK AZALAN HIZ - ASLA GERİYE VE İLERİYE SIÇRAMA YOK)
-        const pExp = isHighDopamine ? (4.0 + (dopamineLevel / 100) * 1.4) : 4.0;
-        const easeP = 1 - Math.pow(1 - progress, pExp);
+        // %100 GERÇEK FİZİKSEL SÖNÜM & ÇARKIFELEK GERİLİM PLATOSU (HESITATION ON FAKE PEG)
+        // Sahte hedef çentiğinde gerilimi tırmandıran duraksama, ardından pimi aşıp hedefe oturma
+        let easeP;
+        let currentSpeed;
 
-        // Çark rotasyonunu güncelle (Kesintisiz, sürekli ve analitik)
+        if (isHighDopamine) {
+          if (progress < pStart) {
+            const pn = progress / pStart;
+            const shape = 1 - Math.pow(1 - pn, 3.0);
+            easeP = lingerStartVal * shape;
+            currentSpeed = (lingerStartVal * totalDelta / (pStart * (duration / 1000))) * 3.0 * Math.pow(1 - pn, 2.0);
+          } else if (progress < pEnd) {
+            // ÇENTİKTE GERİLİM PLATOSU: Çark yem dilimi ve pim çentiğinde aşırı yavaşlar (~1.2-1.5 sn)
+            const ps = (progress - pStart) / (pEnd - pStart);
+            const creep = 0.5 - 0.5 * Math.cos(ps * Math.PI);
+            easeP = lingerStartVal + (lingerEndVal - lingerStartVal) * creep;
+            const plateauSpanSec = (pEnd - pStart) * (duration / 1000);
+            currentSpeed = ((lingerEndVal - lingerStartVal) * totalDelta / plateauSpanSec) * (Math.PI / 2) * Math.sin(ps * Math.PI);
+          } else {
+            // PİMİ AŞMA VE KAZANANIN MERKEZİNE YERLEŞME
+            if (!hasOvercomePeg) {
+              hasOvercomePeg = true;
+              playTick(820);
+              flapperSpringVel = 140; // Pimi aşınca ibreye fırlama ivmesi
+            }
+            const ps = (progress - pEnd) / (1 - pEnd);
+            const shape = 1 - Math.pow(1 - ps, 2.4);
+            easeP = lingerEndVal + (1.0 - lingerEndVal) * shape;
+            const exitSpanSec = (1 - pEnd) * (duration / 1000);
+            currentSpeed = ((1.0 - lingerEndVal) * totalDelta / exitSpanSec) * 2.4 * Math.pow(Math.max(0, 1 - ps), 1.4);
+          }
+        } else {
+          const pExp = 4.0;
+          easeP = 1 - Math.pow(1 - progress, pExp);
+          currentSpeed = (totalDelta / duration) * (pExp * Math.pow(Math.max(0, 1 - progress), pExp - 1));
+        }
+
+        // Çark rotasyonunu güncelle (Monotonik artan, kesintisiz analitik rota)
         wheelRotation = startRotation + totalDelta * easeP;
 
-        // Anlık açısal hız (motion sheen için)
-        const currentSpeed = (totalDelta / duration) * (pExp * Math.pow(Math.max(0, 1 - progress), pExp - 1));
-
-        // Tırnak (Pointer Flapper) Fiziksel Temas, Salınım ve Stoper Dinamiği (DeepSeek Çözümü)
+        // Tırnak (Pointer Flapper) Fiziksel Temas, Salınım ve Stoper Dinamiği
         const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
         const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
 
-        if (phaseInSlice < 0.26) {
+        if (isHighDopamine && progress >= pStart && progress < pEnd) {
+          // Çentik gerilim titremesi: İbre tam pime yaslanmış bükük vaziyette gerilimle titrer
+          flapperDeflection = -16.5 - Math.sin(now * 0.045) * 1.8;
+          flapperSpringVel = 0;
+        } else if (phaseInSlice < 0.26) {
           const pushFraction = phaseInSlice / 0.26;
           flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
           if (curIdx !== lastPegIdx) {
@@ -1502,7 +1542,8 @@
     let rouletteWinningIndex = null;
 
     function resizeRouletteCanvas() {
-      const size = Math.min(window.innerWidth * 0.88, window.innerHeight * 0.65, 520);
+      // Rulet çanağı ekranı daha çok kaplasın (Akıllı tahta ve geniş ekranlarda 720px'e kadar lüks dev boyut)
+      const size = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.72, 720);
       const dpr = window.devicePixelRatio || 1;
       rouletteCanvas.width = size * dpr;
       rouletteCanvas.height = size * dpr;
