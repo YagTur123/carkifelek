@@ -1,13 +1,13 @@
-# 🎡 Sınıf Şans Çarkı & Uzaktan Kumanda
+# Sınıf Çarkı ve Uzaktan Kumanda
 
-PeerJS (WebRTC) ve Tailwind CSS ile geliştirilmiş, sunucusuz, eş zamanlı çalışan çarkıfelek ve gizli kumanda sistemi.
+PeerJS (WebRTC) ve Tailwind CSS ile geliştirilmiş, sunucusuz çalışan çarkıfelek ve kumanda sistemi.
 
-## 🚀 Canlı Bağlantılar (GitHub Pages)
-- **Akıllı Tahta / Ekran**: `https://yagtur123.github.io/carkifelek/index.html`
-- **Gizli Kumanda Paneli**: `https://yagtur123.github.io/carkifelek/control.html`
+## Bağlantılar
+- Ekran / Tahta: https://yagtur123.github.io/carkifelek/index.html
+- Kumanda Paneli: https://yagtur123.github.io/carkifelek/control.html
 
-## 🛠️ Özellikler
-- **WebRTC Canlı Bağlantı**: Sunucusuz, eşler arası doğrudan iletişim.
-- **Gizli Hedef Seçimi**: Kumandadan seçilen hedef fark ettirmeden dilim içinde doğal bir açıda durur.
-- **Gerçekçi Sürtünme Fiziği**: Quintic ease-out eğrisi ve Web Audio API ile çıt-çıt sesi.
-- **Sınıf Listesi Yönetimi**: Toplu kopyala/yapıştır ve yerel hafıza desteği.
+## Özellikler
+- WebRTC üzerinden doğrudan tarayıcılar arası canlı iletişim.
+- Gizli hedef seçimi ve doğal duruş açısı algoritması.
+- Sürtünme fiziği ve Web Audio ses efekti.
+- Sınıf listesi yönetimi ve yerel hafıza kaydı.

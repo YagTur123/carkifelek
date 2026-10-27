@@ -3,48 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Çark Kumandası (Gizli Panel)</title>
-  <!-- Tailwind CSS -->
+  <title>Çark Kumandası</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- PeerJS -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
-    /* Dokunmatik seçim engelleme ve pürüzsüz kaydırma */
     * { -webkit-tap-highlight-color: transparent; }
-    .custom-scroll::-webkit-scrollbar { width: 5px; }
-    .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .custom-scroll::-webkit-scrollbar { width: 4px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #09090b; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none pb-6">
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col font-sans select-none pb-6 antialiased">
 
   <!-- Üst Bar: Bağlantı & Durum -->
-  <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-30 shadow-lg">
-    <div class="max-w-xl mx-auto flex flex-col gap-3">
+  <header class="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-30">
+    <div class="max-w-md mx-auto flex flex-col gap-3">
       <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-xl">🎮</span>
-          <h1 class="font-bold text-base tracking-tight text-white">Çark Uzaktan Kumandası</h1>
-        </div>
-        <div id="connBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-950/80 border border-rose-800/60 text-rose-300">
-          <span id="connDot" class="w-2 h-2 rounded-full bg-rose-500"></span>
+        <h1 class="font-semibold text-sm text-white">Çark Kumandası</h1>
+        <div id="connBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
+          <span id="connDot" class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
           <span id="connStatusText">Bağlantı Yok</span>
         </div>
       </div>
 
       <!-- Bağlantı Kodu Giriş Alanı -->
       <div class="flex gap-2">
-        <div class="relative flex-1">
-          <input 
-            type="text" 
-            id="roomIdInput" 
-            placeholder="Oda Kodu (örn: cark-4921)" 
-            class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
-          />
-        </div>
+        <input 
+          type="text" 
+          id="roomIdInput" 
+          placeholder="Oda Kodu (örn: cark-4921)" 
+          class="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500 font-mono"
+        />
         <button 
           id="connectBtn" 
-          class="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl text-sm transition shadow-md flex items-center justify-center min-w-[90px]">
+          class="bg-zinc-100 hover:bg-white text-zinc-900 font-semibold px-4 py-2 rounded-lg text-xs transition">
           Bağlan
         </button>
       </div>
@@ -52,109 +44,89 @@
   </header>
 
   <!-- Ana İçerik -->
-  <main class="max-w-xl w-full mx-auto p-4 flex-1 flex flex-col gap-5">
+  <main class="max-w-md w-full mx-auto p-4 flex-1 flex flex-col gap-4">
 
-    <!-- 1. HİLE VE TETİKLEME KONTROL MERKEZİ (Sticky Eylem Kartı) -->
-    <section class="bg-gradient-to-b from-slate-900 to-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
-      <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
-        <div class="flex flex-col">
-          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Aktif Hedef Kurban</span>
-          <div class="flex items-center gap-2 mt-0.5">
-            <span id="targetStatusText" class="text-lg font-black text-emerald-400 flex items-center gap-1.5">
-              <span>🎲</span> Tamamen Rastgele
-            </span>
+    <!-- 1. Hedef ve Çevirme Paneli -->
+    <section class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col gap-3">
+      <div class="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+        <div>
+          <span class="text-xs text-zinc-400">Hedef Öğrenci</span>
+          <div id="targetStatusText" class="text-sm font-semibold text-zinc-200 mt-0.5">
+            Rastgele (Hedef Yok)
           </div>
         </div>
         <button 
           id="resetTargetBtn" 
-          class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 active:scale-95 text-xs text-slate-300 transition flex items-center gap-1">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          class="px-2.5 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs text-zinc-300 transition">
           Sıfırla
         </button>
       </div>
 
-      <!-- BÜYÜK ÇEVİR BUTONU -->
+      <!-- Çevir Butonu -->
       <button 
         id="triggerSpinBtn" 
         disabled
-        class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-600 active:scale-98 disabled:opacity-40 disabled:pointer-events-none text-white font-extrabold text-base md:text-lg shadow-xl shadow-emerald-900/30 flex items-center justify-center gap-2 transition duration-200">
-        <span class="text-xl">🎰</span>
-        <span id="triggerBtnText">ÇARKI UZAKTAN ÇEVİR</span>
+        class="w-full py-3.5 px-4 rounded-lg bg-zinc-100 hover:bg-white active:scale-98 disabled:opacity-30 disabled:pointer-events-none text-zinc-900 font-bold text-sm transition">
+        <span id="triggerBtnText">Çarkı Çevir</span>
       </button>
-
-      <p class="text-[11px] text-center text-slate-500">
-        Butona bastığınızda hedef belirlenmişse çark <span class="text-amber-400 font-semibold">fark ettirmeden</span> hedefe oturur.
-      </p>
     </section>
 
-    <!-- 2. HEDEF SEÇİMİ (ÖĞRENCİ GRID) -->
+    <!-- 2. Öğrenci Listesi Grid -->
     <section class="flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <h2 class="text-sm font-bold text-slate-300">Öğrenci Listesi</h2>
-          <span id="studentCountBadge" class="text-xs bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-slate-400">0</span>
+          <h2 class="text-xs font-semibold text-zinc-400">Öğrenciler</h2>
+          <span id="studentCountBadge" class="text-[11px] bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-zinc-400">0</span>
         </div>
-        <div class="flex items-center gap-2">
-          <button 
-            id="toggleListEditorBtn" 
-            class="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-            Listeyi Düzenle
-          </button>
-        </div>
+        <button 
+          id="toggleListEditorBtn" 
+          class="text-xs text-zinc-300 hover:text-white font-medium underline underline-offset-4">
+          Listeyi Düzenle
+        </button>
       </div>
 
-      <!-- Hızlı Filtre Arama -->
-      <div class="relative">
-        <input 
-          type="text" 
-          id="searchInput" 
-          placeholder="İsim ara..." 
-          class="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-        />
-        <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-      </div>
+      <!-- Arama -->
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="İsim ara..." 
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+      />
 
-      <!-- Öğrenci Butonları Grid -->
-      <div id="studentsGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[380px] overflow-y-auto custom-scroll pr-1">
-        <!-- JS ile doldurulacak -->
+      <!-- Grid -->
+      <div id="studentsGrid" class="grid grid-cols-2 gap-2 max-h-[380px] overflow-y-auto custom-scroll pr-1">
       </div>
     </section>
 
-    <!-- 3. LİSTE DÜZENLEYİCİ (MODAL/PANEL) -->
-    <div id="listEditorPanel" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-md w-full shadow-2xl flex flex-col gap-4">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 class="font-bold text-white text-sm">Sınıf Listesini Düzenle</h3>
-          <button id="closeEditorBtn" class="text-slate-400 hover:text-white p-1">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+    <!-- 3. Liste Düzenleme Modalı -->
+    <div id="listEditorPanel" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 max-w-sm w-full flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+          <h3 class="font-semibold text-white text-xs">Sınıf Listesi</h3>
+          <button id="closeEditorBtn" class="text-zinc-400 hover:text-white text-xs">Kapat</button>
         </div>
-        <p class="text-xs text-slate-400">
-          Her satıra bir isim gelecek şekilde sınıf listenizi yapıştırın:
-        </p>
         <textarea 
           id="namesTextarea" 
           rows="8" 
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 custom-scroll resize-none"
-          placeholder="Ahmet&#10;Ayşe&#10;Mehmet..."></textarea>
+          class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-white font-sans focus:outline-none focus:border-zinc-500 custom-scroll resize-none"
+          placeholder="Her satıra bir isim yazın"></textarea>
         
-        <div class="flex items-center justify-between gap-2 pt-2">
+        <div class="flex items-center justify-between gap-2 pt-1">
           <button 
             id="loadDefaultBtn" 
-            class="px-3 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs transition">
+            class="px-2.5 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white text-xs transition">
             Örnek Liste
           </button>
           <div class="flex gap-2">
             <button 
               id="cancelEditorBtn" 
-              class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition">
+              class="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700 transition">
               İptal
             </button>
             <button 
               id="saveAndSyncBtn" 
-              class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow">
-              Kaydet ve Tahtaya Gönder
+              class="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-900 text-xs font-semibold transition">
+              Kaydet
             </button>
           </div>
         </div>
@@ -163,13 +135,12 @@
 
   </main>
 
-  <!-- Bildirim Kutusu (Toast) -->
-  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-white text-xs px-4 py-2 rounded-xl shadow-2xl opacity-0 pointer-events-none transition-all duration-200 z-50">
-    İşlem başarılı
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs px-3.5 py-1.5 rounded-md shadow-md opacity-0 pointer-events-none transition-opacity duration-200 z-50">
+    İşlem tamam
   </div>
 
   <script>
-    // --- Varsayılan İsimler & Durum ---
     const DEFAULT_NAMES = [
       "Ahmet", "Ayşe", "Mehmet", "Fatma", "Ali",
       "Zeynep", "Mustafa", "Elif", "Emre", "Burak",
@@ -177,21 +148,16 @@
     ];
 
     let names = [];
-    let selectedTarget = null; // null ise Rastgele
+    let selectedTarget = null;
     let isConnected = false;
     let isWheelSpinning = false;
     let peer = null;
     let conn = null;
 
-    // Yerel Hafızadan Yükle
     function loadNames() {
       const stored = localStorage.getItem('cark_names');
       if (stored) {
-        try {
-          names = JSON.parse(stored);
-        } catch (e) {
-          names = [...DEFAULT_NAMES];
-        }
+        try { names = JSON.parse(stored); } catch (e) { names = [...DEFAULT_NAMES]; }
       } else {
         names = [...DEFAULT_NAMES];
       }
@@ -201,7 +167,6 @@
       localStorage.setItem('cark_names', JSON.stringify(names));
     }
 
-    // Arayüzü Güncelle
     function renderGrid(filter = '') {
       const grid = document.getElementById('studentsGrid');
       grid.innerHTML = '';
@@ -210,7 +175,7 @@
       document.getElementById('studentCountBadge').textContent = names.length;
 
       if (filtered.length === 0) {
-        grid.innerHTML = `<div class="col-span-2 sm:col-span-3 text-center py-6 text-xs text-slate-500">Öğrenci bulunamadı.</div>`;
+        grid.innerHTML = `<div class="col-span-2 text-center py-6 text-xs text-zinc-500">Öğrenci bulunamadı.</div>`;
         return;
       }
 
@@ -218,28 +183,22 @@
         const isSelected = selectedTarget === name;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `p-3 rounded-xl border text-left flex items-center justify-between transition-all duration-150 active:scale-95 ${
+        btn.className = `p-2.5 rounded-lg border text-left flex items-center justify-between transition text-xs ${
           isSelected 
-            ? 'bg-rose-950/70 border-rose-500 text-white shadow-lg shadow-rose-950/40 ring-2 ring-rose-500/50' 
-            : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white'
+            ? 'bg-zinc-100 text-zinc-900 border-white font-bold' 
+            : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
         }`;
 
         btn.innerHTML = `
-          <span class="font-medium text-xs truncate max-w-[120px]">${name}</span>
-          ${isSelected ? '<span class="text-xs text-rose-400 font-black animate-pulse">🎯 HEDEF</span>' : '<span class="text-[10px] text-slate-600">Seç</span>'}
+          <span class="truncate max-w-[130px]">${name}</span>
+          ${isSelected ? '<span class="text-[10px] uppercase font-bold tracking-wider">Hedef</span>' : ''}
         `;
 
         btn.addEventListener('click', () => {
           vibrate();
-          if (selectedTarget === name) {
-            // İkinci tıklamada hedefi kaldır
-            selectedTarget = null;
-          } else {
-            selectedTarget = name;
-          }
+          selectedTarget = (selectedTarget === name) ? null : name;
           updateTargetUI();
           renderGrid(document.getElementById('searchInput').value);
-          // Tahtaya hedef bilgisini ilet
           if (conn && conn.open) {
             conn.send({ type: 'set_target', target: selectedTarget });
           }
@@ -252,21 +211,18 @@
     function updateTargetUI() {
       const targetText = document.getElementById('targetStatusText');
       if (selectedTarget) {
-        targetText.className = 'text-lg font-black text-rose-400 flex items-center gap-1.5 animate-pulse';
-        targetText.innerHTML = `<span>🎯</span> ${selectedTarget}`;
+        targetText.className = 'text-sm font-bold text-amber-400';
+        targetText.textContent = selectedTarget;
       } else {
-        targetText.className = 'text-lg font-black text-emerald-400 flex items-center gap-1.5';
-        targetText.innerHTML = `<span>🎲</span> Tamamen Rastgele`;
+        targetText.className = 'text-sm font-semibold text-zinc-200';
+        targetText.textContent = 'Rastgele (Hedef Yok)';
       }
     }
 
     function vibrate() {
-      if (navigator.vibrate) {
-        navigator.vibrate(25);
-      }
+      if (navigator.vibrate) navigator.vibrate(20);
     }
 
-    // --- PeerJS WebRTC Bağlantı Mantığı ---
     function initConnection() {
       const targetRoom = document.getElementById('roomIdInput').value.trim();
       if (!targetRoom) {
@@ -275,26 +231,23 @@
       }
 
       localStorage.setItem('cark_last_room', targetRoom);
-
       setConnectionStatus('connecting', 'Bağlanıyor...');
 
       if (peer) {
         try { peer.destroy(); } catch (e) {}
       }
 
-      // Kumanda için rastgele istemci Peer oluştur
       peer = new Peer();
 
-      peer.on('open', (id) => {
+      peer.on('open', () => {
         conn = peer.connect(targetRoom, { reliable: true });
 
         conn.on('open', () => {
           isConnected = true;
           setConnectionStatus('connected', 'Bağlandı');
-          showToast('Tahtaya başarıyla bağlandı!');
+          showToast('Bağlantı kuruldu');
           document.getElementById('triggerSpinBtn').disabled = false;
 
-          // Mevcut listeyi tahtaya senkronize et
           conn.send({
             type: 'sync_names',
             names: names
@@ -311,14 +264,12 @@
           document.getElementById('triggerSpinBtn').disabled = true;
         });
 
-        conn.on('error', (err) => {
-          console.error('Conn error:', err);
+        conn.on('error', () => {
           setConnectionStatus('disconnected', 'Hata Oluştu');
         });
       });
 
-      peer.on('error', (err) => {
-        console.error('Peer error:', err);
+      peer.on('error', () => {
         setConnectionStatus('disconnected', 'Oda Bulunamadı');
       });
     }
@@ -331,14 +282,14 @@
       statusText.textContent = text;
 
       if (status === 'connected') {
-        badge.className = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950/80 border border-emerald-800/60 text-emerald-300';
-        dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-950/60 border border-emerald-800 text-emerald-300';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
       } else if (status === 'connecting') {
-        badge.className = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-950/80 border border-amber-800/60 text-amber-300';
-        dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-ping';
+        badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-950/60 border border-amber-800 text-amber-300';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400';
       } else {
-        badge.className = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-950/80 border border-rose-800/60 text-rose-300';
-        dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-zinc-500';
       }
     }
 
@@ -346,16 +297,12 @@
       if (!data || !data.type) return;
 
       if (data.type === 'init') {
-        if (data.names && data.names.length) {
-          // Tahtanın başlangıç isimleri varsa al (eğer bizde henüz liste yoksa)
-        }
         setSpinningState(data.isSpinning);
       } else if (data.type === 'spin_start') {
         setSpinningState(true);
       } else if (data.type === 'spin_end') {
         setSpinningState(false);
-        showToast('🏆 Kazanan: ' + data.winner);
-        // İsteğe bağlı: Hedef vurulduktan sonra hedefi sıfırla
+        showToast('Kazanan: ' + data.winner);
         selectedTarget = null;
         updateTargetUI();
         renderGrid(document.getElementById('searchInput').value);
@@ -369,25 +316,23 @@
 
       if (spinning) {
         btn.disabled = true;
-        text.textContent = 'ÇARK DÖNÜYOR...';
+        text.textContent = 'Dönüyor...';
       } else {
         btn.disabled = !isConnected;
-        text.textContent = 'ÇARKI UZAKTAN ÇEVİR';
+        text.textContent = 'Çarkı Çevir';
       }
     }
 
-    // Çarkı Tetikle
     document.getElementById('triggerSpinBtn').addEventListener('click', () => {
       if (!isConnected || !conn || !conn.open || isWheelSpinning) return;
       vibrate();
       conn.send({
         type: 'spin',
-        target: selectedTarget // null ise rastgele, isim ise hedef
+        target: selectedTarget
       });
-      showToast(selectedTarget ? `🎯 Hedef ile tetiklendi: ${selectedTarget}` : '🎲 Rastgele tetiklendi');
+      showToast(selectedTarget ? `Hedef ile tetiklendi: ${selectedTarget}` : 'Rastgele tetiklendi');
     });
 
-    // Hedefi Sıfırla
     document.getElementById('resetTargetBtn').addEventListener('click', () => {
       vibrate();
       selectedTarget = null;
@@ -396,21 +341,18 @@
       if (conn && conn.open) {
         conn.send({ type: 'set_target', target: null });
       }
-      showToast('Hedef sıfırlandı: Rastgele');
+      showToast('Hedef sıfırlandı');
     });
 
-    // Arama Filtresi
     document.getElementById('searchInput').addEventListener('input', (e) => {
       renderGrid(e.target.value);
     });
 
-    // Bağlan Butonu
     document.getElementById('connectBtn').addEventListener('click', initConnection);
     document.getElementById('roomIdInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') initConnection();
     });
 
-    // --- Liste Düzenleyici ---
     const listPanel = document.getElementById('listEditorPanel');
     const textarea = document.getElementById('namesTextarea');
 
@@ -437,7 +379,7 @@
         .filter(n => n.length > 0);
 
       if (parsed.length === 0) {
-        showToast('En az 1 isim girmelisiniz!');
+        showToast('En az 1 isim girmelisiniz');
         return;
       }
 
@@ -446,13 +388,12 @@
       renderGrid(document.getElementById('searchInput').value);
       closeEditor();
 
-      // Tahtaya senkronize et
       if (conn && conn.open) {
         conn.send({
           type: 'sync_names',
           names: names
         });
-        showToast('Liste tahtaya gönderildi (' + names.length + ' kişi)');
+        showToast('Liste güncellendi (' + names.length + ' kişi)');
       } else {
         showToast('Liste kaydedildi (' + names.length + ' kişi)');
       }
@@ -464,21 +405,18 @@
       toast.classList.remove('opacity-0');
       setTimeout(() => {
         toast.classList.add('opacity-0');
-      }, 2400);
+      }, 2000);
     }
 
-    // Sayfa Yüklendiğinde
     window.addEventListener('DOMContentLoaded', () => {
       loadNames();
       renderGrid();
       updateTargetUI();
 
-      // URL parametresi kontrolü (?room=cark-1234)
       const urlParams = new URLSearchParams(window.location.search);
       const roomParam = urlParams.get('room') || localStorage.getItem('cark_last_room');
       if (roomParam) {
         document.getElementById('roomIdInput').value = roomParam;
-        // Eğer URL'den doğrudan geldiyse otomatik bağlanmayı dene
         if (urlParams.get('room')) {
           setTimeout(initConnection, 300);
         }
