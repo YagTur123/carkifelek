@@ -395,10 +395,17 @@
       }
     }
 
+    // Türkçe karakterleri tam uyumlu normalizasyon (I-ı, İ-i, Ç-ç, Ş-ş, Ğ-ğ, Ü-ü, Ö-ö)
+    function trNormalize(str) {
+      if (!str) return '';
+      return str.toString().trim().toLocaleLowerCase('tr-TR');
+    }
+
     function renderGrid(filter = '') {
       const grid = document.getElementById('studentsGrid');
       grid.innerHTML = '';
-      const filtered = names.filter(n => n.toLowerCase().includes(filter.toLowerCase()));
+      const normFilter = trNormalize(filter);
+      const filtered = names.filter(n => trNormalize(n).includes(normFilter));
       document.getElementById('tabStudentCount').textContent = names.length;
 
       if (!filtered.length) {
@@ -537,16 +544,16 @@
           if (data.type === 'init') {
             if (data.history) history = data.history;
             if (data.names && data.names.length) names = data.names;
-            if (selectedTarget && !names.includes(selectedTarget)) selectedTarget = null;
-            if (selectedFakeTarget && !names.includes(selectedFakeTarget)) selectedFakeTarget = null;
+            if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
+            if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
             updateTargetUI();
             if (data.gameMode) changeGameMode(data.gameMode);
             saveStorage(); renderGrid(); renderHistoryUI(); setSpinningState(data.isSpinning);
           } else if (data.type === 'sync_names') {
             if (data.names && data.names.length) {
               names = data.names;
-              if (selectedTarget && !names.includes(selectedTarget)) selectedTarget = null;
-              if (selectedFakeTarget && !names.includes(selectedFakeTarget)) selectedFakeTarget = null;
+              if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
+              if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
               updateTargetUI();
               saveStorage();
               renderGrid(document.getElementById('searchInput').value);
@@ -575,17 +582,48 @@
           }
         });
 
+        let reconnectTimer = null;
+        function tryReconnect() {
+          if (isConnected) return;
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          const lastRoom = localStorage.getItem('cark_last_room');
+          if (lastRoom) {
+            setConnectionStatus('connecting', 'Yeniden bağlanılıyor...');
+            reconnectTimer = setTimeout(() => {
+              if (!isConnected) initConnection();
+            }, 3500);
+          }
+        }
+
         conn.on('close', () => {
           isConnected = false;
-          setConnectionStatus('disconnected', 'Bağlantı Kesildi');
+          setConnectionStatus('disconnected', 'Bağlantı Kesildi (Yeniden deneniyor...)');
           document.getElementById('triggerSpinBtn').disabled = true;
+          tryReconnect();
         });
 
-        conn.on('error', () => setConnectionStatus('disconnected', 'Hata'));
+        conn.on('error', () => {
+          isConnected = false;
+          setConnectionStatus('disconnected', 'Bağlantı Hatası');
+          document.getElementById('triggerSpinBtn').disabled = true;
+          tryReconnect();
+        });
       });
 
-      peer.on('error', () => setConnectionStatus('disconnected', 'Bulunamadı'));
+      peer.on('error', () => {
+        setConnectionStatus('disconnected', 'Masa Bulunamadı');
+      });
     }
+
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !isConnected) {
+        const lastRoom = localStorage.getItem('cark_last_room');
+        if (lastRoom) {
+          document.getElementById('roomIdInput').value = lastRoom;
+          initConnection();
+        }
+      }
+    });
 
     function setConnectionStatus(status, text) {
       const badge = document.getElementById('connBadge');
@@ -630,9 +668,9 @@
 
     function removeStudent(studentName) {
       if (!studentName) return;
-      names = names.filter(n => n !== studentName);
-      if (selectedTarget === studentName) selectedTarget = null;
-      if (selectedFakeTarget === studentName) selectedFakeTarget = null;
+      names = names.filter(n => trNormalize(n) !== trNormalize(studentName));
+      if (selectedTarget && trNormalize(selectedTarget) === trNormalize(studentName)) selectedTarget = null;
+      if (selectedFakeTarget && trNormalize(selectedFakeTarget) === trNormalize(studentName)) selectedFakeTarget = null;
       updateTargetUI();
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);

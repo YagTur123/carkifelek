@@ -246,6 +246,10 @@
         <svg id="soundOnIcon" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
         <svg id="soundOffIcon" class="w-4 h-4 hidden text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
       </button>
+      <button id="fullscreenToggleBtn" title="Tam Ekran (Akıllı Tahta)" class="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-amber-300 transition flex items-center justify-center">
+        <svg id="enterFullscreenIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+        <svg id="exitFullscreenIcon" class="w-4 h-4 hidden text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v4m0 0H5m4 0L4 2m11 1v4m0 0h4m-4 0l5-5M9 21v-4m0 0H5m4 0l-5 5m11-1v-4m0 0h4m-4 0l5 5"/></svg>
+      </button>
     </div>
   </header>
 
@@ -525,9 +529,16 @@
     let activeGameMode = 'wheel';
     let isPlaying = false;
     let pendingTarget = null;
+    let pendingFakeTarget = null;
     let activeIntervals = [];
     let spinDuration = 6.5; // Varsayılan dönüş süresi (sn)
     let dopamineLevel = 75; // 0 - 100 arası gerilim ve fakeout seviyesi
+
+    // Türkçe karakterleri tam uyumlu normalizasyon (I-ı, İ-i, Ç-ç, Ş-ş, Ğ-ğ, Ü-ü, Ö-ö)
+    function trNormalize(str) {
+      if (!str) return '';
+      return str.toString().trim().toLocaleLowerCase('tr-TR');
+    }
 
     // Kart Oyununun Durumu
     let cardsState = 'opened'; // 'opened' | 'gathering' | 'shuffling' | 'closed_ready' | 'revealed'
@@ -820,10 +831,20 @@
     }
 
     function drawWheel() {
-      if (!names.length) return;
+      if (!wheelCanvas) return;
+      wheelCtx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
+      if (!names.length) {
+        wheelCtx.save();
+        wheelCtx.textAlign = 'center';
+        wheelCtx.textBaseline = 'middle';
+        wheelCtx.fillStyle = '#a1a1aa';
+        wheelCtx.font = 'bold 16px sans-serif';
+        wheelCtx.fillText('Katılımcı Bulunamadı', wheelRadius, wheelRadius);
+        wheelCtx.restore();
+        return;
+      }
       const N = names.length, arc = (2 * Math.PI) / N;
       const cx = wheelRadius, cy = wheelRadius, r = wheelRadius - 14;
-      wheelCtx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
 
       // 1. Dilimler & İsimler
       for (let i = 0; i < N; i++) {
@@ -940,13 +961,13 @@
       const N = names.length, arc = (2 * Math.PI) / N;
       const POINTER_ANGLE = 1.5 * Math.PI; // 270 derece (tam tepe ibresi)
 
-      let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
+      let targetIndex = targetName ? names.findIndex(n => trNormalize(n) === trNormalize(targetName)) : -1;
       if (targetIndex === -1) targetIndex = Math.floor(Math.random() * N);
 
       // Sahte Hedef (Yem / Troll / Near-Miss Hedefi)
       let fakeTargetIndex = -1;
       if (fakeTargetName) {
-        fakeTargetIndex = names.findIndex(n => n.trim().toLowerCase() === fakeTargetName.trim().toLowerCase());
+        fakeTargetIndex = names.findIndex(n => trNormalize(n) === trNormalize(fakeTargetName));
       }
       if (fakeTargetIndex === -1 || fakeTargetIndex === targetIndex) {
         fakeTargetIndex = (targetIndex + 1) % N;
@@ -1126,11 +1147,20 @@
       const col1 = document.getElementById('slotReelCol1');
       const col2 = document.getElementById('slotReelCol2');
       const col3 = document.getElementById('slotReelCol3');
-      if (!col1 || !col2 || !col3 || !names.length) return;
+      if (!col1 || !col2 || !col3) return;
 
       const totalEl = document.getElementById('slotTotalPeople');
       if (totalEl) totalEl.textContent = names.length;
       const meter = document.getElementById('slotWinMeter');
+
+      if (!names.length) {
+        if (meter) meter.textContent = 'İSİM YOK';
+        col1.innerHTML = createSlotNameCell('İsim Yok') + createSlotNameCell('İsim Yok') + createSlotNameCell('İsim Yok');
+        col2.innerHTML = createSlotNameCell('İsim Yok') + createSlotNameCell('İsim Yok') + createSlotNameCell('İsim Yok');
+        col3.innerHTML = createSlotNameCell('İsim Yok') + createSlotNameCell('İsim Yok') + createSlotNameCell('İsim Yok');
+        return;
+      }
+
       if (meter) meter.textContent = 'HAZIR';
 
       const N = names.length;
@@ -1173,19 +1203,19 @@
       broadcast({ type: 'spin_start' });
 
       let target = targetName;
-      if (!target || !names.some(n => n.trim().toLowerCase() === target.trim().toLowerCase())) {
+      if (!target || !names.some(n => trNormalize(n) === trNormalize(target))) {
         target = names[Math.floor(Math.random() * names.length)];
       } else {
-        target = names.find(n => n.trim().toLowerCase() === target.trim().toLowerCase());
+        target = names.find(n => trNormalize(n) === trNormalize(target));
       }
       target = target || names[0] || 'Şanslı Kişi';
 
       // Sahte Hedef (Yem / Troll / Near-Miss)
       let fakeTarget = fakeTargetName;
-      if (fakeTarget && names.some(n => n.trim().toLowerCase() === fakeTarget.trim().toLowerCase())) {
-        fakeTarget = names.find(n => n.trim().toLowerCase() === fakeTarget.trim().toLowerCase());
+      if (fakeTarget && names.some(n => trNormalize(n) === trNormalize(fakeTarget))) {
+        fakeTarget = names.find(n => trNormalize(n) === trNormalize(fakeTarget));
       } else {
-        const others = names.filter(n => n.trim().toLowerCase() !== target.trim().toLowerCase());
+        const others = names.filter(n => trNormalize(n) !== trNormalize(target));
         fakeTarget = others.length ? others[0] : target;
       }
 
@@ -1210,7 +1240,7 @@
       else if (chosenPattern === 'center') targetRowPerCol = [1, 1, 1];
 
       // Diğer katılımcıların isim havuzu (kazanan hariç diğer kişiler)
-      const otherNames = names.filter(n => n.trim().toLowerCase() !== target.trim().toLowerCase());
+      const otherNames = names.filter(n => trNormalize(n) !== trNormalize(target));
       const getOtherName = () => {
         if (!otherNames.length) return target;
         return otherNames[Math.floor(Math.random() * otherNames.length)];
@@ -1342,7 +1372,18 @@
     }
 
     function drawRoulette(ballDist = null, ballZ = 0) {
-      if (!names.length) return;
+      if (!rouletteCanvas) return;
+      rouletteCtx.clearRect(0, 0, rouletteRadius * 2, rouletteRadius * 2);
+      if (!names.length) {
+        rouletteCtx.save();
+        rouletteCtx.textAlign = 'center';
+        rouletteCtx.textBaseline = 'middle';
+        rouletteCtx.fillStyle = '#a1a1aa';
+        rouletteCtx.font = 'bold 16px sans-serif';
+        rouletteCtx.fillText('Katılımcı Bulunamadı', rouletteRadius, rouletteRadius);
+        rouletteCtx.restore();
+        return;
+      }
       const N = names.length;
       const arc = (2 * Math.PI) / N;
       const cx = rouletteRadius, cy = rouletteRadius;
@@ -1353,8 +1394,6 @@
       const rPocketsOuter = R - 36;
       const rPocketsInner = R * 0.44;
       const rDeflector = (rMahoganyInner + rPocketsOuter) / 2;
-
-      rouletteCtx.clearRect(0, 0, rouletteRadius * 2, rouletteRadius * 2);
 
       // 1. Maun Ahşap Dış Çanak (Derin Lake Gradient)
       const woodGrad = rouletteCtx.createRadialGradient(cx, cy, rMahoganyInner, cx, cy, rMahoganyOuter);
@@ -1647,7 +1686,7 @@
         stage3D.classList.add('roulette-spinning-cam');
       }
 
-      let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
+      let targetIndex = targetName ? names.findIndex(n => trNormalize(n) === trNormalize(targetName)) : -1;
       if (targetIndex === -1 && names.length > 0) targetIndex = Math.floor(Math.random() * names.length);
       if (targetIndex < 0 || targetIndex >= names.length) targetIndex = 0;
 
@@ -1666,7 +1705,7 @@
       // Sahte Hedef (Yem / Near-Miss kurbanı)
       let fakeTargetIndex = -1;
       if (fakeTargetName) {
-        fakeTargetIndex = names.findIndex(n => n.trim().toLowerCase() === fakeTargetName.trim().toLowerCase());
+        fakeTargetIndex = names.findIndex(n => trNormalize(n) === trNormalize(fakeTargetName));
       }
       if (fakeTargetIndex === -1 || fakeTargetIndex === targetIndex) {
         fakeTargetIndex = (targetIndex + (Math.random() > 0.5 ? 1 : N - 1)) % N;
@@ -1858,6 +1897,13 @@
       grid.innerHTML = '';
       cardMapping = [...names];
       document.getElementById('cardsTotalCount').textContent = names.length;
+      if (!names.length) {
+        document.getElementById('cardsStatusLabel').textContent = 'Katılımcı bulunamadı. Lütfen kumandadan isim ekleyin.';
+        document.getElementById('cardsShuffleBtn').disabled = true;
+        document.getElementById('cardsPickRandomBtn').disabled = true;
+        grid.innerHTML = '<div class="col-span-full py-12 text-center text-zinc-500 text-sm">Katılımcı bulunamadı. Lütfen kumandadan isim ekleyin.</div>';
+        return;
+      }
       document.getElementById('cardsStatusLabel').textContent = 'Tüm isimler açık. Karıştırmak için butona basın veya bir karta dokunun.';
       document.getElementById('cardsShuffleBtn').disabled = false;
       document.getElementById('cardsPickRandomBtn').disabled = false;
@@ -1982,7 +2028,7 @@
       // HİLE KURALI:
       // Eğer bir pendingTarget (gizli hedef) varsa, tıklanan bu kart KESİNLİKLE o hedef olur!
       let winner = pendingTarget;
-      const matched = names.find(n => n.trim().toLowerCase() === (winner || '').trim().toLowerCase());
+      const matched = names.find(n => trNormalize(n) === trNormalize(winner || ''));
       if (matched) {
         winner = matched;
       } else {
@@ -1991,10 +2037,10 @@
 
       // Sahte Hedef (Near-Miss Kurbanı)
       let fakeVictim = pendingFakeTarget;
-      if (fakeVictim && names.some(n => n.trim().toLowerCase() === fakeVictim.trim().toLowerCase())) {
-        fakeVictim = names.find(n => n.trim().toLowerCase() === fakeVictim.trim().toLowerCase());
+      if (fakeVictim && names.some(n => trNormalize(n) === trNormalize(fakeVictim))) {
+        fakeVictim = names.find(n => trNormalize(n) === trNormalize(fakeVictim));
       } else {
-        const othersPool = names.filter(n => n !== winner);
+        const othersPool = names.filter(n => trNormalize(n) !== trNormalize(winner));
         fakeVictim = othersPool.length ? othersPool[0] : null;
       }
 
@@ -2074,6 +2120,10 @@
 
     // --- GENEL TETİKLEME ---
     function triggerGame(target = null, fakeTarget = null) {
+      if (!names.length) {
+        showQrModal(); // Kullanıcıya isim eklemesi için kumanda QR'ını aç
+        return;
+      }
       pendingTarget = target;
       pendingFakeTarget = fakeTarget;
       if (activeGameMode === 'wheel') spinWheel(target, fakeTarget);
@@ -2154,6 +2204,20 @@
         if (sNames) names = JSON.parse(sNames);
         const sHist = localStorage.getItem('cark_history');
         if (sHist) { history = JSON.parse(sHist); round = history.length + 1; }
+        const sSound = localStorage.getItem('cark_sound');
+        if (sSound !== null) {
+          soundEnabled = (sSound === 'true');
+          const soundOn = document.getElementById('soundOnIcon');
+          const soundOff = document.getElementById('soundOffIcon');
+          if (soundOn && soundOff) {
+            soundOn.classList.toggle('hidden', !soundEnabled);
+            soundOff.classList.toggle('hidden', soundEnabled);
+          }
+        }
+        const sMode = localStorage.getItem('cark_game_mode');
+        if (sMode && ['wheel', 'slot', 'roulette', 'cards'].includes(sMode)) {
+          activeGameMode = sMode;
+        }
       } catch (e) {}
       updateRoundUI();
       renderHistoryUI();
@@ -2163,6 +2227,8 @@
       try {
         localStorage.setItem('cark_names', JSON.stringify(names));
         localStorage.setItem('cark_history', JSON.stringify(history));
+        localStorage.setItem('cark_sound', soundEnabled ? 'true' : 'false');
+        localStorage.setItem('cark_game_mode', activeGameMode);
       } catch (e) {}
     }
 
@@ -2243,7 +2309,28 @@
       soundEnabled = !soundEnabled;
       document.getElementById('soundOnIcon').classList.toggle('hidden', !soundEnabled);
       document.getElementById('soundOffIcon').classList.toggle('hidden', soundEnabled);
+      saveStorage();
     });
+
+    const fsBtn = document.getElementById('fullscreenToggleBtn');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      });
+      document.addEventListener('fullscreenchange', () => {
+        const isFs = !!document.fullscreenElement;
+        const enterIcon = document.getElementById('enterFullscreenIcon');
+        const exitIcon = document.getElementById('exitFullscreenIcon');
+        if (enterIcon && exitIcon) {
+          enterIcon.classList.toggle('hidden', isFs);
+          exitIcon.classList.toggle('hidden', !isFs);
+        }
+      });
+    }
 
     // --- PeerJS & MQTT ---
     let peer = null, connections = [], mqttClient = null, heartbeatInterval = null;
@@ -2319,29 +2406,29 @@
               setGameMode(data.mode, false);
             }
             let validTarget = data.target;
-            if (validTarget && !names.some(n => n.trim().toLowerCase() === validTarget.trim().toLowerCase())) {
+            if (validTarget && !names.some(n => trNormalize(n) === trNormalize(validTarget))) {
               validTarget = null;
             }
             let validFakeTarget = data.fakeTarget;
-            if (validFakeTarget && !names.some(n => n.trim().toLowerCase() === validFakeTarget.trim().toLowerCase())) {
+            if (validFakeTarget && !names.some(n => trNormalize(n) === trNormalize(validFakeTarget))) {
               validFakeTarget = null;
             }
             triggerGame(validTarget, validFakeTarget);
           } else if (data.type === 'set_target') {
             let validTarget = data.target;
-            if (validTarget && !names.some(n => n.trim().toLowerCase() === validTarget.trim().toLowerCase())) {
+            if (validTarget && !names.some(n => trNormalize(n) === trNormalize(validTarget))) {
               validTarget = null;
             }
             pendingTarget = validTarget;
             let validFakeTarget = data.fakeTarget;
-            if (validFakeTarget && !names.some(n => n.trim().toLowerCase() === validFakeTarget.trim().toLowerCase())) {
+            if (validFakeTarget && !names.some(n => trNormalize(n) === trNormalize(validFakeTarget))) {
               validFakeTarget = null;
             }
             pendingFakeTarget = validFakeTarget;
           } else if (data.type === 'set_game_mode') {
             setGameMode(data.mode, false);
           } else if (data.type === 'remove_name') {
-            names = names.filter(n => n !== data.name);
+            names = names.filter(n => trNormalize(n) !== trNormalize(data.name));
             if (names.length === 0) names = ["Ahmet", "Ayşe", "Mehmet"];
             saveStorage();
             updateRoundUI();
@@ -2369,7 +2456,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       loadStorage();
-      setGameMode('wheel', false);
+      setGameMode(activeGameMode, false);
       initPeer();
     });
   </script>
