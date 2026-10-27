@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Şans Çarkı</title>
+  <title>Şans Oyunları</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -11,141 +11,183 @@
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     .casino-felt {
-      background-color: #080d0a;
-      background-image: radial-gradient(#102317 1px, transparent 1px), radial-gradient(#102317 1px, #080d0a 1px);
-      background-size: 40px 40px;
-      background-position: 0 0, 20px 20px;
+      background-color: #070c09;
+      background-image: radial-gradient(#112217 1px, transparent 1px), radial-gradient(#112217 1px, #070c09 1px);
+      background-size: 36px 36px;
+      background-position: 0 0, 18px 18px;
     }
   </style>
 </head>
-<body class="casino-felt text-zinc-100 min-h-screen flex flex-col items-center justify-center overflow-hidden select-none font-sans antialiased">
+<body class="casino-felt text-zinc-100 min-h-screen flex flex-col items-center justify-between overflow-hidden select-none font-sans antialiased">
 
   <!-- Üst Bar -->
-  <header class="absolute top-5 left-0 right-0 flex items-center justify-between px-6 md:px-8 z-10">
+  <header class="w-full flex items-center justify-between px-6 py-4 z-20 bg-zinc-950/80 border-b border-zinc-800/80 backdrop-blur">
     <div class="flex items-center gap-3">
-      <div class="w-2.5 h-7 bg-amber-500 rounded-sm"></div>
+      <div class="w-2.5 h-6 bg-amber-500 rounded-sm"></div>
       <div>
-        <h1 class="text-lg md:text-xl font-bold tracking-wider text-amber-100 uppercase font-serif">Casino Çarkı</h1>
+        <h1 class="text-base md:text-lg font-bold tracking-wider text-amber-100 font-serif uppercase" id="gameTitleDisplay">Casino Çarkı</h1>
         <p class="text-[11px] text-zinc-400">Tur: <span id="roundCounter" class="text-amber-400 font-mono font-bold">1</span></p>
       </div>
     </div>
 
-    <!-- Üst Sağ: Kontroller -->
+    <!-- Oyun Seçici Sekmeler (Üst Menü) -->
+    <div class="flex items-center bg-zinc-900 border border-zinc-800 p-1 rounded-lg gap-1 text-xs">
+      <button onclick="setGameMode('wheel')" id="btnModeWheel" class="px-3 py-1 rounded bg-amber-500 text-black font-bold transition">
+        Çarkıfelek
+      </button>
+      <button onclick="setGameMode('slot')" id="btnModeSlot" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+        Slot Makinesi
+      </button>
+      <button onclick="setGameMode('roulette')" id="btnModeRoulette" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+        Rulet
+      </button>
+      <button onclick="setGameMode('plinko')" id="btnModePlinko" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+        Plinko
+      </button>
+    </div>
+
+    <!-- Sağ Kontroller -->
     <div class="flex items-center gap-2">
-      <!-- QR Kod Bağlantı Butonu -->
-      <button id="openQrBtn" title="Kamera ile Bağlan (QR)" class="px-3 py-1.5 rounded-md bg-zinc-900/90 border border-amber-900/40 text-xs text-amber-200/90 hover:text-white hover:border-amber-700/60 transition flex items-center gap-1.5 backdrop-blur">
+      <button id="openQrBtn" title="Kamera ile Bağlan" class="px-2.5 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-amber-200 hover:text-white transition flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
-        <span>Kamera ile Bağlan</span>
+        <span class="hidden md:inline">Kamera Bağlantısı</span>
       </button>
 
-      <!-- Geçmiş Butonu -->
-      <button id="toggleHistoryBtn" title="Çekiliş Geçmişi" class="px-3 py-1.5 rounded-md bg-zinc-900/90 border border-amber-900/40 text-xs text-amber-200/80 hover:text-amber-100 hover:border-amber-700/60 transition flex items-center gap-1.5 backdrop-blur">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span>Geçmiş (<span id="historyCount">0</span>)</span>
+      <button id="toggleHistoryBtn" class="px-2.5 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-white transition">
+        Geçmiş (<span id="historyCount">0</span>)
       </button>
 
-      <!-- Ses -->
-      <button id="soundToggleBtn" title="Sesi Aç/Kapat" class="p-2 rounded-md bg-zinc-900/90 border border-zinc-800 text-zinc-400 hover:text-white transition">
+      <button id="soundToggleBtn" class="p-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition">
         <svg id="soundOnIcon" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
         <svg id="soundOffIcon" class="w-4 h-4 hidden text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
       </button>
 
-      <!-- Tam Ekran -->
-      <button id="fullscreenBtn" title="Tam Ekran" class="p-2 rounded-md bg-zinc-900/90 border border-zinc-800 text-zinc-400 hover:text-white transition">
+      <button id="fullscreenBtn" class="p-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
       </button>
     </div>
   </header>
 
-  <!-- Çark Alanı -->
-  <main class="relative flex items-center justify-center p-4 my-auto">
-    <div class="relative">
-      <!-- Mekanik Altın Gösterge Dili (Pointer) -->
-      <div class="absolute -top-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-transform duration-75 filter drop-shadow-md" id="pointerEl">
-        <div class="w-7 h-10 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
-        <div class="w-2.5 h-2.5 rounded-full bg-amber-100 mx-auto -mt-10 border border-amber-900"></div>
+  <!-- OYUN ALANLARI (CONTAINER) -->
+  <main class="relative flex-1 w-full flex items-center justify-center p-4">
+
+    <!-- 1. OYUN: ÇARKIFELEK -->
+    <div id="gameWheelView" class="game-view relative flex items-center justify-center">
+      <div class="relative">
+        <div class="absolute -top-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-transform duration-75 filter drop-shadow" id="pointerEl">
+          <div class="w-7 h-10 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
+          <div class="w-2.5 h-2.5 rounded-full bg-amber-100 mx-auto -mt-10 border border-amber-900"></div>
+        </div>
+        <canvas id="wheelCanvas" class="rounded-full cursor-pointer shadow-2xl"></canvas>
+        <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-900 border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-xl">
+          <span class="text-amber-400 text-xs md:text-sm font-black uppercase tracking-widest font-serif">ÇEVİR</span>
+        </button>
       </div>
-
-      <!-- Çark Kanvası -->
-      <canvas id="wheelCanvas" class="rounded-full cursor-pointer shadow-2xl"></canvas>
-
-      <!-- Çark Merkez Göbeği -->
-      <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-b from-zinc-800 via-zinc-900 to-black border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-xl">
-        <span class="text-amber-400 text-xs md:text-sm font-black uppercase tracking-widest font-serif">ÇEVİR</span>
-      </button>
     </div>
+
+    <!-- 2. OYUN: SLOT MAKİNESİ -->
+    <div id="gameSlotView" class="game-view hidden flex flex-col items-center">
+      <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-4 border-amber-600 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col items-center gap-6 max-w-lg w-full relative">
+        <div class="text-center">
+          <h2 class="text-amber-300 font-serif font-black text-xl tracking-widest uppercase">LUCKY SLOTS</h2>
+          <p class="text-[10px] text-zinc-500 tracking-wider">3 EŞLEŞME = JACKPOT</p>
+        </div>
+
+        <!-- 3 Makaralı Slot Penceresi -->
+        <div class="flex items-center gap-3 bg-black p-4 rounded-2xl border-2 border-amber-700/80 shadow-inner w-full justify-center">
+          <!-- Makara 1 -->
+          <div class="w-28 md:w-32 h-36 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden relative shadow-inner flex items-center justify-center">
+            <div id="slotReel1" class="text-center font-bold text-base md:text-lg text-amber-200 transition-all font-serif px-2">---</div>
+          </div>
+          <!-- Makara 2 -->
+          <div class="w-28 md:w-32 h-36 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden relative shadow-inner flex items-center justify-center">
+            <div id="slotReel2" class="text-center font-bold text-base md:text-lg text-amber-200 transition-all font-serif px-2">---</div>
+          </div>
+          <!-- Makara 3 -->
+          <div class="w-28 md:w-32 h-36 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden relative shadow-inner flex items-center justify-center">
+            <div id="slotReel3" class="text-center font-bold text-base md:text-lg text-amber-200 transition-all font-serif px-2">---</div>
+          </div>
+        </div>
+
+        <!-- Kolu Çek / Spin Butonu -->
+        <button id="slotSpinBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-sm uppercase tracking-widest shadow-lg transition active:scale-98">
+          KOLU ÇEK (SPIN)
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. OYUN: RULET MASASI -->
+    <div id="gameRouletteView" class="game-view hidden flex flex-col items-center gap-4">
+      <div class="relative">
+        <canvas id="rouletteCanvas" class="rounded-full shadow-2xl border-4 border-amber-700/80"></canvas>
+        <button id="rouletteSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-zinc-950 border-2 border-amber-500 text-amber-300 font-bold text-xs uppercase transition hover:border-amber-400 active:scale-95">
+          Topu At
+        </button>
+      </div>
+      <!-- Masa Bahis / İsim Görünümü -->
+      <div id="rouletteCurrentNumber" class="text-xs text-amber-200/80 bg-zinc-950 px-4 py-1.5 rounded-full border border-zinc-800">
+        Krupiye bekleniyor...
+      </div>
+    </div>
+
+    <!-- 4. OYUN: PLINKO BOARD -->
+    <div id="gamePlinkoView" class="game-view hidden flex flex-col items-center">
+      <div class="relative bg-zinc-950/90 border-2 border-amber-700/60 rounded-2xl p-4 shadow-2xl flex flex-col items-center">
+        <div class="flex items-center justify-between w-full px-2 mb-2">
+          <span class="text-xs text-amber-300 font-serif font-bold uppercase tracking-wider">PLINKO DROP</span>
+          <button id="plinkoDropBtn" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase transition active:scale-95">
+            Topu Bırak
+          </button>
+        </div>
+        <canvas id="plinkoCanvas" class="rounded-xl bg-black border border-zinc-800"></canvas>
+      </div>
+    </div>
+
   </main>
 
-  <!-- Sol Alt: Kalan Kişi -->
-  <div class="absolute bottom-4 left-4 z-10 text-xs text-zinc-400 bg-zinc-950/80 px-3 py-1.5 rounded border border-zinc-800/80 backdrop-blur">
-    Kalan: <span id="studentCount" class="text-amber-400 font-bold font-mono">0</span> kişi
-  </div>
-
-  <!-- Sağ Alt: Minik Oda Kodu -->
-  <footer class="absolute bottom-4 right-4 z-10">
-    <div id="roomBadge" title="QR Kodu Aç veya Kopyala" class="flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-950/80 border border-zinc-800 text-xs text-zinc-400 hover:text-amber-200 transition cursor-pointer backdrop-blur">
+  <!-- Alt Bar Bilgileri -->
+  <footer class="w-full flex items-center justify-between px-6 py-3 bg-zinc-950/80 border-t border-zinc-800/80 backdrop-blur text-xs text-zinc-400">
+    <div>Kalan: <span id="studentCount" class="text-amber-400 font-bold font-mono">0</span> kişi</div>
+    <div id="roomBadge" class="flex items-center gap-2 cursor-pointer hover:text-amber-200 transition">
       <span id="statusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
       <span class="font-mono text-xs" id="roomIdDisplay">Bağlanıyor...</span>
     </div>
   </footer>
 
-  <!-- QR Kod Modalı (Otomatik Bağlantı İçin) -->
+  <!-- QR Kod Modalı -->
   <div id="qrModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200 backdrop-blur-sm">
     <div class="bg-zinc-950 border border-amber-500/60 rounded-2xl p-6 max-w-xs w-full text-center shadow-2xl flex flex-col items-center gap-4">
-      <div>
-        <h3 class="font-bold text-amber-200 text-sm font-serif">Kamerayla Bağlan</h3>
-        <p class="text-xs text-zinc-400 mt-1">Tablet veya telefonunuzun kamerasıyla QR kodu tarayın:</p>
-      </div>
-      
-      <!-- QR İmajı -->
+      <h3 class="font-bold text-amber-200 text-sm font-serif">Kamerayla Bağlan</h3>
       <div class="p-3 bg-white rounded-xl shadow-inner">
         <img id="qrImage" src="" alt="QR Kod" class="w-48 h-48 block">
       </div>
-
-      <div class="w-full">
-        <div class="text-[11px] text-zinc-400 font-mono bg-zinc-900 py-1.5 px-3 rounded border border-zinc-800 truncate" id="qrRoomCode">
-          Oda Kodu: ...
-        </div>
+      <div class="text-[11px] text-zinc-400 font-mono bg-zinc-900 py-1 px-3 rounded border border-zinc-800 truncate w-full" id="qrRoomCode">
+        Oda: ...
       </div>
-
-      <button id="closeQrBtn" class="w-full py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition">
-        Kapat
-      </button>
+      <button id="closeQrBtn" class="w-full py-2 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold">Kapat</button>
     </div>
   </div>
 
-  <!-- Çekiliş Geçmişi Yan Paneli -->
+  <!-- Geçmiş Yan Paneli -->
   <aside id="historyPanel" class="fixed top-0 right-0 bottom-0 w-80 bg-zinc-950/95 border-l border-zinc-800 p-5 z-40 transform translate-x-full transition-transform duration-300 flex flex-col backdrop-blur-md shadow-2xl">
     <div class="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
-      <div class="flex items-center gap-2">
-        <h2 class="font-bold text-sm text-amber-200 font-serif">Çekiliş Geçmişi</h2>
-      </div>
-      <button id="closeHistoryBtn" class="text-zinc-400 hover:text-white text-xs px-2 py-1 rounded bg-zinc-900 border border-zinc-800">
-        Kapat
-      </button>
+      <h2 class="font-bold text-sm text-amber-200 font-serif">Çekiliş Geçmişi</h2>
+      <button id="closeHistoryBtn" class="text-zinc-400 hover:text-white text-xs px-2 py-1 rounded bg-zinc-900 border border-zinc-800">Kapat</button>
     </div>
-    
-    <div id="historyList" class="flex-1 overflow-y-auto space-y-2 pr-1">
-      <div class="text-center py-8 text-xs text-zinc-600">Henüz çekiliş yapılmadı.</div>
-    </div>
-
+    <div id="historyList" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
     <div class="pt-3 border-t border-zinc-800 flex justify-between items-center">
-      <button id="clearHistoryBtn" class="text-xs text-zinc-500 hover:text-rose-400 transition">
-        Geçmişi Temizle
-      </button>
+      <button id="clearHistoryBtn" class="text-xs text-zinc-500 hover:text-rose-400 transition">Geçmişi Temizle</button>
       <span class="text-[11px] text-zinc-600" id="totalSpinsCount">Toplam: 0</span>
     </div>
   </aside>
 
   <!-- Kazanan Pop-up Modalı -->
   <div id="winnerModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200 backdrop-blur-sm">
-    <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-2 border-amber-500/80 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl relative" id="modalCard">
-      <p class="text-xs text-amber-400/90 font-serif uppercase tracking-widest mb-1">Kazanan</p>
-      
-      <div id="winnerName" class="text-3xl font-black text-amber-100 tracking-tight my-4 py-3 px-4 bg-zinc-900/90 border border-amber-600/40 rounded-xl shadow-inner font-serif">
+    <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-2 border-amber-500/80 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+      <p id="winnerGameLabel" class="text-xs text-amber-400/90 font-serif uppercase tracking-widest mb-1">KAZANAN</p>
+      <div id="winnerName" class="text-3xl font-black text-amber-100 tracking-tight my-4 py-3 px-4 bg-zinc-900/90 border border-amber-600/40 rounded-xl font-serif">
         Kazanan İsim
       </div>
-
       <div class="flex flex-col gap-2 mt-5">
         <button id="removeWinnerBtn" class="w-full py-2.5 px-4 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider transition">
           Listeden Çıkar ve Devam Et
@@ -157,11 +199,6 @@
     </div>
   </div>
 
-  <!-- Toast -->
-  <div id="toast" class="fixed bottom-14 right-4 bg-zinc-900 border border-amber-600/40 text-amber-200 text-xs px-3 py-1.5 rounded shadow-lg opacity-0 transition-opacity pointer-events-none z-50">
-    Kopyalandı
-  </div>
-
   <script>
     let names = [
       "Ahmet", "Ayşe", "Mehmet", "Fatma", "Ali",
@@ -169,52 +206,22 @@
       "Gamze", "Can", "Selin", "Kemal", "Büşra", "Deniz"
     ];
 
-    const casinoPalette = [
-      '#8f1d1d', '#18201d', '#155234', '#18201d', '#b3822a', '#18201d',
-      '#9e2222', '#18201d', '#1b633f', '#18201d', '#996f24', '#18201d'
-    ];
-
     let history = [];
     let currentWinner = null;
     let round = 1;
-
-    function loadStorage() {
-      const savedNames = localStorage.getItem('cark_names');
-      if (savedNames) {
-        try { names = JSON.parse(savedNames); } catch (e) {}
-      }
-      const savedHistory = localStorage.getItem('cark_history');
-      if (savedHistory) {
-        try { 
-          history = JSON.parse(savedHistory);
-          round = history.length + 1;
-        } catch (e) {}
-      }
-      updateRoundUI();
-      renderHistoryUI();
-    }
-
-    function saveStorage() {
-      localStorage.setItem('cark_names', JSON.stringify(names));
-      localStorage.setItem('cark_history', JSON.stringify(history));
-    }
-
-    const canvas = document.getElementById('wheelCanvas');
-    const ctx = canvas.getContext('2d');
-    let wheelRadius = 0;
-    let currentRotation = 0;
-    let isSpinning = false;
+    let activeGameMode = 'wheel'; // 'wheel' | 'slot' | 'roulette' | 'plinko'
+    let isPlaying = false;
     let pendingTarget = null;
 
+    // --- Web Audio Sentezleyici ---
     let audioCtx = null;
     let soundEnabled = true;
-    let lastTickIndex = -1;
 
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    function playTick() {
+    function playTick(freq = 700) {
       if (!soundEnabled) return;
       try {
         initAudio();
@@ -222,14 +229,14 @@
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(750, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.035);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + 0.035);
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.03);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + 0.03);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.035);
+        osc.stop(audioCtx.currentTime + 0.03);
       } catch (e) {}
     }
 
@@ -242,205 +249,545 @@
           const gain = audioCtx.createGain();
           osc.type = 'sine';
           osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.09);
-          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.09 + 0.4);
+          gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.08 + 0.35);
           osc.connect(gain);
           gain.connect(audioCtx.destination);
-          osc.start(audioCtx.currentTime + i * 0.09);
-          osc.stop(audioCtx.currentTime + i * 0.09 + 0.4);
+          osc.start(audioCtx.currentTime + i * 0.08);
+          osc.stop(audioCtx.currentTime + i * 0.08 + 0.35);
         });
       } catch (e) {}
     }
 
-    function resizeCanvas() {
-      const size = Math.min(window.innerWidth * 0.88, window.innerHeight * 0.72, 580);
+    // --- Oyun Modu Yönetimi ---
+    function setGameMode(mode, broadcastSync = true) {
+      activeGameMode = mode;
+      document.querySelectorAll('.game-view').forEach(el => el.classList.add('hidden'));
+
+      const modes = ['wheel', 'slot', 'roulette', 'plinko'];
+      modes.forEach(m => {
+        const btn = document.getElementById('btnMode' + m.charAt(0).toUpperCase() + m.slice(1));
+        if (btn) {
+          if (m === mode) {
+            btn.className = 'px-3 py-1 rounded bg-amber-500 text-black font-bold transition';
+          } else {
+            btn.className = 'px-3 py-1 rounded text-zinc-400 hover:text-white transition';
+          }
+        }
+      });
+
+      const titleMap = {
+        wheel: 'Casino Çarkı',
+        slot: 'Lucky Slots (Slot Makinesi)',
+        roulette: 'Roulette Masası',
+        plinko: 'Plinko Board'
+      };
+      document.getElementById('gameTitleDisplay').textContent = titleMap[mode] || 'Şans Oyunu';
+
+      if (mode === 'wheel') {
+        document.getElementById('gameWheelView').classList.remove('hidden');
+        resizeWheelCanvas();
+      } else if (mode === 'slot') {
+        document.getElementById('gameSlotView').classList.remove('hidden');
+        initSlotDisplay();
+      } else if (mode === 'roulette') {
+        document.getElementById('gameRouletteView').classList.remove('hidden');
+        resizeRouletteCanvas();
+      } else if (mode === 'plinko') {
+        document.getElementById('gamePlinkoView').classList.remove('hidden');
+        resizePlinkoCanvas();
+      }
+
+      if (broadcastSync) {
+        broadcast({ type: 'game_mode_changed', mode: mode });
+      }
+    }
+
+    // --- 1. ÇARKIFELEK KODLARI ---
+    const wheelCanvas = document.getElementById('wheelCanvas');
+    const wheelCtx = wheelCanvas.getContext('2d');
+    let wheelRadius = 0;
+    let wheelRotation = 0;
+    let lastWheelTickIndex = -1;
+    const casinoPalette = ['#8f1d1d', '#18201d', '#155234', '#18201d', '#b3822a', '#18201d'];
+
+    function resizeWheelCanvas() {
+      const size = Math.min(window.innerWidth * 0.85, window.innerHeight * 0.68, 540);
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = size * dpr;
-      canvas.height = size * dpr;
-      canvas.style.width = size + 'px';
-      canvas.style.height = size + 'px';
-      ctx.scale(dpr, dpr);
+      wheelCanvas.width = size * dpr;
+      wheelCanvas.height = size * dpr;
+      wheelCanvas.style.width = size + 'px';
+      wheelCanvas.style.height = size + 'px';
+      wheelCtx.scale(dpr, dpr);
       wheelRadius = size / 2;
       drawWheel();
     }
 
     function drawWheel() {
-      if (!names.length) {
-        ctx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
-        return;
-      }
+      if (!names.length) return;
       const N = names.length;
       const arc = (2 * Math.PI) / N;
-      const cx = wheelRadius;
-      const cy = wheelRadius;
-      const r = wheelRadius - 14;
-
-      ctx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
+      const cx = wheelRadius, cy = wheelRadius, r = wheelRadius - 12;
+      wheelCtx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
 
       for (let i = 0; i < N; i++) {
-        const angle = currentRotation + i * arc;
-        const color = casinoPalette[i % casinoPalette.length];
+        const angle = wheelRotation + i * arc;
+        wheelCtx.beginPath();
+        wheelCtx.fillStyle = casinoPalette[i % casinoPalette.length];
+        wheelCtx.moveTo(cx, cy);
+        wheelCtx.arc(cx, cy, r, angle, angle + arc);
+        wheelCtx.lineTo(cx, cy);
+        wheelCtx.fill();
+        wheelCtx.strokeStyle = '#d4af37';
+        wheelCtx.lineWidth = 1.5;
+        wheelCtx.stroke();
 
-        ctx.beginPath();
-        ctx.fillStyle = color;
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, r, angle, angle + arc);
-        ctx.lineTo(cx, cy);
-        ctx.fill();
-
-        ctx.strokeStyle = '#d4af37';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle + arc / 2);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#fef3c7';
-
-        const fontSize = Math.max(11, Math.min(15, Math.floor(wheelRadius / 17)));
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        
+        wheelCtx.save();
+        wheelCtx.translate(cx, cy);
+        wheelCtx.rotate(angle + arc / 2);
+        wheelCtx.textAlign = 'right';
+        wheelCtx.fillStyle = '#fef3c7';
+        const fontSize = Math.max(10, Math.min(15, Math.floor(wheelRadius / 17)));
+        wheelCtx.font = `bold ${fontSize}px sans-serif`;
         let displayName = names[i];
         if (displayName.length > 13) displayName = displayName.substring(0, 12) + '…';
-        ctx.fillText(displayName, r - 22, fontSize / 3);
-        ctx.restore();
+        wheelCtx.fillText(displayName, r - 20, fontSize / 3);
+        wheelCtx.restore();
       }
 
-      ctx.beginPath();
-      ctx.arc(cx, cy, r + 6, 0, 2 * Math.PI);
-      ctx.strokeStyle = '#272017';
-      ctx.lineWidth = 14;
-      ctx.stroke();
+      wheelCtx.beginPath();
+      wheelCtx.arc(cx, cy, r + 5, 0, 2 * Math.PI);
+      wheelCtx.strokeStyle = '#272017';
+      wheelCtx.lineWidth = 12;
+      wheelCtx.stroke();
 
-      ctx.beginPath();
-      ctx.arc(cx, cy, r + 12, 0, 2 * Math.PI);
-      ctx.strokeStyle = '#b48a3c';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-
-      const pinCount = Math.max(N, 24);
-      for (let i = 0; i < pinCount; i++) {
-        const pinAngle = currentRotation + (i * 2 * Math.PI) / pinCount;
-        const px = cx + (r + 6) * Math.cos(pinAngle);
-        const py = cy + (r + 6) * Math.sin(pinAngle);
-
-        ctx.beginPath();
-        ctx.arc(px, py, 3, 0, 2 * Math.PI);
-        ctx.fillStyle = '#fef08a';
-        ctx.fill();
-        ctx.strokeStyle = '#854d0e';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-    }
-
-    const POINTER_ANGLE = 1.5 * Math.PI;
-
-    function getCurrentWinningIndex(rotation) {
-      const N = names.length;
-      const arc = (2 * Math.PI) / N;
-      const norm = ((POINTER_ANGLE - rotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-      return Math.floor(norm / arc) % N;
+      wheelCtx.beginPath();
+      wheelCtx.arc(cx, cy, r + 10, 0, 2 * Math.PI);
+      wheelCtx.strokeStyle = '#b48a3c';
+      wheelCtx.lineWidth = 2;
+      wheelCtx.stroke();
     }
 
     function spinWheel(targetName = null) {
-      if (isSpinning || names.length === 0) return;
-      isSpinning = true;
-      document.getElementById('centerSpinBtn').disabled = true;
-
+      if (isPlaying || !names.length) return;
+      isPlaying = true;
       broadcast({ type: 'spin_start' });
 
       const N = names.length;
       const arc = (2 * Math.PI) / N;
-
-      let targetIndex = -1;
-      if (targetName) {
-        targetIndex = names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase());
-      }
+      let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
+      const totalTurns = (6 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
 
       let deltaRotation = 0;
-      const minFullSpins = 6;
-      const extraSpins = Math.floor(Math.random() * 3);
-      const totalTurns = (minFullSpins + extraSpins) * 2 * Math.PI;
+      const POINTER_ANGLE = 1.5 * Math.PI;
 
       if (targetIndex !== -1) {
-        const randRatio = 0.2 + Math.random() * 0.6;
-        const targetPointInsideSlice = targetIndex * arc + randRatio * arc;
-        const desiredMod = ((POINTER_ANGLE - targetPointInsideSlice) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-        const currentMod = ((currentRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const randInside = targetIndex * arc + (0.2 + Math.random() * 0.6) * arc;
+        const desiredMod = ((POINTER_ANGLE - randInside) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const currentMod = (wheelRotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
         let diff = desiredMod - currentMod;
         if (diff < 0) diff += 2 * Math.PI;
         deltaRotation = totalTurns + diff;
       } else {
-        const randomExtraAngle = Math.random() * 2 * Math.PI;
-        deltaRotation = totalTurns + randomExtraAngle;
+        deltaRotation = totalTurns + Math.random() * 2 * Math.PI;
       }
 
-      const startRotation = currentRotation;
-      const finalRotation = startRotation + deltaRotation;
-      const duration = 5200 + Math.random() * 600;
+      const startRot = wheelRotation;
+      const finalRot = startRot + deltaRotation;
+      const duration = 5000 + Math.random() * 500;
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
 
-      function animate(time) {
+      function anim(time) {
         const elapsed = time - startTime;
         const progress = Math.min(elapsed / duration, 1);
         const ease = 1 - Math.pow(1 - progress, 5);
-
-        currentRotation = startRotation + deltaRotation * ease;
+        wheelRotation = startRot + deltaRotation * ease;
         drawWheel();
 
-        const currentIndex = getCurrentWinningIndex(currentRotation);
-        if (currentIndex !== lastTickIndex) {
-          playTick();
-          lastTickIndex = currentIndex;
+        const norm = ((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const curIdx = Math.floor(norm / arc) % N;
+        if (curIdx !== lastWheelTickIndex) {
+          playTick(750);
+          lastWheelTickIndex = curIdx;
           pointerEl.style.transform = 'translateX(-50%) rotate(-12deg)';
-          setTimeout(() => {
-            pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
-          }, 35);
+          setTimeout(() => pointerEl.style.transform = 'translateX(-50%) rotate(0deg)', 35);
         }
 
         if (progress < 1) {
-          requestAnimationFrame(animate);
+          requestAnimationFrame(anim);
         } else {
-          isSpinning = false;
-          document.getElementById('centerSpinBtn').disabled = false;
-          currentRotation = finalRotation;
+          isPlaying = false;
+          wheelRotation = finalRot;
           drawWheel();
-
-          const winnerIdx = getCurrentWinningIndex(currentRotation);
-          currentWinner = names[winnerIdx];
-
-          addHistoryRecord(currentWinner, round, targetName !== null);
-          round++;
-          updateRoundUI();
-
-          playWinSound();
-          triggerCelebration(currentWinner);
-
-          broadcast({ 
-            type: 'spin_end', 
-            winner: currentWinner,
-            history: history,
-            names: names
-          });
+          const winnerIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
+          finishGame(names[winnerIdx], targetName !== null, 'Çarkıfelek');
         }
       }
-
-      requestAnimationFrame(animate);
+      requestAnimationFrame(anim);
     }
 
-    function addHistoryRecord(winner, roundNumber, wasTargeted) {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const record = {
-        round: roundNumber,
-        winner: winner,
-        time: timeStr,
-        wasTargeted: wasTargeted
+    // --- 2. SLOT MAKİNESİ KODLARI ---
+    function initSlotDisplay() {
+      if (!names.length) return;
+      document.getElementById('slotReel1').textContent = names[0];
+      document.getElementById('slotReel2').textContent = names[Math.min(1, names.length - 1)];
+      document.getElementById('slotReel3').textContent = names[Math.min(2, names.length - 1)];
+    }
+
+    function spinSlot(targetName = null) {
+      if (isPlaying || !names.length) return;
+      isPlaying = true;
+      broadcast({ type: 'spin_start' });
+
+      let target = targetName;
+      if (!target) {
+        target = names[Math.floor(Math.random() * names.length)];
+      }
+
+      const r1 = document.getElementById('slotReel1');
+      const r2 = document.getElementById('slotReel2');
+      const r3 = document.getElementById('slotReel3');
+
+      let speed1 = 60, speed2 = 60, speed3 = 60;
+      let interval1, interval2, interval3;
+
+      interval1 = setInterval(() => {
+        r1.textContent = names[Math.floor(Math.random() * names.length)];
+        playTick(600);
+      }, speed1);
+
+      interval2 = setInterval(() => {
+        r2.textContent = names[Math.floor(Math.random() * names.length)];
+      }, speed2);
+
+      interval3 = setInterval(() => {
+        r3.textContent = names[Math.floor(Math.random() * names.length)];
+      }, speed3);
+
+      // 1. Makara Durur
+      setTimeout(() => {
+        clearInterval(interval1);
+        r1.textContent = target;
+        playTick(900);
+      }, 2500);
+
+      // 2. Makara Durur
+      setTimeout(() => {
+        clearInterval(interval2);
+        r2.textContent = target;
+        playTick(950);
+      }, 3400);
+
+      // 3. Makara Durur (JACKPOT!)
+      setTimeout(() => {
+        clearInterval(interval3);
+        r3.textContent = target;
+        playTick(1100);
+        isPlaying = false;
+        finishGame(target, targetName !== null, 'Slot Makinesi (Jackpot)');
+      }, 4300);
+    }
+
+    // --- 3. RULET MASASI KODLARI ---
+    const rouletteCanvas = document.getElementById('rouletteCanvas');
+    const rouletteCtx = rouletteCanvas.getContext('2d');
+    let rouletteRadius = 0;
+    let rouletteAngle = 0;
+    let ballAngle = 0;
+
+    function resizeRouletteCanvas() {
+      const size = Math.min(window.innerWidth * 0.85, window.innerHeight * 0.58, 460);
+      const dpr = window.devicePixelRatio || 1;
+      rouletteCanvas.width = size * dpr;
+      rouletteCanvas.height = size * dpr;
+      rouletteCanvas.style.width = size + 'px';
+      rouletteCanvas.style.height = size + 'px';
+      rouletteCtx.scale(dpr, dpr);
+      rouletteRadius = size / 2;
+      drawRoulette();
+    }
+
+    function drawRoulette(ballDist = null) {
+      if (!names.length) return;
+      const N = names.length;
+      const arc = (2 * Math.PI) / N;
+      const cx = rouletteRadius, cy = rouletteRadius, r = rouletteRadius - 10;
+      rouletteCtx.clearRect(0, 0, rouletteRadius * 2, rouletteRadius * 2);
+
+      // Dilimler
+      for (let i = 0; i < N; i++) {
+        const a = rouletteAngle + i * arc;
+        rouletteCtx.beginPath();
+        rouletteCtx.fillStyle = (i % 2 === 0) ? '#8f1d1d' : '#141414';
+        rouletteCtx.moveTo(cx, cy);
+        rouletteCtx.arc(cx, cy, r, a, a + arc);
+        rouletteCtx.fill();
+        rouletteCtx.strokeStyle = '#d4af37';
+        rouletteCtx.lineWidth = 1;
+        rouletteCtx.stroke();
+
+        rouletteCtx.save();
+        rouletteCtx.translate(cx, cy);
+        rouletteCtx.rotate(a + arc / 2);
+        rouletteCtx.textAlign = 'right';
+        rouletteCtx.fillStyle = '#fef3c7';
+        rouletteCtx.font = 'bold 11px sans-serif';
+        let displayName = names[i];
+        if (displayName.length > 10) displayName = displayName.substring(0, 9) + '…';
+        rouletteCtx.fillText(displayName, r - 16, 4);
+        rouletteCtx.restore();
+      }
+
+      // Merkez Göbek
+      rouletteCtx.beginPath();
+      rouletteCtx.arc(cx, cy, r * 0.45, 0, 2 * Math.PI);
+      rouletteCtx.fillStyle = '#1c1917';
+      rouletteCtx.fill();
+      rouletteCtx.strokeStyle = '#d4af37';
+      rouletteCtx.lineWidth = 3;
+      rouletteCtx.stroke();
+
+      // Top Çizimi
+      if (ballDist !== null) {
+        const bx = cx + ballDist * Math.cos(ballAngle);
+        const by = cy + ballDist * Math.sin(ballAngle);
+        rouletteCtx.beginPath();
+        rouletteCtx.arc(bx, by, 5, 0, 2 * Math.PI);
+        rouletteCtx.fillStyle = '#ffffff';
+        rouletteCtx.fill();
+        rouletteCtx.shadowColor = 'white';
+        rouletteCtx.shadowBlur = 4;
+        rouletteCtx.stroke();
+      }
+    }
+
+    function spinRoulette(targetName = null) {
+      if (isPlaying || !names.length) return;
+      isPlaying = true;
+      broadcast({ type: 'spin_start' });
+
+      let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
+      if (targetIndex === -1) targetIndex = Math.floor(Math.random() * names.length);
+
+      const N = names.length;
+      const arc = (2 * Math.PI) / N;
+      const duration = 5400;
+      const startTime = performance.now();
+      const r = rouletteRadius - 10;
+
+      function anim(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+
+        rouletteAngle += 0.04 * (1 - progress * 0.7);
+        ballAngle -= 0.12 * (1 - ease * 0.9);
+
+        // Top raydan iç cebe doğru iner
+        const ballDist = (r - 18) - (progress > 0.6 ? (progress - 0.6) * 45 : 0);
+        drawRoulette(ballDist);
+
+        if (Math.random() < 0.25) playTick(800 + Math.random() * 200);
+
+        if (progress < 1) {
+          requestAnimationFrame(anim);
+        } else {
+          isPlaying = false;
+          drawRoulette(r - 35);
+          finishGame(names[targetIndex], targetName !== null, 'Rulet Masası');
+        }
+      }
+      requestAnimationFrame(anim);
+    }
+
+    // --- 4. PLINKO BOARD KODLARI ---
+    const plinkoCanvas = document.getElementById('plinkoCanvas');
+    const plinkoCtx = plinkoCanvas.getContext('2d');
+    let plinkoWidth = 420;
+    let plinkoHeight = 440;
+    let pegs = [];
+
+    function resizePlinkoCanvas() {
+      const sizeW = Math.min(window.innerWidth * 0.9, 440);
+      plinkoWidth = sizeW;
+      plinkoHeight = Math.min(window.innerHeight * 0.62, 460);
+      const dpr = window.devicePixelRatio || 1;
+      plinkoCanvas.width = plinkoWidth * dpr;
+      plinkoCanvas.height = plinkoHeight * dpr;
+      plinkoCanvas.style.width = plinkoWidth + 'px';
+      plinkoCanvas.style.height = plinkoHeight + 'px';
+      plinkoCtx.scale(dpr, dpr);
+      createPegs();
+      drawPlinko();
+    }
+
+    function createPegs() {
+      pegs = [];
+      const rows = 8;
+      const startY = 50;
+      const rowSpacing = (plinkoHeight - 120) / rows;
+
+      for (let r = 0; r < rows; r++) {
+        const count = r + 3;
+        const spacing = (plinkoWidth - 60) / (count - 1);
+        for (let c = 0; c < count; c++) {
+          const px = 30 + c * spacing;
+          const py = startY + r * rowSpacing;
+          pegs.push({ x: px, y: py, r: 3.5 });
+        }
+      }
+    }
+
+    function drawPlinko(ball = null) {
+      plinkoCtx.clearRect(0, 0, plinkoWidth, plinkoHeight);
+
+      // Çiviler (Pirinç Pimler)
+      pegs.forEach(p => {
+        plinkoCtx.beginPath();
+        plinkoCtx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
+        plinkoCtx.fillStyle = '#fef08a';
+        plinkoCtx.fill();
+        plinkoCtx.strokeStyle = '#854d0e';
+        plinkoCtx.stroke();
+      });
+
+      // Alt Kovalar (İsim Kutucukları)
+      const binCount = Math.min(names.length, 6);
+      const binW = plinkoWidth / binCount;
+      const binH = 50;
+      const binY = plinkoHeight - binH;
+
+      for (let i = 0; i < binCount; i++) {
+        const bx = i * binW;
+        plinkoCtx.fillStyle = (i % 2 === 0) ? '#18201d' : '#272017';
+        plinkoCtx.fillRect(bx, binY, binW, binH);
+        plinkoCtx.strokeStyle = '#d4af37';
+        plinkoCtx.strokeRect(bx, binY, binW, binH);
+
+        plinkoCtx.fillStyle = '#fef3c7';
+        plinkoCtx.font = 'bold 10px sans-serif';
+        plinkoCtx.textAlign = 'center';
+        let displayName = names[i];
+        if (displayName && displayName.length > 8) displayName = displayName.substring(0, 7) + '…';
+        plinkoCtx.fillText(displayName || '', bx + binW / 2, binY + 28);
+      }
+
+      // Düşen Top
+      if (ball) {
+        plinkoCtx.beginPath();
+        plinkoCtx.arc(ball.x, ball.y, ball.r, 0, 2 * Math.PI);
+        plinkoCtx.fillStyle = '#f59e0b';
+        plinkoCtx.fill();
+        plinkoCtx.strokeStyle = '#fff';
+        plinkoCtx.stroke();
+      }
+    }
+
+    function dropPlinko(targetName = null) {
+      if (isPlaying || !names.length) return;
+      isPlaying = true;
+      broadcast({ type: 'spin_start' });
+
+      let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
+      const binCount = Math.min(names.length, 6);
+      if (targetIndex === -1 || targetIndex >= binCount) {
+        targetIndex = Math.floor(Math.random() * binCount);
+      }
+
+      const binW = plinkoWidth / binCount;
+      const targetX = targetIndex * binW + binW / 2;
+
+      let ball = {
+        x: plinkoWidth / 2 + (Math.random() * 20 - 10),
+        y: 15,
+        vx: (Math.random() * 2 - 1),
+        vy: 0,
+        r: 6
       };
-      history.unshift(record);
+
+      const gravity = 0.22;
+      const bounce = 0.55;
+
+      function anim() {
+        ball.vy += gravity;
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Hedefe doğru akıllıca saptırma (Bias)
+        const biasStrength = 0.04;
+        if (ball.x < targetX) ball.vx += biasStrength;
+        else ball.vx -= biasStrength;
+
+        // Çivilere çarpışma
+        pegs.forEach(p => {
+          const dx = ball.x - p.x;
+          const dy = ball.y - p.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < ball.r + p.r) {
+            playTick(800 + Math.random() * 150);
+            const angle = Math.atan2(dy, dx);
+            ball.vx = Math.cos(angle) * 2.8 + (Math.random() * 0.4 - 0.2);
+            ball.vy = Math.sin(angle) * 2.8 * bounce;
+          }
+        });
+
+        // Duvar sınırları
+        if (ball.x < ball.r) { ball.x = ball.r; ball.vx *= -bounce; }
+        if (ball.x > plinkoWidth - ball.r) { ball.x = plinkoWidth - ball.r; ball.vx *= -bounce; }
+
+        drawPlinko(ball);
+
+        if (ball.y < plinkoHeight - 45) {
+          requestAnimationFrame(anim);
+        } else {
+          isPlaying = false;
+          drawPlinko(ball);
+          finishGame(names[targetIndex], targetName !== null, 'Plinko Drop');
+        }
+      }
+      requestAnimationFrame(anim);
+    }
+
+    // --- GENEL TETİKLEME FONKSİYONU ---
+    function triggerGame(target = null) {
+      if (activeGameMode === 'wheel') spinWheel(target);
+      else if (activeGameMode === 'slot') spinSlot(target);
+      else if (activeGameMode === 'roulette') spinRoulette(target);
+      else if (activeGameMode === 'plinko') dropPlinko(target);
+    }
+
+    // Oyun Bitiş & Sonuç Bildirimi
+    function finishGame(winner, wasTargeted, gameLabel) {
+      currentWinner = winner;
+      addHistoryRecord(winner, round, wasTargeted, gameLabel);
+      round++;
+      updateRoundUI();
+
+      playWinSound();
+      triggerCelebration(winner, gameLabel);
+
+      broadcast({
+        type: 'spin_end',
+        winner: winner,
+        history: history,
+        names: names
+      });
+    }
+
+    function triggerCelebration(winner, gameLabel) {
+      try {
+        confetti({ particleCount: 90, spread: 75, origin: { y: 0.6 } });
+      } catch (e) {}
+
+      document.getElementById('winnerName').textContent = winner;
+      document.getElementById('winnerGameLabel').textContent = gameLabel || 'KAZANAN';
+      document.getElementById('winnerModal').classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    function addHistoryRecord(winner, roundNumber, wasTargeted, gameLabel) {
+      const timeStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      history.unshift({ round: roundNumber, winner: winner, time: timeStr, wasTargeted: wasTargeted, game: gameLabel });
       saveStorage();
       renderHistoryUI();
     }
@@ -450,16 +797,19 @@
       document.getElementById('historyCount').textContent = history.length;
       document.getElementById('totalSpinsCount').textContent = 'Toplam: ' + history.length;
 
-      if (history.length === 0) {
+      if (!history.length) {
         list.innerHTML = `<div class="text-center py-8 text-xs text-zinc-600">Henüz çekiliş yapılmadı.</div>`;
         return;
       }
 
       list.innerHTML = history.map(item => `
         <div class="flex items-center justify-between p-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs">
-          <div class="flex items-center gap-2">
-            <span class="text-amber-500 font-mono font-bold">#${item.round}</span>
-            <span class="text-zinc-200 font-semibold">${item.winner}</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-amber-500 font-mono font-bold">#${item.round}</span>
+              <span class="text-zinc-200 font-semibold">${item.winner}</span>
+            </div>
+            <div class="text-[10px] text-zinc-500">${item.game || 'Çark'}</div>
           </div>
           <span class="text-[10px] text-zinc-500 font-mono">${item.time}</span>
         </div>
@@ -471,23 +821,27 @@
       document.getElementById('studentCount').textContent = names.length;
     }
 
-    function triggerCelebration(winner) {
-      try {
-        confetti({
-          particleCount: 90,
-          spread: 75,
-          origin: { y: 0.6 }
-        });
-      } catch (e) {}
+    function loadStorage() {
+      const sNames = localStorage.getItem('cark_names');
+      if (sNames) { try { names = JSON.parse(sNames); } catch (e) {} }
+      const sHist = localStorage.getItem('cark_history');
+      if (sHist) {
+        try {
+          history = JSON.parse(sHist);
+          round = history.length + 1;
+        } catch (e) {}
+      }
+      updateRoundUI();
+      renderHistoryUI();
+    }
 
-      document.getElementById('winnerName').textContent = winner;
-      const modal = document.getElementById('winnerModal');
-      modal.classList.remove('opacity-0', 'pointer-events-none');
+    function saveStorage() {
+      localStorage.setItem('cark_names', JSON.stringify(names));
+      localStorage.setItem('cark_history', JSON.stringify(history));
     }
 
     function closeModal() {
-      const modal = document.getElementById('winnerModal');
-      modal.classList.add('opacity-0', 'pointer-events-none');
+      document.getElementById('winnerModal').classList.add('opacity-0', 'pointer-events-none');
     }
 
     function removeCurrentWinner() {
@@ -495,9 +849,10 @@
         names = names.filter(n => n !== currentWinner);
         saveStorage();
         updateRoundUI();
-        drawWheel();
+        if (activeGameMode === 'wheel') drawWheel();
+        else if (activeGameMode === 'roulette') drawRoulette();
+        else if (activeGameMode === 'plinko') drawPlinko();
         broadcast({ type: 'sync_names', names: names });
-        showToast(currentWinner + ' listeden çıkarıldı');
       }
       closeModal();
     }
@@ -508,49 +863,32 @@
       if (e.target === document.getElementById('winnerModal')) closeModal();
     });
 
-    // Geçmiş Paneli
-    document.getElementById('toggleHistoryBtn').addEventListener('click', () => {
-      document.getElementById('historyPanel').classList.remove('translate-x-full');
-    });
+    // Buton Tetikleyicileri
+    document.getElementById('centerSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
+    document.getElementById('slotSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
+    document.getElementById('rouletteSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
+    document.getElementById('plinkoDropBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
 
-    document.getElementById('closeHistoryBtn').addEventListener('click', () => {
-      document.getElementById('historyPanel').classList.add('translate-x-full');
-    });
-
+    // Geçmiş & QR
+    document.getElementById('toggleHistoryBtn').addEventListener('click', () => document.getElementById('historyPanel').classList.remove('translate-x-full'));
+    document.getElementById('closeHistoryBtn').addEventListener('click', () => document.getElementById('historyPanel').classList.add('translate-x-full'));
     document.getElementById('clearHistoryBtn').addEventListener('click', () => {
-      if (confirm('Çekiliş geçmişini sıfırlamak istiyor musunuz?')) {
-        history = [];
-        round = 1;
-        saveStorage();
-        renderHistoryUI();
-        updateRoundUI();
-        broadcast({ type: 'history_updated', history: [] });
+      if (confirm('Geçmişi sıfırlamak istiyor musunuz?')) {
+        history = []; round = 1; saveStorage(); renderHistoryUI(); updateRoundUI();
       }
     });
 
-    // QR Kod Modalı
+    // QR Modal
     function showQrModal() {
       const currentUrl = window.location.href.split('?')[0].replace('index.html', 'control.html');
-      const targetControlUrl = `${currentUrl}?room=${roomId}`;
-      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(targetControlUrl)}&bgcolor=ffffff&color=000000`;
-      
-      document.getElementById('qrImage').src = qrApiUrl;
+      const targetUrl = `${currentUrl}?room=${roomId}`;
+      document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(targetUrl)}&bgcolor=ffffff&color=000000`;
       document.getElementById('qrRoomCode').textContent = 'Oda: ' + roomId;
-      const modal = document.getElementById('qrModal');
-      modal.classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('qrModal').classList.remove('opacity-0', 'pointer-events-none');
     }
-
-    function closeQrModal() {
-      const modal = document.getElementById('qrModal');
-      modal.classList.add('opacity-0', 'pointer-events-none');
-    }
-
     document.getElementById('openQrBtn').addEventListener('click', showQrModal);
     document.getElementById('roomBadge').addEventListener('click', showQrModal);
-    document.getElementById('closeQrBtn').addEventListener('click', closeQrModal);
-    document.getElementById('qrModal').addEventListener('click', (e) => {
-      if (e.target === document.getElementById('qrModal')) closeQrModal();
-    });
+    document.getElementById('closeQrBtn').addEventListener('click', () => document.getElementById('qrModal').classList.add('opacity-0', 'pointer-events-none'));
 
     document.getElementById('soundToggleBtn').addEventListener('click', () => {
       soundEnabled = !soundEnabled;
@@ -563,22 +901,8 @@
       else document.exitFullscreen().catch(() => {});
     });
 
-    document.getElementById('centerSpinBtn').addEventListener('click', () => {
-      initAudio();
-      spinWheel(pendingTarget);
-      pendingTarget = null;
-    });
-
-    canvas.addEventListener('click', () => {
-      initAudio();
-      spinWheel(pendingTarget);
-      pendingTarget = null;
-    });
-
-    // --- PeerJS & Canlı Lobi Yayını (MQTT Heartbeat) ---
-    let peer = null;
-    let connections = [];
-    let mqttClient = null;
+    // --- PeerJS & MQTT ---
+    let peer = null, connections = [], mqttClient = null;
     const randomCode = Math.floor(1000 + Math.random() * 9000);
     const roomId = 'cark-' + randomCode;
 
@@ -586,35 +910,29 @@
       try {
         mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
           clientId: 'host_' + roomId + '_' + Math.random().toString(16).substring(2, 8),
-          clean: true,
-          connectTimeout: 4000
+          clean: true, connectTimeout: 4000
         });
-
         mqttClient.on('connect', () => {
-          // Her 3 saniyede bir kalp atışı yayınla
           sendHeartbeat();
           setInterval(sendHeartbeat, 3000);
         });
-      } catch (e) {
-        console.warn('MQTT broadcast err:', e);
-      }
+      } catch (e) {}
     }
 
     function sendHeartbeat() {
       if (mqttClient && mqttClient.connected) {
-        const payload = JSON.stringify({
+        mqttClient.publish('carkifelek_public_rooms', JSON.stringify({
           roomId: roomId,
-          title: 'Sınıf Çarkı #' + randomCode,
+          title: 'Casino Masası #' + randomCode,
+          gameMode: activeGameMode,
           studentCount: names.length,
           lastSeen: Date.now()
-        });
-        mqttClient.publish('carkifelek_public_rooms', payload);
+        }));
       }
     }
 
     function initPeer() {
       peer = new Peer(roomId);
-
       peer.on('open', (id) => {
         document.getElementById('roomIdDisplay').textContent = id;
         document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-emerald-400';
@@ -628,75 +946,56 @@
             type: 'init',
             names: names,
             history: history,
-            isSpinning: isSpinning
+            gameMode: activeGameMode,
+            isSpinning: isPlaying
           });
         });
 
-        conn.on('data', (data) => handleIncomingMessage(data));
+        conn.on('data', (data) => {
+          if (!data || !data.type) return;
+          if (data.type === 'sync_names') {
+            names = data.names;
+            saveStorage();
+            updateRoundUI();
+            if (activeGameMode === 'wheel') drawWheel();
+            else if (activeGameMode === 'roulette') drawRoulette();
+            else if (activeGameMode === 'plinko') drawPlinko();
+          } else if (data.type === 'spin') {
+            closeModal();
+            triggerGame(data.target || null);
+          } else if (data.type === 'set_target') {
+            pendingTarget = data.target || null;
+          } else if (data.type === 'set_game_mode') {
+            setGameMode(data.mode, false);
+          } else if (data.type === 'remove_name') {
+            names = names.filter(n => n !== data.name);
+            saveStorage();
+            updateRoundUI();
+            if (activeGameMode === 'wheel') drawWheel();
+            else if (activeGameMode === 'roulette') drawRoulette();
+            else if (activeGameMode === 'plinko') drawPlinko();
+          }
+        });
+
         conn.on('close', () => { connections = connections.filter(c => c !== conn); });
       });
-
-      peer.on('error', (err) => {
-        if (err.type === 'unavailable-id') {
-          const fallbackId = 'cark-' + Math.floor(1000 + Math.random() * 9000);
-          peer = new Peer(fallbackId);
-          peer.on('open', (newId) => {
-            document.getElementById('roomIdDisplay').textContent = newId;
-          });
-        }
-      });
-    }
-
-    function handleIncomingMessage(msg) {
-      if (!msg || !msg.type) return;
-
-      if (msg.type === 'sync_names') {
-        if (Array.isArray(msg.names) && msg.names.length > 0) {
-          names = msg.names;
-          saveStorage();
-          updateRoundUI();
-          drawWheel();
-          broadcast({ type: 'names_updated', names: names });
-        }
-      } else if (msg.type === 'spin') {
-        closeModal();
-        spinWheel(msg.target || null);
-      } else if (msg.type === 'set_target') {
-        pendingTarget = msg.target || null;
-      } else if (msg.type === 'remove_name') {
-        names = names.filter(n => n !== msg.name);
-        saveStorage();
-        updateRoundUI();
-        drawWheel();
-        broadcast({ type: 'names_updated', names: names });
-      } else if (msg.type === 'clear_history') {
-        history = [];
-        round = 1;
-        saveStorage();
-        renderHistoryUI();
-        updateRoundUI();
-      }
     }
 
     function broadcast(data) {
       connections.forEach(conn => {
-        if (conn && conn.open) {
-          try { conn.send(data); } catch (e) {}
-        }
+        if (conn && conn.open) try { conn.send(data); } catch (e) {}
       });
     }
 
-    function showToast(msg) {
-      const toast = document.getElementById('toast');
-      toast.textContent = msg;
-      toast.classList.remove('opacity-0');
-      setTimeout(() => { toast.classList.add('opacity-0'); }, 2000);
-    }
+    window.addEventListener('resize', () => {
+      if (activeGameMode === 'wheel') resizeWheelCanvas();
+      else if (activeGameMode === 'roulette') resizeRouletteCanvas();
+      else if (activeGameMode === 'plinko') resizePlinkoCanvas();
+    });
 
-    window.addEventListener('resize', resizeCanvas);
     window.addEventListener('DOMContentLoaded', () => {
       loadStorage();
-      resizeCanvas();
+      setGameMode('wheel', false);
       initPeer();
     });
   </script>
