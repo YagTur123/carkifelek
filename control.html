@@ -537,8 +537,20 @@
           if (data.type === 'init') {
             if (data.history) history = data.history;
             if (data.names && data.names.length) names = data.names;
+            if (selectedTarget && !names.includes(selectedTarget)) selectedTarget = null;
+            if (selectedFakeTarget && !names.includes(selectedFakeTarget)) selectedFakeTarget = null;
+            updateTargetUI();
             if (data.gameMode) changeGameMode(data.gameMode);
             saveStorage(); renderGrid(); renderHistoryUI(); setSpinningState(data.isSpinning);
+          } else if (data.type === 'sync_names') {
+            if (data.names && data.names.length) {
+              names = data.names;
+              if (selectedTarget && !names.includes(selectedTarget)) selectedTarget = null;
+              if (selectedFakeTarget && !names.includes(selectedFakeTarget)) selectedFakeTarget = null;
+              updateTargetUI();
+              saveStorage();
+              renderGrid(document.getElementById('searchInput').value);
+            }
           } else if (data.type === 'spin_start') {
             setSpinningState(true);
           } else if (data.type === 'spin_end') {
@@ -619,6 +631,9 @@
     function removeStudent(studentName) {
       if (!studentName) return;
       names = names.filter(n => n !== studentName);
+      if (selectedTarget === studentName) selectedTarget = null;
+      if (selectedFakeTarget === studentName) selectedFakeTarget = null;
+      updateTargetUI();
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);
       document.getElementById('lastWinnerCard').classList.add('hidden');

@@ -765,6 +765,8 @@
     function setGameMode(mode, broadcastSync = true) {
       if (isPlaying) return;
       clearAllIntervals();
+      closeModal();
+      clearSlotSosLine();
       activeGameMode = mode;
       document.querySelectorAll('.game-view').forEach(el => el.classList.add('hidden'));
 
@@ -782,6 +784,11 @@
         cards: '3D Gizemli Kart Masası'
       };
       document.getElementById('gameTitleDisplay').textContent = titles[mode] || 'Şans Oyunu';
+
+      const stage3D = document.getElementById('roulette3DStage');
+      if (stage3D) stage3D.classList.remove('roulette-spinning-cam', 'roulette-zoom-winner');
+      const rouletteBadge = document.getElementById('rouletteStatusBadge');
+      if (rouletteBadge) rouletteBadge.textContent = 'Krupiye: Çark çevrilmeye hazır';
 
       const viewEl = document.getElementById('game' + mode.charAt(0).toUpperCase() + mode.slice(1) + 'View');
       if (viewEl) viewEl.classList.remove('hidden');
@@ -886,6 +893,42 @@
         wheelCtx.lineWidth = 0.8;
         wheelCtx.stroke();
       }
+
+      // 4. Lüks 3D Pirinç & Altın Merkez Göbek (Gold Center Hub)
+      const hubR = Math.max(18, r * 0.17);
+      const hubGrad = wheelCtx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, hubR);
+      hubGrad.addColorStop(0, '#fffbeb');
+      hubGrad.addColorStop(0.35, '#fef08a');
+      hubGrad.addColorStop(0.70, '#ca8a04');
+      hubGrad.addColorStop(1, '#713f12');
+
+      wheelCtx.save();
+      wheelCtx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+      wheelCtx.shadowBlur = 9;
+      wheelCtx.shadowOffsetY = 4;
+      wheelCtx.beginPath();
+      wheelCtx.arc(cx, cy, hubR, 0, 2 * Math.PI);
+      wheelCtx.fillStyle = hubGrad;
+      wheelCtx.fill();
+      wheelCtx.strokeStyle = '#fef08a';
+      wheelCtx.lineWidth = 2.5;
+      wheelCtx.stroke();
+
+      // Merkez Yakut Somun
+      wheelCtx.beginPath();
+      wheelCtx.arc(cx, cy, hubR * 0.45, 0, 2 * Math.PI);
+      wheelCtx.fillStyle = '#b91c1c';
+      wheelCtx.fill();
+      wheelCtx.strokeStyle = '#fef08a';
+      wheelCtx.lineWidth = 1.5;
+      wheelCtx.stroke();
+
+      // Yakut Üzeri Işıltı Noktası
+      wheelCtx.beginPath();
+      wheelCtx.arc(cx - hubR * 0.15, cy - hubR * 0.15, hubR * 0.12, 0, 2 * Math.PI);
+      wheelCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      wheelCtx.fill();
+      wheelCtx.restore();
     }
 
     // --- GELİŞMİŞ ANALİTİK FİZİK & DOPAMİN NEAR-MISS MOTORU İLE ÇARKIFELEK ---
@@ -1188,35 +1231,33 @@
         cfg.col.style.transition = 'none';
         cfg.col.style.transform = 'translateY(0px)';
 
-        let html = '';
-        // Başlangıç hücresi
-        html += createSlotNameCell(getOtherName());
-
-        // Dönen ara şerit: Sadece sınıftaki diğer katılımcıların isimleri!
-        for (let i = 1; i < cfg.count - 4; i++) {
-          const randomPerson = names[Math.floor(Math.random() * names.length)];
-          html += createSlotNameCell(randomPerson);
+        const cellNames = [];
+        cellNames[0] = getOtherName();
+        for (let i = 1; i < cfg.count; i++) {
+          cellNames[i] = names[Math.floor(Math.random() * names.length)];
         }
 
-        // Makara 3'te veya komşularda sahte hedef hücresi:
-        // cfg.count - 4 pozisyonu (ilk duruşta sahte hedef satırına denk gelen hücre)
+        // Asıl kazanan hücre indeksi (final duruşta tam pencereye oturacak hücre)
+        const realWinnerIdx = cfg.count - 3 + cfg.targetRow;
+        cellNames[realWinnerIdx] = target;
+
+        // Sahte kazanan hücre indeksi (Makara 3 ilk sahteY'de durduğunda tam pencereye oturacak hücre)
+        const fakeWinnerIdx = cfg.count - 4 + cfg.targetRow;
         if (cfg.colIdx === 2 && isHighDopamine) {
-          html += createSlotNameCell(fakeTarget, '🎭');
-        } else {
-          html += createSlotNameCell(getOtherName());
+          cellNames[fakeWinnerIdx] = fakeTarget;
+        } else if (cfg.colIdx < 2 && isHighDopamine && Math.random() < 0.4) {
+          // Makara 1 ve 2'nin diğer hücrelerine de sahte hedefi serpiştir
+          const otherRow = (cfg.targetRow + 1) % 3;
+          cellNames[cfg.count - 3 + otherRow] = fakeTarget;
         }
 
-        // Son 3 hücre (3x3 Pencere):
-        // cfg.targetRow hangi indeksteyse (0, 1, 2) o hücreye KAZANAN KİŞİ yerleştirilir!
-        for (let r = 0; r < 3; r++) {
-          const isWinnerCell = (r === cfg.targetRow);
-          // Eğer 3. makara değilse ama sahte hedef varsa, diğer satırlara sahte hedefi serpiştir (az daha o kazanıyordu hissi)
-          let cellName = isWinnerCell ? target : getOtherName();
-          if (!isWinnerCell && cfg.colIdx < 2 && Math.random() < 0.5) {
-            cellName = fakeTarget;
-          }
-          const cellId = `slotCell_${cfg.colIdx}_${r}`;
-          html += createSlotNameCell(cellName, isWinnerCell ? '👑' : null, isWinnerCell, cellId);
+        let html = '';
+        for (let i = 0; i < cfg.count; i++) {
+          const isRealWinner = (i === realWinnerIdx);
+          const isFakeWinner = (cfg.colIdx === 2 && isHighDopamine && i === fakeWinnerIdx);
+          const badge = isRealWinner ? '👑' : (isFakeWinner ? '🎭' : null);
+          const cellId = (i >= cfg.count - 3) ? `slotCell_${cfg.colIdx}_${i - (cfg.count - 3)}` : '';
+          html += createSlotNameCell(cellNames[i], badge, isRealWinner, cellId);
         }
 
         cfg.col.innerHTML = html;
@@ -1930,7 +1971,7 @@
       }, 2000);
     }
 
-    // KART SEÇİMİ VE SİHİRBAZLIK AÇILIŞI (FORCED MAGIC TRICK)
+    // KART SEÇİMİ VE SİHİRBAZLIK AÇILIŞI (FORCED MAGIC TRICK & NEAR-MISS)
     function revealCard(clickedIndex) {
       if (isPlaying || cardsState !== 'closed_ready') return;
       isPlaying = true;
@@ -1948,10 +1989,20 @@
         winner = names[Math.floor(Math.random() * names.length)] || names[0] || 'Şanslı Kişi';
       }
 
-      // Kalan isimleri diğer kartlara paylaştır (böylece masada her isim tutarlı kalır)
-      const otherNames = names.filter(n => n !== winner).sort(() => Math.random() - 0.5);
+      // Sahte Hedef (Near-Miss Kurbanı)
+      let fakeVictim = pendingFakeTarget;
+      if (fakeVictim && names.some(n => n.trim().toLowerCase() === fakeVictim.trim().toLowerCase())) {
+        fakeVictim = names.find(n => n.trim().toLowerCase() === fakeVictim.trim().toLowerCase());
+      } else {
+        const othersPool = names.filter(n => n !== winner);
+        fakeVictim = othersPool.length ? othersPool[0] : null;
+      }
 
-      let otherIdx = 0;
+      // Kalan isimleri diğer kartlara paylaştır
+      const remainingNames = names.filter(n => n !== winner && n !== fakeVictim).sort(() => Math.random() - 0.5);
+      const fakeCardIndex = (clickedIndex + 1) % names.length;
+
+      let remIdx = 0;
       names.forEach((_, i) => {
         const cardEl = document.getElementById('cardIndex_' + i);
         if (!cardEl) return;
@@ -1959,28 +2010,55 @@
         if (!nameSpan) return;
         if (i === clickedIndex) {
           nameSpan.textContent = winner;
+        } else if (i === fakeCardIndex && fakeVictim) {
+          nameSpan.textContent = fakeVictim;
         } else {
-          nameSpan.textContent = otherNames[otherIdx++] || names[i];
+          nameSpan.textContent = remainingNames[remIdx++] || names[i];
         }
       });
 
-      // Tıklanan kartı görkemli şekilde havaya kaldırıp aç
       const selectedCard = document.getElementById('cardIndex_' + clickedIndex);
-      playWinSound();
+      const fakeCard = document.getElementById('cardIndex_' + fakeCardIndex);
 
-      selectedCard.classList.remove('card-flipped'); // Ön yüzünü aç
-      selectedCard.classList.add('card-selected-reveal');
+      if (fakeVictim && (dopamineLevel > 50 || pendingFakeTarget)) {
+        // YÜKSEK GERİLİM: Önce sahte kart hafifçe parlar ve titrer!
+        if (fakeCard) {
+          fakeCard.classList.add('ring-2', 'ring-purple-400', 'scale-105');
+          document.getElementById('cardsStatusLabel').textContent = `Az daha bu kart açılıyordu: ${fakeVictim}?!`;
+          playTick(820);
+        }
 
-      document.getElementById('cardsStatusLabel').textContent = `Seçilen Kart Açıldı: ${winner}!`;
+        setTimeout(() => {
+          if (fakeCard) fakeCard.classList.remove('ring-2', 'ring-purple-400', 'scale-105');
+          playWinSound();
+          selectedCard.classList.remove('card-flipped');
+          selectedCard.classList.add('card-selected-reveal');
+          document.getElementById('cardsStatusLabel').textContent = `👑 KAZANAN KART: ${winner}!`;
 
-      setTimeout(() => {
-        isPlaying = false;
-        finishGame(winner, pendingTarget !== null, '3D Gizemli Kart Masası');
-      }, 1600);
+          setTimeout(() => {
+            isPlaying = false;
+            finishGame(winner, pendingTarget !== null, '3D Gizemli Kart Masası');
+          }, 1500);
+        }, 420);
+
+      } else {
+        // Standart doğrudan açılış
+        playWinSound();
+        selectedCard.classList.remove('card-flipped');
+        selectedCard.classList.add('card-selected-reveal');
+        document.getElementById('cardsStatusLabel').textContent = `Seçilen Kart Açıldı: ${winner}!`;
+
+        setTimeout(() => {
+          isPlaying = false;
+          finishGame(winner, pendingTarget !== null, '3D Gizemli Kart Masası');
+        }, 1500);
+      }
     }
 
-    function pickRandomCard() {
+    function pickRandomCard(target = null, fakeTarget = null) {
       if (isPlaying) return;
+      if (target) pendingTarget = target;
+      if (fakeTarget) pendingFakeTarget = fakeTarget;
       if (cardsState === 'closed_ready') {
         const randIdx = Math.floor(Math.random() * names.length);
         revealCard(randIdx);
@@ -2002,7 +2080,7 @@
       else if (activeGameMode === 'slot') spinSlot(target, fakeTarget);
       else if (activeGameMode === 'roulette') spinRoulette(target, fakeTarget);
       else if (activeGameMode === 'cards') {
-        pickRandomCard();
+        pickRandomCard(target, fakeTarget);
       }
     }
 
@@ -2124,12 +2202,19 @@
       if (e.target === document.getElementById('winnerModal')) closeModal();
     });
 
-    document.getElementById('centerSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
-    document.getElementById('slotSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
-    document.getElementById('slotLeverControl').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
-    document.getElementById('rouletteSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
+    document.getElementById('centerSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
+    document.getElementById('slotSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
+    document.getElementById('slotLeverControl').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
+    document.getElementById('rouletteSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
     document.getElementById('cardsShuffleBtn').addEventListener('click', shuffleCardsDeck);
-    document.getElementById('cardsPickRandomBtn').addEventListener('click', pickRandomCard);
+    document.getElementById('cardsPickRandomBtn').addEventListener('click', () => { triggerGame(pendingTarget, pendingFakeTarget); pendingTarget = null; pendingFakeTarget = null; });
+
+    window.addEventListener('pointerdown', () => {
+      initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+    }, { passive: true });
 
     document.getElementById('toggleHistoryBtn').addEventListener('click', () => document.getElementById('historyPanel').classList.remove('translate-x-full'));
     document.getElementById('closeHistoryBtn').addEventListener('click', () => document.getElementById('historyPanel').classList.add('translate-x-full'));
