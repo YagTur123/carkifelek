@@ -1111,12 +1111,11 @@
       }
 
       // 4. Hedef ve Yem'i YAN YANA (komşu dilim/cep) olarak rastgele bir konuma ekle
-      // Çark saat yönünde dönerken hedeften önceki dilim (targetIndex + 1) % N'dir.
-      // Rulette de komşu cepler yan yanadır.
-      // Diziye [target, fake] sırasıyla yan yana eklenir.
+      // KULLANICI KURALI: Kazanan, Yem'in hemen arkasında olacak ki;
+      // Çark ileri dönerken Yem'de duracak, sonra Yem'den yavaş yavaş geriye dönüp gerçek kazanana inecek!
       const insertIndex = Math.floor(Math.random() * (others.length + 1));
       if (fake) {
-        others.splice(insertIndex, 0, target, fake);
+        others.splice(insertIndex, 0, fake, target);
       } else {
         others.splice(insertIndex, 0, target);
       }
@@ -1153,8 +1152,9 @@
       let targetIndex = names.findIndex(n => trNormalize(n) === trNormalize(actualTarget));
       if (targetIndex === -1) targetIndex = 0;
 
-      // Çark saat yönünde dönerken hedefe varmadan hemen önceki komşu dilim: (targetIndex + 1) % N
-      const fakeTargetIndex = (targetIndex + 1) % N;
+      // Çark saat yönünde dönerken hedeften hemen sonra gelen komşu dilim: fakeTargetIndex
+      // KULLANICI KURALI: Kazanan, Yem'in hemen arkasında yer alır.
+      const fakeTargetIndex = (targetIndex - 1 + N) % N;
 
       // Kumandadan gelen süre ve sürekli (analog) dopamin seviyesi ölçeklemesi
       const duration = Math.max(4500, spinDuration * 1000);
@@ -1179,7 +1179,7 @@
       // DOPAMİN DİNAMİĞİ (%0 ile %100 ARASI KESİNTİSİZ ANALOG ÖLÇEKLEME):
       // %0 - %11: Standart doğal fiziksel sönüm
       // %12 - %79: Near-miss gerilimi & pimde ağır çekim sürünme
-      // %80 - %100: KULLANICI KURALI: Uca vurup GERİYE DÖNME (Recoil), Yem diliminde asılı kalma ve son saniyede kazanana fırlama!
+      // %80 - %100: KULLANICI KURALI: Çark ileri dönerken YEMDE DURACAK, Yemden yavaş yavaş geriye dönüp gerçek kazanana inecek!
       const isRecoilActive = (effD >= 0.80);
 
       // Normal Dopamin (12-79%) parametreleri
@@ -1193,15 +1193,11 @@
       const m1 = 0; // Kazanan dilim merkezine sıfır hızla pürüzsüzce oturur
       let hasOvercomePeg = false;
 
-      // %80-100 Recoil & Yemde Bekleme Parametreleri
-      const pStrike = 0.70; // Uca (sınır pimine) vurma zamanı
-      const pRecoil = 0.80; // Geriye sekip yem diliminin göbeğine varış zamanı
-      const pHoverEnd = 0.88; // Yem üstünde nefes kesen beklemenin bitiş zamanı
-      const strikeTheta = finalRotation - 0.38 * arc; // Pimin hemen eşiği (aşmaya çalışıp zorladığı açı)
-      const recoilTheta = finalRotation - 0.88 * arc; // Yem diliminin merkezine geriye sekme açısı
-      let strikeTickPlayed = false;
+      // %80-100 Recoil & Yemde Durma, Yemden Yavaş Yavaş Kazanana İnme Parametreleri
+      const fakeStopRotation = finalRotation + 0.85 * arc; // Yem diliminin tam merkezi
+      const pStop = 0.70; // Yem dilimine varış ve durma zamanı
+      const pHoverEnd = 0.82; // Yem üstünde durup beklemenin bitiş zamanı (0.70-0.82 arası tam duruş)
       let recoilTickPlayed = false;
-      let snapTickPlayed = false;
 
       // İbre (flapper) gerilim ve titreme şiddeti: %0'da normal, %100'de kalp krizi seviyesi
       const maxFlapperDeflection = 14.0 + effD * 12.0; // 14° ile 26° arası bükülme
@@ -1231,61 +1227,47 @@
 
         if (isRecoilActive) {
           // ==========================================
-          // %80 - %100 SİNEMATİK GERİYE DÖNÜŞ (RECOIL) & YEMDE DURAKSAMA MODU
+          // %80 - %100 SİNEMATİK: YEMDE DURUŞ & YEMDEN GERÇEK KAZANANA GERİ DÖNÜŞ (RECOIL)
           // ==========================================
-          if (progress <= pStrike) {
-            // 1. AŞAMA: Pime doğru yavaşlayarak gelip uca çarpma
-            const u = progress / pStrike;
-            const ease = 1 - Math.pow(1 - u, 2.8);
-            wheelRotation = startRotation + (strikeTheta - startRotation) * ease;
-            const du = (2.8 * Math.pow(1 - u, 1.8)) / pStrike;
-            currentSpeed = Math.max(0, ((strikeTheta - startRotation) / (duration / 1000)) * du);
+          if (progress <= pStop) {
+            // 1. AŞAMA: Çark hızla döner ve YEM DİLİMİNİN MERKEZİNDE TAMAMEN DURUR
+            const u = progress / pStop;
+            const ease = 1 - Math.pow(1 - u, 3.4); // Doğal sürtünme ve yavaşlama
+            wheelRotation = startRotation + (fakeStopRotation - startRotation) * ease;
+            const du = (3.4 * Math.pow(1 - u, 2.4)) / pStop;
+            currentSpeed = Math.max(0, ((fakeStopRotation - startRotation) / (duration / 1000)) * du);
 
-            if (progress >= pStrike - 0.08) {
-              const tensionP = (progress - (pStrike - 0.08)) / 0.08;
-              flapperDeflection = -maxFlapperDeflection * tensionP;
-            }
-            if (progress >= pStrike - 0.015 && !strikeTickPlayed) {
-              strikeTickPlayed = true;
-              playTick(480); // Tok uca çarpma ve kilitlenme sesi
-            }
-          } else if (progress <= pRecoil) {
-            // 2. AŞAMA: GERİYE SEKME (RECOIL / BOUNCE BACK)
-            // Çark tırnak yayının direnciyle ters yönde geriye döner!
-            const u = (progress - pStrike) / (pRecoil - pStrike);
-            const ease = 0.5 * (1 - Math.cos(u * Math.PI));
-            wheelRotation = strikeTheta - (strikeTheta - recoilTheta) * ease;
-            currentSpeed = 0.012; // görsel dinamik bulanıklık
-
-            // İbre pimin baskısından kurtulup rahatlar
-            flapperDeflection = -maxFlapperDeflection * (1 - u);
-            if (!recoilTickPlayed && u > 0.35) {
-              recoilTickPlayed = true;
-              playTick(410); // Geriye sekme tok çıtırtısı
+            if (progress >= pStop - 0.05) {
+              flapperDeflection = flapperDeflection * 0.85; // Yem merkezinde ibre durulur
             }
           } else if (progress <= pHoverEnd) {
-            // 3. AŞAMA: YEM DİLİMİNDE ASILI KALMA & DURAKSAMA (SUSPENSE HOLD)
-            // Çark sahte hedefin üstünde durur, hafif bir gerilim titremesi yapar
-            const u = (progress - pRecoil) / (pHoverEnd - pRecoil);
-            const tremor = Math.sin(u * Math.PI * 4) * 0.018 * arc;
-            wheelRotation = recoilTheta + tremor;
-            currentSpeed = 0.002;
-            flapperDeflection = Math.sin(now * 0.04) * 1.5; // gerilim nefesi
+            // 2. AŞAMA: YEMDE TAM DURUŞ & ASILI KALMA (HERKES YEM KAZANDI SANIR!)
+            // Çark YEM diliminin tam ortasında durmuştur
+            const u = (progress - pStop) / (pHoverEnd - pStop);
+            const tremor = Math.sin(u * Math.PI * 2) * 0.006 * arc;
+            wheelRotation = fakeStopRotation + tremor;
+            currentSpeed = 0.001; // durdu
+            flapperDeflection = Math.sin(now * 0.04) * 0.8; // hafif nefes
           } else {
-            // 4. AŞAMA: SON SANİYE PİMİ AŞIP KAZANANA FIRLAMA (FINAL SNAP TO WINNER)
+            // 3. AŞAMA: YEMDEN YAVAŞ YAVAŞ GERÇEK KAZANANA GERİ DÖNÜŞ (RECOIL / ROLL BACK)
+            // Çark yay direnciyle saat yönünün tersine geriye döner (fakeStopRotation -> finalRotation)
             const u = (progress - pHoverEnd) / (1.0 - pHoverEnd);
-            const ease = 1 - Math.pow(1 - u, 3.2);
-            wheelRotation = recoilTheta + (finalRotation - recoilTheta) * ease;
-            const du = (3.2 * Math.pow(1 - u, 2.2)) / (1.0 - pHoverEnd);
-            currentSpeed = Math.max(0, ((finalRotation - recoilTheta) / (duration / 1000)) * du);
+            const ease = 0.5 * (1 - Math.cos(u * Math.PI)); // Pürüzsüz S-Curve geriye akış
+            wheelRotation = fakeStopRotation - (fakeStopRotation - finalRotation) * ease;
+            const du = (0.5 * Math.PI * Math.sin(u * Math.PI)) / (1.0 - pHoverEnd);
+            currentSpeed = Math.max(0, ((fakeStopRotation - finalRotation) / (duration / 1000)) * du);
 
-            if (progress >= pHoverEnd + 0.03 && !snapTickPlayed) {
-              snapTickPlayed = true;
-              playTick(960); // Pimi aşma zafer klik sesi
-              flapperSpringVel = flapperSnapVel;
+            // Geri dönerken sınır pimini ters yönde aşarken ibre sağa (+10°) esner
+            if (u > 0.35 && u < 0.70) {
+              flapperDeflection = 12.0 * Math.sin(((u - 0.35) / 0.35) * Math.PI);
+              if (!recoilTickPlayed && u > 0.50) {
+                recoilTickPlayed = true;
+                playTick(580); // Pimi geriye aşma tok klik sesi
+              }
+            } else {
+              flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+              flapperDeflection += flapperSpringVel * dt;
             }
-            flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
-            flapperDeflection += flapperSpringVel * dt;
           }
         } else if (isDopamineActive) {
           // ==========================================
