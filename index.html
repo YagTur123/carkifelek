@@ -1120,7 +1120,7 @@
       const fakeTargetIndex = (targetIndex + 1) % N;
 
       // Kumandadan gelen süre ve dopamin seviyesi
-      const duration = Math.max(3000, spinDuration * 1000);
+      const duration = Math.max(4500, spinDuration * 1000);
       const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
 
       // Hedeflenen dilimin tam merkezinin tepe ibresiyle (POINTER_ANGLE) çakışması için gereken açı
@@ -1131,22 +1131,22 @@
       let deltaAngle = targetModulo - currentModulo;
       if (deltaAngle <= 0.1) deltaAngle += 2 * Math.PI;
 
-      // Süreye göre tur sayısı (kısa sürede 4-5 tur, uzun sürede 8-10 tur)
-      const baseTurns = Math.max(4, Math.floor(duration / 1000 * 1.1));
+      // Süreye göre dengeli tur sayısı (aşırı hızlı fırıldak yerine asil ve okunaklı dönüş)
+      const baseTurns = Math.max(3, Math.floor((duration / 1000) * 0.85));
       const totalDelta = baseTurns * (2 * Math.PI) + deltaAngle;
       const startRotation = wheelRotation;
       const finalRotation = startRotation + totalDelta;
 
-      // Kazanan ile Yem artık yan yana olduğundan, sahte hedefin duraklama açısı tam olarak finalRotation - arc'tır!
-      // Sahte dilim ile hedef arasındaki pim çentiği açısı: finalRotation - 0.5 * arc
-      // GERÇEK FİZİKSEL SÖNÜM & C^1 KESİNTİSİZ SÜREKLİ NEAR-MISS MODELİ (SIFIR TP / SIFIR HIZ SIÇRAMASI)
+      // Kazanan ile Yem yan yana olduğundan, sahte hedefin pim çentiği açısı: finalRotation - 0.5 * arc
+      // DEEPSEEK KİNEMATİK SÖNÜM: Son saniyelerde dramatik yavaşlama (C^1 sürekli analitik model)
       const pegRatio = (totalDelta - 0.5 * arc) / totalDelta;
-      const pPeg = 0.84;
-      const crawlC = isHighDopamine ? (0.04 + (dopamineLevel / 100) * 0.04) : 0.08;
+      const pPeg = 0.76; // Son %24'lük genişletilmiş gerilim ve yavaşlama penceresi (son ~2 saniye)
+      const crawlC = isHighDopamine ? (0.025 + (dopamineLevel / 100) * 0.02) : 0.05;
       const span2 = 1 - pPeg;
-      const vPeg = pegRatio * crawlC / pPeg;
+      const a = 3.2; // İlk fazda belirgin ve doğal sönüm katsayısı
+      const vPeg = (pegRatio * crawlC) / pPeg;
       const m0 = vPeg * span2;
-      const m1 = 0; // Hedef merkezine 0 hızla pürüzsüzce oturur
+      const m1 = 0; // Kazanan dilim merkezine sıfır hızla pürüzsüzce oturur
       let hasOvercomePeg = false;
 
       const startTime = performance.now();
@@ -1175,15 +1175,15 @@
         if (isHighDopamine) {
           if (progress < pPeg) {
             const pn = progress / pPeg;
-            const a = 2.4;
-            easeP = pegRatio * ((1 - Math.pow(1 - pn, a)) * (1 - crawlC) + crawlC * pn);
-            currentSpeed = (pegRatio * totalDelta / (pPeg * (duration / 1000))) * (a * Math.pow(Math.max(0, 1 - pn), a - 1) * (1 - crawlC) + crawlC);
+            const oneMinusPn = Math.max(0, 1 - pn);
+            easeP = pegRatio * ((1 - Math.pow(oneMinusPn, a)) * (1 - crawlC) + crawlC * pn);
+            currentSpeed = (pegRatio * totalDelta / (pPeg * (duration / 1000))) * (a * Math.pow(oneMinusPn, a - 1) * (1 - crawlC) + crawlC);
           } else {
-            // PİMİ AŞMA VE KAZANANIN MERKEZİNE YERLEŞME
-            if (!hasOvercomePeg) {
+            // PİMİ AŞMA VE KAZANANIN MERKEZİNE YERLEŞME (SON SANİYE SÜRÜNMESİ)
+            if (!hasOvercomePeg && progress >= pPeg + 0.05) {
               hasOvercomePeg = true;
-              playTick(840);
-              flapperSpringVel = 135; // Pimi aşınca ibreye fırlama ivmesi
+              playTick(860);
+              flapperSpringVel = 140; // Pimi aşınca ibreye fırlama ivmesi
             }
             const tRatio = (progress - pPeg) / span2;
             const t2 = tRatio * tRatio, t3 = t2 * tRatio;
@@ -1196,7 +1196,7 @@
             currentSpeed = Math.max(0, (dh * totalDelta) / (span2 * (duration / 1000)));
           }
         } else {
-          const pExp = 3.6;
+          const pExp = 4.6;
           easeP = 1 - Math.pow(1 - progress, pExp);
           currentSpeed = (totalDelta / duration) * (pExp * Math.pow(Math.max(0, 1 - progress), pExp - 1));
         }
@@ -1208,10 +1208,10 @@
         const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
         const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
 
-        if (isHighDopamine && progress >= pPeg - 0.08 && progress < pPeg) {
+        if (isHighDopamine && progress >= pPeg - 0.12 && progress < pPeg) {
           // Pim çentiğinde maksimum bükülme gerilimi ve gerilim titremesi (tremor)
-          const tensionProgress = (progress - (pPeg - 0.08)) / 0.08;
-          flapperDeflection = -16.0 * tensionProgress - Math.sin(now * 0.045) * 1.5;
+          const tensionProgress = (progress - (pPeg - 0.12)) / 0.12;
+          flapperDeflection = -18.0 * tensionProgress - Math.sin(now * 0.05) * 1.8;
           flapperSpringVel = 0;
         } else if (phaseInSlice < 0.24) {
           const pushFraction = phaseInSlice / 0.24;
