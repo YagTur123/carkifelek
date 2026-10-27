@@ -235,7 +235,7 @@
     <!-- 1. 3D ÇARKIFELEK -->
     <div id="gameWheelView" class="game-view relative flex items-center justify-center">
       <div class="relative wheel-3d transition-all duration-300">
-        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none filter drop-shadow-xl" id="pointerEl">
+        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none filter drop-shadow-xl" id="pointerEl" style="transform-origin: 50% 4px; transition: transform 0.05s ease-out;">
           <div class="w-8 h-12 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
           <div class="w-3.5 h-3.5 rounded-full bg-amber-100 mx-auto -mt-12 border border-amber-950"></div>
         </div>
@@ -267,10 +267,10 @@
             </div>
             
             <h2 class="text-amber-300 font-serif font-black text-xl md:text-2xl tracking-widest uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center gap-2">
-              <span>★</span> LAS VEGAS SLOTS <span>★</span>
+              <span>★</span> VEGAS ÇEKİLİŞİ <span>★</span>
             </h2>
-            <div class="text-[11px] font-mono font-bold tracking-widest text-red-200 uppercase bg-black/60 px-3 py-0.5 rounded-full border border-red-500/40 mt-0.5">
-              JACKPOT 777
+            <div class="text-[11px] font-mono font-bold tracking-widest text-amber-200 uppercase bg-black/60 px-3 py-0.5 rounded-full border border-amber-500/40 mt-0.5">
+              3'LÜ EŞLEŞME KAZANIR
             </div>
           </div>
 
@@ -291,41 +291,41 @@
               <!-- Makara 1 -->
               <div class="w-24 md:w-28 h-full bg-zinc-950/90 rounded-lg overflow-hidden relative border border-zinc-800/80 shadow-inner">
                 <div id="slotReelCol1" class="slot-reel-strip">
-                  <!-- Dinamik semboller doldurulacak -->
+                  <!-- Dinamik kişi isimleri doldurulacak -->
                 </div>
               </div>
 
               <!-- Makara 2 -->
               <div class="w-24 md:w-28 h-full bg-zinc-950/90 rounded-lg overflow-hidden relative border border-zinc-800/80 shadow-inner">
                 <div id="slotReelCol2" class="slot-reel-strip">
-                  <!-- Dinamik semboller doldurulacak -->
+                  <!-- Dinamik kişi isimleri doldurulacak -->
                 </div>
               </div>
 
               <!-- Makara 3 -->
               <div class="w-24 md:w-28 h-full bg-zinc-950/90 rounded-lg overflow-hidden relative border border-zinc-800/80 shadow-inner">
                 <div id="slotReelCol3" class="slot-reel-strip">
-                  <!-- Dinamik semboller doldurulacak -->
+                  <!-- Dinamik kişi isimleri doldurulacak -->
                 </div>
               </div>
 
             </div>
           </div>
 
-          <!-- Alt Kontrol Masası (LED Sayaçlar & 3D Kırmızı SPIN Butonu) -->
+          <!-- Alt Kontrol Masası (Katılımcı & Durum LED Paneli & 3D SPIN Butonu) -->
           <div class="w-full flex flex-col gap-3">
             <div class="grid grid-cols-3 gap-2 bg-black/80 p-2 rounded-xl border border-amber-600/50 shadow-inner">
               <div class="flex flex-col items-center">
-                <span class="text-[9px] text-zinc-400 font-mono">KREDİ</span>
-                <span class="text-amber-400 font-mono font-bold text-xs md:text-sm">777</span>
+                <span class="text-[9px] text-zinc-400 font-mono uppercase">TOPLAM KİŞİ</span>
+                <span id="slotTotalPeople" class="text-amber-400 font-mono font-bold text-xs md:text-sm">0</span>
               </div>
               <div class="flex flex-col items-center border-x border-zinc-800">
-                <span class="text-[9px] text-zinc-400 font-mono">BAHİS</span>
-                <span class="text-amber-400 font-mono font-bold text-xs md:text-sm">25</span>
+                <span class="text-[9px] text-zinc-400 font-mono uppercase">HEDEF</span>
+                <span class="text-amber-400 font-mono font-bold text-xs md:text-sm">3x EŞLEŞME</span>
               </div>
               <div class="flex flex-col items-center">
-                <span class="text-[9px] text-zinc-400 font-mono">KAZANÇ</span>
-                <span id="slotWinMeter" class="text-emerald-400 font-mono font-bold text-xs md:text-sm">0</span>
+                <span class="text-[9px] text-zinc-400 font-mono uppercase">DURUM</span>
+                <span id="slotWinMeter" class="text-emerald-400 font-mono font-bold text-xs md:text-sm">HAZIR</span>
               </div>
             </div>
 
@@ -775,9 +775,10 @@
     function drawWheel() {
       if (!names.length) return;
       const N = names.length, arc = (2 * Math.PI) / N;
-      const cx = wheelRadius, cy = wheelRadius, r = wheelRadius - 12;
+      const cx = wheelRadius, cy = wheelRadius, r = wheelRadius - 14;
       wheelCtx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
 
+      // 1. Dilimler & İsimler
       for (let i = 0; i < N; i++) {
         const a = wheelRotation + i * arc;
         wheelCtx.beginPath();
@@ -786,7 +787,7 @@
         wheelCtx.arc(cx, cy, r, a, a + arc);
         wheelCtx.fill();
         wheelCtx.strokeStyle = '#d4af37';
-        wheelCtx.lineWidth = 1.5;
+        wheelCtx.lineWidth = 1.4;
         wheelCtx.stroke();
 
         wheelCtx.save();
@@ -794,98 +795,160 @@
         wheelCtx.rotate(a + arc / 2);
         wheelCtx.textAlign = 'right';
         wheelCtx.fillStyle = '#fef3c7';
-        const fontSize = Math.max(10, Math.min(14, Math.floor(wheelRadius / 17)));
+        wheelCtx.shadowColor = 'rgba(0,0,0,0.85)';
+        wheelCtx.shadowBlur = 4;
+        const fontSize = Math.max(9, Math.min(14, Math.floor(wheelRadius / 17)));
         wheelCtx.font = `bold ${fontSize}px sans-serif`;
         let displayName = names[i];
         if (displayName.length > 12) displayName = displayName.substring(0, 11) + '…';
-        wheelCtx.fillText(displayName, r - 20, fontSize / 3);
+        wheelCtx.fillText(displayName, r - 22, fontSize / 3);
         wheelCtx.restore();
       }
 
+      // 2. Dış Ahşap & Altın Çember
       wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, r + 5, 0, 2 * Math.PI);
+      wheelCtx.arc(cx, cy, r + 4, 0, 2 * Math.PI);
       wheelCtx.strokeStyle = '#272017';
-      wheelCtx.lineWidth = 12;
+      wheelCtx.lineWidth = 14;
       wheelCtx.stroke();
 
       wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, r + 10, 0, 2 * Math.PI);
+      wheelCtx.arc(cx, cy, r + 11, 0, 2 * Math.PI);
       wheelCtx.strokeStyle = '#b48a3c';
-      wheelCtx.lineWidth = 2;
+      wheelCtx.lineWidth = 2.5;
       wheelCtx.stroke();
+
+      // 3. Pirinç Pimler (3D Brass Pegs / Çiviler - Gerçek Fizik Temas Noktaları)
+      const pegR = r + 3;
+      for (let i = 0; i < N; i++) {
+        const pa = wheelRotation + i * arc;
+        const px = cx + pegR * Math.cos(pa);
+        const py = cy + pegR * Math.sin(pa);
+
+        // Pim Alt Gölgesi
+        wheelCtx.beginPath();
+        wheelCtx.arc(px + 1.2, py + 1.5, 3.5, 0, 2 * Math.PI);
+        wheelCtx.fillStyle = 'rgba(0,0,0,0.65)';
+        wheelCtx.fill();
+
+        // 3D Pirinç Gövde
+        const pegGrad = wheelCtx.createRadialGradient(px - 1, py - 1, 0.5, px, py, 3.5);
+        pegGrad.addColorStop(0, '#fffbeb');
+        pegGrad.addColorStop(0.35, '#fef08a');
+        pegGrad.addColorStop(0.75, '#ca8a04');
+        pegGrad.addColorStop(1, '#713f12');
+
+        wheelCtx.beginPath();
+        wheelCtx.arc(px, py, 3.5, 0, 2 * Math.PI);
+        wheelCtx.fillStyle = pegGrad;
+        wheelCtx.fill();
+        wheelCtx.strokeStyle = '#854d0e';
+        wheelCtx.lineWidth = 0.8;
+        wheelCtx.stroke();
+      }
     }
 
+    // --- GERÇEK AÇISAL FİZİK MOTORU İLE ÇARKIFELEK (ANGULAR PHYSICS & ELASTIC FLAPPER) ---
     function spinWheel(targetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
       broadcast({ type: 'spin_start' });
 
       const N = names.length, arc = (2 * Math.PI) / N;
+      const POINTER_ANGLE = 1.5 * Math.PI; // 270 derece (tam tepe)
+
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
-      const totalTurns = (6 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
-      let deltaRotation = 0;
-      const POINTER_ANGLE = 1.5 * Math.PI;
+      if (targetIndex === -1) targetIndex = Math.floor(Math.random() * N);
 
-      if (targetIndex !== -1) {
-        const randInside = targetIndex * arc + (0.2 + Math.random() * 0.6) * arc;
-        const desiredMod = ((POINTER_ANGLE - randInside) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-        const currentMod = (wheelRotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-        let diff = desiredMod - currentMod;
-        if (diff < 0) diff += 2 * Math.PI;
-        deltaRotation = totalTurns + diff;
-      } else {
-        deltaRotation = totalTurns + Math.random() * 2 * Math.PI;
-      }
+      // Hedeflenen dilimin tam ortasının tepe noktasına oturması için gereken açı hesabı
+      const turns = 6 + Math.floor(Math.random() * 2); // 6-7 tam tur
+      const desiredInside = (targetIndex + 0.5) * arc;
+      const targetModulo = ((POINTER_ANGLE - desiredInside) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const currentModulo = (wheelRotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      let deltaAngle = targetModulo - currentModulo;
+      if (deltaAngle <= 0) deltaAngle += 2 * Math.PI;
+      const totalDelta = turns * (2 * Math.PI) + deltaAngle;
 
-      const startRot = wheelRotation, finalRot = startRot + deltaRotation;
-      const duration = 5000, startTime = performance.now();
+      // Gerçek fizik sürtünme katsayısı ve başlangıç açısal hızı (Analitik Balistik Çözüm)
+      const friction = 0.62; // 1/saniye sürtünme frenlemesi
+      let omega = friction * totalDelta; // Başlangıç açısal hızı (rad/s)
+      let currentRot = wheelRotation;
+
+      let lastTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
+      let lastPegIndex = -1;
+      let flapperDeflection = 0; // Tırnağın anlık fiziksel eğim açısı
+      let flapperSpringVel = 0;
 
-      function anim(time) {
-        const elapsed = time - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const ease = 1 - Math.pow(1 - progress, 5);
-        wheelRotation = startRot + deltaRotation * ease;
+      function physicsStep(now) {
+        let dt = (now - lastTime) / 1000;
+        lastTime = now;
+        if (dt > 0.05) dt = 0.016; // FPS düşüşü kalkanı
+
+        // Açısal Fizik: Sürtünme diferansiyeli
+        const alphaFriction = -friction * omega;
+        omega += alphaFriction * dt;
+        currentRot += omega * dt;
+        wheelRotation = currentRot;
+
+        // Tırnak & Pim Fiziksel Çarpışma Hesaplaması
+        const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
+        const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
+
+        // Pim tırnağa çarpıp iterken
+        if (phaseInSlice < 0.28) {
+          const pushFraction = phaseInSlice / 0.28;
+          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 22; // tırnak 22 dereceye kadar itilir
+          if (curIdx !== lastPegIndex) {
+            lastPegIndex = curIdx;
+            playTick(720 + Math.min(220, omega * 15));
+            flapperSpringVel = 45;
+          }
+        } else {
+          // Pimden kurtulunca sönümlü yay titreşimi
+          flapperSpringVel += -350 * flapperDeflection * dt - 18 * flapperSpringVel * dt;
+          flapperDeflection += flapperSpringVel * dt;
+          if (Math.abs(flapperDeflection) < 0.2 && Math.abs(flapperSpringVel) < 0.5) {
+            flapperDeflection = 0;
+            flapperSpringVel = 0;
+          }
+        }
+
+        if (pointerEl) {
+          pointerEl.style.transform = `translateX(-50%) rotate(${flapperDeflection.toFixed(2)}deg)`;
+        }
+
         drawWheel();
 
-        const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
-        if (curIdx !== lastWheelTickIndex) {
-          playTick(750);
-          lastWheelTickIndex = curIdx;
-          pointerEl.style.transform = 'translateX(-50%) rotate(-15deg)';
-          setTimeout(() => pointerEl.style.transform = 'translateX(-50%) rotate(0deg)', 40);
-        }
-
-        if (progress < 1) requestAnimationFrame(anim);
-        else {
+        // Durma Kriteri (Açısal hız kritik eşiğin altına indiğinde)
+        if (omega > 0.08) {
+          requestAnimationFrame(physicsStep);
+        } else {
+          // Çark dilim içine oturup mikronluk son yaylanmayı tamamlar
           isPlaying = false;
-          wheelRotation = finalRot;
+          if (pointerEl) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
+          
+          // Tam hedef açıya kilitlen
+          wheelRotation = currentModulo + totalDelta;
           drawWheel();
+
           const winnerIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
-          finishGame(names[winnerIdx], targetName !== null, '3D Çarkıfelek');
+          finishGame(names[winnerIdx], targetName !== null, '3D Gerçek Fizik Çarkı');
         }
       }
-      requestAnimationFrame(anim);
+
+      requestAnimationFrame(physicsStep);
     }
 
-    // --- 2. 3D RETRO VEGAS SLOT (GITHUB AÇIK KAYNAKLI KABİN & MAKARALAR) ---
-    const SLOT_SYMBOLS = [
-      { icon: '🍒', name: 'KİRAZ' },
-      { icon: '🍋', name: 'LİMON' },
-      { icon: '🔔', name: 'ÇAN' },
-      { icon: '7️⃣', name: '777' },
-      { icon: '⭐', name: 'YILDIZ' },
-      { icon: '💎', name: 'ELMAS' },
-      { icon: '🍇', name: 'ÜZÜM' },
-      { icon: '🍀', name: 'YONCA' },
-      { icon: '💰', name: 'ALTIN' }
-    ];
+    // --- 2. 3D RETRO VEGAS SLOT (KİŞİ EŞLEŞTİRME & DİĞER İSİMLERDEN ŞERİT) ---
+    const SLOT_BADGES = ['👑', '⭐', '🎯', '💎', '🎲', '🍀', '✨', '🔥', '🏆', '♠️', '♥️', '♦️', '♣️'];
 
-    function createSlotCell(icon, text, isWinner = false) {
+    function createSlotNameCell(name, badge = null, isWinner = false) {
+      const icon = isWinner ? '👑' : (badge || SLOT_BADGES[Math.floor(Math.random() * SLOT_BADGES.length)]);
       return `
-        <div class="slot-symbol-cell ${isWinner ? 'bg-amber-950/70 border-y border-amber-500/60' : ''} text-center select-none px-1">
-          <span class="text-2xl md:text-3xl leading-tight filter drop-shadow">${icon}</span>
-          <span class="text-[10px] md:text-xs font-black ${isWinner ? 'text-amber-300' : 'text-zinc-200'} font-mono uppercase truncate w-full tracking-wider mt-0.5">${text}</span>
+        <div class="slot-symbol-cell ${isWinner ? 'bg-amber-950/80 border-y-2 border-amber-400' : 'bg-zinc-950/90'} text-center select-none px-1 flex flex-col items-center justify-center">
+          <span class="text-xl md:text-2xl leading-tight filter drop-shadow select-none">${icon}</span>
+          <span class="text-[11px] md:text-xs font-black ${isWinner ? 'text-amber-300 font-serif' : 'text-zinc-200'} uppercase truncate w-full tracking-wider mt-0.5">${name}</span>
         </div>
       `;
     }
@@ -894,26 +957,34 @@
       const col1 = document.getElementById('slotReelCol1');
       const col2 = document.getElementById('slotReelCol2');
       const col3 = document.getElementById('slotReelCol3');
-      if (!col1 || !col2 || !col3) return;
+      if (!col1 || !col2 || !col3 || !names.length) return;
 
-      const p1 = names[0] || 'LUCKY';
-      const p2 = names[Math.min(1, names.length - 1)] || '777';
-      const p3 = names[Math.min(2, names.length - 1)] || 'JACKPOT';
+      const totalEl = document.getElementById('slotTotalPeople');
+      if (totalEl) totalEl.textContent = names.length;
+      const meter = document.getElementById('slotWinMeter');
+      if (meter) meter.textContent = 'HAZIR';
 
+      const N = names.length;
       col1.style.transition = 'none';
       col1.style.transform = 'translateY(0px)';
-      col1.innerHTML = createSlotCell('🍒', 'KİRAZ') + createSlotCell('💎', p1) + createSlotCell('🔔', 'ÇAN');
+      col1.innerHTML = 
+        createSlotNameCell(names[0 % N]) + 
+        createSlotNameCell(names[1 % N], '⭐') + 
+        createSlotNameCell(names[2 % N]);
 
       col2.style.transition = 'none';
       col2.style.transform = 'translateY(0px)';
-      col2.innerHTML = createSlotCell('🍋', 'LİMON') + createSlotCell('👑', p2) + createSlotCell('⭐', 'YILDIZ');
+      col2.innerHTML = 
+        createSlotNameCell(names[(3 % N)]) + 
+        createSlotNameCell(names[(4 % N)], '👑') + 
+        createSlotNameCell(names[(5 % N)]);
 
       col3.style.transition = 'none';
       col3.style.transform = 'translateY(0px)';
-      col3.innerHTML = createSlotCell('🍇', 'ÜZÜM') + createSlotCell('7️⃣', p3) + createSlotCell('🍀', 'YONCA');
-
-      const meter = document.getElementById('slotWinMeter');
-      if (meter) meter.textContent = '0';
+      col3.innerHTML = 
+        createSlotNameCell(names[(6 % N)]) + 
+        createSlotNameCell(names[(7 % N)], '🎯') + 
+        createSlotNameCell(names[(8 % N)]);
     }
 
     function pullSlotLever() {
@@ -943,9 +1014,16 @@
       const col2 = document.getElementById('slotReelCol2');
       const col3 = document.getElementById('slotReelCol3');
       const meter = document.getElementById('slotWinMeter');
-      if (meter) meter.textContent = '---';
+      if (meter) meter.textContent = 'ÇEVRİLİYOR...';
 
-      // 3 Makara için dinamik sembol zincirleri oluştur (Sondan 2. hücre tam Payline hedefine oturur)
+      // Diğer katılımcıların isim havuzu (kazanan hariç diğer kişiler)
+      const otherNames = names.filter(n => n.trim().toLowerCase() !== target.trim().toLowerCase());
+      const getOtherName = () => {
+        if (!otherNames.length) return target;
+        return otherNames[Math.floor(Math.random() * otherNames.length)];
+      };
+
+      // 3 Makara için dinamik isim zincirleri oluştur (Sondan 2. hücre tam Payline hedefine oturur)
       const CELL_HEIGHT = 74;
       const reelConfigs = [
         { col: col1, count: 26, duration: 2000, delay: 0 },
@@ -960,33 +1038,29 @@
 
         let html = '';
         // Başlangıç sembolü
-        html += createSlotCell(SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)].icon, 'SPIN');
+        html += createSlotNameCell(getOtherName());
 
-        // Ara döner semboller ve isimler
+        // Dönen ara şeritteki tüm hücreler: Sınıftaki diğer kişilerin isimleri!
         for (let i = 1; i < cfg.count - 2; i++) {
-          const sym = SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)];
-          const randomName = names[Math.floor(Math.random() * names.length)];
-          const showName = (Math.random() > 0.45);
-          html += createSlotCell(sym.icon, showName ? randomName : sym.name);
+          const randomPerson = names[Math.floor(Math.random() * names.length)];
+          html += createSlotNameCell(randomPerson);
         }
 
-        // Son 3 hücre: [Üst Sembol, HEDEF KAZANAN İSİM (Payline), Alt Sembol]
-        const topSym = SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)];
-        const botSym = SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)];
-        html += createSlotCell(topSym.icon, topSym.name);
-        html += createSlotCell('👑', target, true); // Tam orta payline
-        html += createSlotCell(botSym.icon, botSym.name);
+        // Son 3 hücre: [Üstteki Arkadaşı, HEDEF KAZANAN KİŞİ (Payline), Alttaki Arkadaşı]
+        html += createSlotNameCell(getOtherName());
+        html += createSlotNameCell(target, '👑', true); // Tam orta payline'da 3'lü eşleşme
+        html += createSlotNameCell(getOtherName());
 
         cfg.col.innerHTML = html;
       });
 
-      // Makaraları dikey kaydır
+      // Makaraları dikey kaydırırken dişli tıkırtısı
       const spinTickInterval = setInterval(() => {
         playTick(620);
       }, 90);
       activeIntervals.push(spinTickInterval);
 
-      // DOM repaint sonrası kaydırmayı başlat
+      // DOM repaint sonrası dikey fiziksel akış başlat
       requestAnimationFrame(() => {
         reelConfigs.forEach((cfg, idx) => {
           const targetY = -(cfg.count - 2) * CELL_HEIGHT;
@@ -1001,9 +1075,9 @@
             if (idx === 2) {
               clearInterval(spinTickInterval);
               isPlaying = false;
-              if (meter) meter.textContent = '9999';
+              if (meter) meter.textContent = 'EŞLEŞTİ!';
               setTimeout(() => {
-                finishGame(target, targetName !== null, '3D Vegas Slots');
+                finishGame(target, targetName !== null, '3D Vegas Çekilişi');
               }, 450);
             }
           }, cfg.duration);
@@ -1757,6 +1831,8 @@
     function updateRoundUI() {
       document.getElementById('roundCounter').textContent = round;
       document.getElementById('studentCount').textContent = names.length;
+      const slotTotal = document.getElementById('slotTotalPeople');
+      if (slotTotal) slotTotal.textContent = names.length;
     }
 
     function loadStorage() {
