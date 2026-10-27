@@ -6,7 +6,6 @@
   <title>3D Vegas Casino & Şans Oyunları</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; }
@@ -105,16 +104,6 @@
       z-index: 50 !important;
       box-shadow: 0 0 35px rgba(245, 158, 11, 0.8), 0 25px 40px rgba(0,0,0,0.9) !important;
     }
-
-    /* Ekran Sarsıntısı */
-    @keyframes screen-shake {
-      0%, 100% { transform: translate(0, 0); }
-      20% { transform: translate(-4px, 4px); }
-      40% { transform: translate(4px, -3px); }
-      60% { transform: translate(-3px, -4px); }
-      80% { transform: translate(3px, 3px); }
-    }
-    .shake { animation: screen-shake 0.4s both; }
 
     /* Kol Çekme Animasyonu */
     .lever-arm {
@@ -572,11 +561,7 @@
     }
 
     function triggerScreenShake() {
-      const body = document.getElementById('mainBody');
-      body.classList.remove('shake');
-      void body.offsetWidth;
-      body.classList.add('shake');
-      setTimeout(() => body.classList.remove('shake'), 400);
+      // Sarsıntı / patlama efekti kaldırıldı
     }
 
     // --- OYUN MODU YÖNETİMİ ---
@@ -1387,7 +1372,6 @@
     }
 
     function triggerCelebration(winner, gameLabel) {
-      try { confetti({ particleCount: 110, spread: 80, origin: { y: 0.6 } }); } catch (e) {}
       document.getElementById('winnerName').textContent = winner;
       document.getElementById('winnerGameLabel').textContent = gameLabel || 'KAZANAN';
       const modal = document.getElementById('winnerModal');
