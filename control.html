@@ -30,23 +30,35 @@
         </div>
       </div>
 
-      <!-- Canlı Açık Masalar (Lobi Keşfi) -->
-      <div id="lobbyContainer" class="flex flex-col gap-1.5 bg-zinc-950 p-2.5 rounded border border-zinc-800">
+      <!-- Oda Kodu & Canlı Bağlantı Paneli (Daimi Açık ve Ön Planda) -->
+      <div id="lobbyContainer" class="flex flex-col gap-2.5 bg-zinc-950 p-3 rounded-xl border border-zinc-800 shadow-md">
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-semibold text-zinc-400 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            Açık Masalar (Canlı Keşif)
+          <span class="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 uppercase tracking-wider">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            Masa Bağlantısı
           </span>
-          <button id="toggleManualCodeBtn" class="text-[11px] text-amber-400 hover:text-amber-300">Manuel Kod</button>
+          <span id="connMethodBadge" class="text-[10px] text-zinc-500 font-mono">Çift Kanallı P2P/MQTT</span>
         </div>
 
-        <div id="activeRoomsList" class="space-y-1.5 mt-1">
-          <div class="text-[11px] text-zinc-500 py-1 text-center italic">Açık masa aranıyor...</div>
+        <div class="flex gap-2">
+          <input type="text" id="roomIdInput" placeholder="Oda Kodu (örn: 4921 veya cark-4921)" class="flex-1 bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 font-mono font-bold tracking-wider" />
+          <button id="connectBtn" class="bg-amber-500 hover:bg-amber-400 active:scale-95 text-black font-extrabold px-4 py-2 rounded-lg text-xs transition shadow flex items-center gap-1">
+            <span>Bağlan</span>
+          </button>
         </div>
 
-        <div id="manualCodeArea" class="hidden flex gap-2 pt-2 border-t border-zinc-800/80">
-          <input type="text" id="roomIdInput" placeholder="Oda Kodu (örn: cark-4921)" class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 font-mono" />
-          <button id="connectBtn" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded text-xs transition">Bağlan</button>
+        <!-- Ağdaki Açık Masalar (Canlı Keşif) -->
+        <div class="flex flex-col gap-1.5 pt-2 border-t border-zinc-800/80">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-semibold text-zinc-400 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              Ağda Algılanan Masalar
+            </span>
+            <span id="lobbyCount" class="text-[10px] text-zinc-500 font-mono">0 masa</span>
+          </div>
+          <div id="activeRoomsList" class="space-y-1 mt-0.5">
+            <div class="text-[11px] text-zinc-500 py-1 text-center italic">Masa aranıyor...</div>
+          </div>
         </div>
       </div>
 
@@ -322,21 +334,65 @@
       document.getElementById('triggerBtnText').textContent = textMap[currentGameMode] || 'OYNA';
     }
 
+    const MQTT_BROKERS = [
+      'wss://broker.emqx.io:8084/mqtt',
+      'wss://broker.hivemq.com:8884/mqtt'
+    ];
+    let currentBrokerIdx = 0;
+    let activeTargetRoom = '';
+    let syncInterval = null;
+    let syncAttempts = 0;
+
+    function startSyncLoop(room) {
+      if (!room) return;
+      if (syncInterval) clearInterval(syncInterval);
+      syncAttempts = 0;
+
+      const ping = () => {
+        if (isConnected && syncAttempts > 2) {
+          clearInterval(syncInterval);
+          return;
+        }
+        syncAttempts++;
+        if (mqttClient && mqttClient.connected) {
+          try {
+            mqttClient.subscribe('cark_state_' + room);
+            mqttClient.publish('cark_cmd_' + room, JSON.stringify({ type: 'request_sync' }));
+          } catch (e) {}
+        }
+        if (syncAttempts > 15) {
+          clearInterval(syncInterval);
+          if (!isConnected) {
+            setConnectionStatus('disconnected', 'Masa Bulunamadı (Kodu kontrol edin)');
+          }
+        }
+      };
+
+      ping();
+      syncInterval = setInterval(ping, 1000);
+    }
+
     // --- Güvenli MQTT Lobi Keşfi & Çift Kanallı İletişim ---
     function initLobbyDiscovery() {
       try {
-        mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+        if (mqttClient && mqttClient.connected) return;
+        if (mqttClient) { try { mqttClient.end(true); } catch (e) {} }
+
+        const brokerUrl = MQTT_BROKERS[currentBrokerIdx % MQTT_BROKERS.length];
+        mqttClient = mqtt.connect(brokerUrl, {
           clientId: 'ctrl_' + Math.random().toString(16).substring(2, 8),
-          clean: true, connectTimeout: 4000
+          clean: true,
+          connectTimeout: 4000,
+          reconnectPeriod: 2500
         });
 
         mqttClient.on('connect', () => {
           mqttClient.subscribe('carkifelek_public_rooms');
-          let currentTarget = document.getElementById('roomIdInput').value.trim() || localStorage.getItem('cark_last_room') || '';
+          let currentTarget = activeTargetRoom || document.getElementById('roomIdInput').value.trim() || localStorage.getItem('cark_last_room') || '';
           if (/^\d{4,5}$/.test(currentTarget)) currentTarget = 'cark-' + currentTarget;
           if (currentTarget) {
-            mqttClient.subscribe('cark_state_' + currentTarget);
-            mqttClient.publish('cark_cmd_' + currentTarget, JSON.stringify({ type: 'request_sync' }));
+            activeTargetRoom = currentTarget;
+            startSyncLoop(currentTarget);
           }
         });
 
@@ -351,15 +407,20 @@
             } else if (topic.startsWith('cark_state_')) {
               const data = JSON.parse(message.toString());
               handleIncomingData(data);
-              // MQTT üzerinden mesaj alındığında bağlantıyı açık olarak işaretle
               if (!isConnected) {
                 isConnected = true;
-                const roomName = document.getElementById('roomIdInput').value.trim() || topic.replace('cark_state_', '');
+                if (syncInterval) clearInterval(syncInterval);
+                const roomName = activeTargetRoom || document.getElementById('roomIdInput').value.trim() || topic.replace('cark_state_', '');
                 setConnectionStatus('connected', 'Bağlandı (' + roomName + ')');
                 document.getElementById('triggerSpinBtn').disabled = false;
+                showToast('Masaya bağlandı!');
               }
             }
           } catch (e) {}
+        });
+
+        mqttClient.on('error', () => {
+          currentBrokerIdx++;
         });
 
         setInterval(() => {
@@ -385,9 +446,11 @@
     function renderActiveRoomsList() {
       const listEl = document.getElementById('activeRoomsList');
       const rooms = Array.from(discoveredRooms.values());
+      const countEl = document.getElementById('lobbyCount');
+      if (countEl) countEl.textContent = rooms.length + ' masa';
 
       if (!rooms.length) {
-        listEl.innerHTML = `<div class="text-[11px] text-zinc-500 py-1 text-center italic">Açık masa aranıyor...</div>`;
+        listEl.innerHTML = `<div class="text-[11px] text-zinc-500 py-1 text-center italic">Masa aranıyor...</div>`;
         return;
       }
 
@@ -558,6 +621,16 @@
 
     function handleIncomingData(data) {
       if (!data || !data.type) return;
+
+      if (!isConnected && (data.type === 'init' || data.type === 'sync_names' || data.type === 'game_mode_changed')) {
+        isConnected = true;
+        if (syncInterval) clearInterval(syncInterval);
+        const targetRoom = activeTargetRoom || document.getElementById('roomIdInput').value.trim() || 'Masa';
+        setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
+        document.getElementById('triggerSpinBtn').disabled = false;
+        showToast('Masaya bağlandı!');
+      }
+
       if (data.type === 'init') {
         if (data.history) history = data.history;
         if (data.names && data.names.length) names = data.names;
@@ -566,10 +639,6 @@
         updateTargetUI();
         if (data.gameMode) changeGameMode(data.gameMode);
         saveStorage(); renderGrid(); renderHistoryUI(); setSpinningState(data.isSpinning);
-        isConnected = true;
-        document.getElementById('triggerSpinBtn').disabled = false;
-        const targetRoom = document.getElementById('roomIdInput').value.trim() || localStorage.getItem('cark_last_room') || '';
-        setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
       } else if (data.type === 'sync_names') {
         if (data.names && data.names.length) {
           names = data.names;
@@ -611,16 +680,18 @@
         document.getElementById('roomIdInput').value = targetRoom;
       }
 
+      activeTargetRoom = targetRoom;
       localStorage.setItem('cark_last_room', targetRoom);
-      setConnectionStatus('connecting', 'Bağlanıyor...');
+      setConnectionStatus('connecting', 'Bağlanıyor (' + targetRoom + ')...');
 
-      // 1. MQTT ile anında kanala abone ol ve masadan sync iste
-      if (mqttClient && mqttClient.connected) {
-        mqttClient.subscribe('cark_state_' + targetRoom);
-        mqttClient.publish('cark_cmd_' + targetRoom, JSON.stringify({ type: 'request_sync' }));
-      }
+      // 1. MQTT üzerinden otomatik ve tekrarlayan senkronizasyon döngüsü başlat
+      startSyncLoop(targetRoom);
 
-      // 2. PeerJS ile WebRTC P2P başlat
+      // 2. Paralel WebRTC P2P bağlantısı kur
+      initPeerP2P(targetRoom);
+    }
+
+    function initPeerP2P(targetRoom) {
       if (peer) { try { peer.destroy(); } catch (e) {} }
       try {
         peer = new Peer(undefined, {
@@ -637,6 +708,7 @@
 
           conn.on('open', () => {
             isConnected = true;
+            if (syncInterval) clearInterval(syncInterval);
             setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
             showToast('Masaya bağlandı!');
             document.getElementById('triggerSpinBtn').disabled = false;
@@ -666,13 +738,7 @@
 
         peer.on('error', (err) => {
           console.warn('Peer uyarısı:', err);
-          if (mqttClient && mqttClient.connected) {
-            isConnected = true;
-            setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
-            document.getElementById('triggerSpinBtn').disabled = false;
-          } else {
-            setConnectionStatus('disconnected', 'Masa Bulunamadı');
-          }
+          // WebRTC başarısız olsa bile MQTT arka planda startSyncLoop ile masayı arar
         });
       } catch (e) {}
     }
@@ -887,10 +953,6 @@
       if (confirm('Geçmişi sıfırlamak istiyor musunuz?')) {
         history = []; saveStorage(); renderHistoryUI(); showToast('Geçmiş temizlendi');
       }
-    });
-
-    document.getElementById('toggleManualCodeBtn').addEventListener('click', () => {
-      document.getElementById('manualCodeArea').classList.toggle('hidden');
     });
 
     document.getElementById('searchInput').addEventListener('input', (e) => renderGrid(e.target.value));

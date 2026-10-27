@@ -2736,21 +2736,37 @@
       }
     }
 
+    const MQTT_BROKERS = [
+      'wss://broker.emqx.io:8084/mqtt',
+      'wss://broker.hivemq.com:8884/mqtt'
+    ];
+    let currentBrokerIdx = 0;
+
     function initLobbyBroadcast() {
       try {
-        if (mqttClient && mqttClient.connected) return;
-        mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+        if (mqttClient && mqttClient.connected) {
+          mqttClient.subscribe('cark_cmd_' + roomId);
+          return;
+        }
+        if (mqttClient) { try { mqttClient.end(true); } catch (e) {} }
+
+        const brokerUrl = MQTT_BROKERS[currentBrokerIdx % MQTT_BROKERS.length];
+        mqttClient = mqtt.connect(brokerUrl, {
           clientId: 'host_' + roomId + '_' + Math.random().toString(16).substring(2, 8),
-          clean: true, connectTimeout: 4000
+          clean: true,
+          connectTimeout: 4000,
+          reconnectPeriod: 2500
         });
+
         mqttClient.on('connect', () => {
           mqttClient.subscribe('cark_cmd_' + roomId);
           sendHeartbeat();
           if (heartbeatInterval) clearInterval(heartbeatInterval);
-          heartbeatInterval = setInterval(sendHeartbeat, 3000);
+          heartbeatInterval = setInterval(sendHeartbeat, 2500);
           document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-emerald-400';
           document.getElementById('roomIdDisplay').textContent = roomId;
         });
+
         mqttClient.on('message', (topic, message) => {
           if (topic === 'cark_cmd_' + roomId) {
             try {
@@ -2759,6 +2775,10 @@
             } catch (e) {}
           }
         });
+
+        mqttClient.on('error', () => {
+          currentBrokerIdx++;
+        });
       } catch (e) {}
     }
 
@@ -2766,7 +2786,7 @@
       if (mqttClient && mqttClient.connected) {
         mqttClient.publish('carkifelek_public_rooms', JSON.stringify({
           roomId: roomId,
-          title: 'Casino Masası #' + randomCode,
+          title: 'Casino Masası #' + (roomId.replace('cark-', '') || randomCode),
           gameMode: activeGameMode,
           studentCount: names.length,
           lastSeen: Date.now()
