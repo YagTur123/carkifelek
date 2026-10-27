@@ -2089,15 +2089,16 @@
       const fakeCard = document.getElementById('cardIndex_' + fakeCardIndex);
 
       if (fakeVictim && (dopamineLevel > 50 || pendingFakeTarget)) {
-        // YÜKSEK GERİLİM: Önce sahte kart hafifçe parlar ve titrer!
+        // YÜKSEK GERİLİM: Önce sahte kart havaya kalkar, mor neonla parlar ve titrer!
         if (fakeCard) {
-          fakeCard.classList.add('ring-2', 'ring-purple-400', 'scale-105');
+          fakeCard.classList.add('ring-4', 'ring-purple-500', 'shadow-2xl', 'shadow-purple-500/50', 'scale-110', '-translate-y-3');
           document.getElementById('cardsStatusLabel').textContent = `Az daha bu kart açılıyordu: ${fakeVictim}?!`;
           playTick(820);
         }
 
         setTimeout(() => {
-          if (fakeCard) fakeCard.classList.remove('ring-2', 'ring-purple-400', 'scale-105');
+          if (fakeCard) fakeCard.classList.remove('ring-4', 'ring-purple-500', 'shadow-2xl', 'shadow-purple-500/50', 'scale-110', '-translate-y-3');
+          playCardDealSound();
           playWinSound();
           selectedCard.classList.remove('card-flipped');
           selectedCard.classList.add('card-selected-reveal');
@@ -2107,7 +2108,7 @@
             isPlaying = false;
             finishGame(winner, pendingTarget !== null, '3D Gizemli Kart Masası');
           }, 1500);
-        }, 420);
+        }, 440);
 
       } else {
         // Standart doğrudan açılış
