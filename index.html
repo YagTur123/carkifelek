@@ -278,7 +278,7 @@
     <!-- 1. 3D ÇARKIFELEK -->
     <div id="gameWheelView" class="game-view relative flex items-center justify-center my-auto py-4">
       <div id="wheel3DStage" class="relative wheel-3d">
-        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none filter drop-shadow-[0_8px_14px_rgba(0,0,0,0.85)]" id="pointerEl" style="transform-origin: 50% 6px;">
+        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none filter drop-shadow-[0_8px_14px_rgba(0,0,0,0.85)]" id="pointerEl" style="transform-origin: 50% 6px; will-change: transform;">
           <!-- 3D Lüks Şevli İbre (Bevelled Needle) -->
           <div class="relative w-8 h-12 flex flex-col items-center">
             <svg class="w-8 h-12" viewBox="0 0 32 48" fill="none">
@@ -856,6 +856,8 @@
     const wheelCanvas = document.getElementById('wheelCanvas');
     const wheelCtx = wheelCanvas.getContext('2d');
     let wheelRadius = 0, wheelRotation = 0, lastWheelTickIndex = -1;
+    let wheelDiskCanvas = null, wheelDiskCtx = null;
+    let lastWheelDiskKey = '';
     const casinoPalette = ['#8f1d1d', '#18201d', '#155234', '#18201d', '#b3822a', '#18201d'];
 
     function resizeWheelCanvas() {
@@ -870,7 +872,145 @@
       wheelCanvas.style.height = size + 'px';
       wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       wheelRadius = size / 2;
+      lastWheelDiskKey = ''; // Boyut değişince offscreen canvas yenilensin
       drawWheel();
+    }
+
+    // 60 FPS ULTRA AKICI RENDER: Çark diski (dilimler, yazılar, pimler, altın çember)
+    // bir kez offscreen canvasa çizilir; animasyon boyunca tek bir GPU drawImage ile döner!
+    function renderWheelDisk() {
+      if (!names.length || wheelRadius <= 20) return;
+      if (!wheelDiskCanvas) {
+        wheelDiskCanvas = document.createElement('canvas');
+        wheelDiskCtx = wheelDiskCanvas.getContext('2d');
+      }
+      const dpr = window.devicePixelRatio || 1;
+      const size = wheelRadius * 2;
+      wheelDiskCanvas.width = size * dpr;
+      wheelDiskCanvas.height = size * dpr;
+      wheelDiskCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      wheelDiskCtx.clearRect(0, 0, size, size);
+
+      const N = names.length, arc = (2 * Math.PI) / N;
+      const cx = wheelRadius, cy = wheelRadius, r = wheelRadius - 14;
+
+      // 1. Dilimler & İsimler
+      for (let i = 0; i < N; i++) {
+        const a = i * arc;
+        wheelDiskCtx.beginPath();
+        wheelDiskCtx.fillStyle = casinoPalette[i % casinoPalette.length];
+        wheelDiskCtx.moveTo(cx, cy);
+        wheelDiskCtx.arc(cx, cy, r, a, a + arc);
+        wheelDiskCtx.fill();
+        wheelDiskCtx.strokeStyle = '#d4af37';
+        wheelDiskCtx.lineWidth = 1.4;
+        wheelDiskCtx.stroke();
+
+        wheelDiskCtx.save();
+        wheelDiskCtx.translate(cx, cy);
+        wheelDiskCtx.rotate(a + arc / 2);
+        wheelDiskCtx.textAlign = 'right';
+        wheelDiskCtx.fillStyle = '#fef3c7';
+        wheelDiskCtx.shadowColor = 'rgba(0,0,0,0.9)';
+        wheelDiskCtx.shadowBlur = 4;
+        const fontSize = Math.max(9, Math.min(14, Math.floor(wheelRadius / 17)));
+        wheelDiskCtx.font = `bold ${fontSize}px sans-serif`;
+        let displayName = names[i];
+        if (displayName.length > 12) displayName = displayName.substring(0, 11) + '…';
+        wheelDiskCtx.fillText(displayName, r - 22, fontSize / 3);
+        wheelDiskCtx.restore();
+      }
+
+      // 2. Dış Ahşap & Altın Çember
+      const rimGrad = wheelDiskCtx.createRadialGradient(cx, cy, r, cx, cy, r + 14);
+      rimGrad.addColorStop(0, '#1c1917');
+      rimGrad.addColorStop(0.3, '#451a03');
+      rimGrad.addColorStop(0.7, '#291104');
+      rimGrad.addColorStop(1, '#0c0a09');
+
+      wheelDiskCtx.beginPath();
+      wheelDiskCtx.arc(cx, cy, r + 7, 0, 2 * Math.PI);
+      wheelDiskCtx.strokeStyle = rimGrad;
+      wheelDiskCtx.lineWidth = 14;
+      wheelDiskCtx.stroke();
+
+      // Altın Yivli Çemberler
+      wheelDiskCtx.beginPath();
+      wheelDiskCtx.arc(cx, cy, r + 0.5, 0, 2 * Math.PI);
+      wheelDiskCtx.strokeStyle = '#d4af37';
+      wheelDiskCtx.lineWidth = 2.0;
+      wheelDiskCtx.stroke();
+
+      wheelDiskCtx.beginPath();
+      wheelDiskCtx.arc(cx, cy, r + 13.5, 0, 2 * Math.PI);
+      wheelDiskCtx.strokeStyle = '#fef08a';
+      wheelDiskCtx.lineWidth = 1.8;
+      wheelDiskCtx.stroke();
+
+      // 3. Pirinç Pimler (3D Brass Pegs)
+      const pegR = r + 3;
+      for (let i = 0; i < N; i++) {
+        const pa = i * arc;
+        const px = cx + pegR * Math.cos(pa);
+        const py = cy + pegR * Math.sin(pa);
+
+        // Pim Alt Gölgesi
+        wheelDiskCtx.beginPath();
+        wheelDiskCtx.arc(px + 1.2, py + 1.5, 3.5, 0, 2 * Math.PI);
+        wheelDiskCtx.fillStyle = 'rgba(0,0,0,0.65)';
+        wheelDiskCtx.fill();
+
+        // 3D Pirinç Gövde
+        const pegGrad = wheelDiskCtx.createRadialGradient(px - 1, py - 1, 0.5, px, py, 3.5);
+        pegGrad.addColorStop(0, '#fffbeb');
+        pegGrad.addColorStop(0.35, '#fef08a');
+        pegGrad.addColorStop(0.75, '#ca8a04');
+        pegGrad.addColorStop(1, '#713f12');
+
+        wheelDiskCtx.beginPath();
+        wheelDiskCtx.arc(px, py, 3.5, 0, 2 * Math.PI);
+        wheelDiskCtx.fillStyle = pegGrad;
+        wheelDiskCtx.fill();
+        wheelDiskCtx.strokeStyle = '#854d0e';
+        wheelDiskCtx.lineWidth = 0.8;
+        wheelDiskCtx.stroke();
+      }
+
+      // 4. Lüks 3D Pirinç & Altın Merkez Göbek (Gold Center Hub)
+      const hubR = Math.max(18, r * 0.17);
+      const hubGrad = wheelDiskCtx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, hubR);
+      hubGrad.addColorStop(0, '#fffbeb');
+      hubGrad.addColorStop(0.35, '#fef08a');
+      hubGrad.addColorStop(0.70, '#ca8a04');
+      hubGrad.addColorStop(1, '#713f12');
+
+      wheelDiskCtx.save();
+      wheelDiskCtx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+      wheelDiskCtx.shadowBlur = 9;
+      wheelDiskCtx.shadowOffsetY = 4;
+      wheelDiskCtx.beginPath();
+      wheelDiskCtx.arc(cx, cy, hubR, 0, 2 * Math.PI);
+      wheelDiskCtx.fillStyle = hubGrad;
+      wheelDiskCtx.fill();
+      wheelDiskCtx.strokeStyle = '#fef08a';
+      wheelDiskCtx.lineWidth = 2.5;
+      wheelDiskCtx.stroke();
+
+      // Merkez Yakut Somun
+      wheelDiskCtx.beginPath();
+      wheelDiskCtx.arc(cx, cy, hubR * 0.45, 0, 2 * Math.PI);
+      wheelDiskCtx.fillStyle = '#b91c1c';
+      wheelDiskCtx.fill();
+      wheelDiskCtx.strokeStyle = '#fef08a';
+      wheelDiskCtx.lineWidth = 1.5;
+      wheelDiskCtx.stroke();
+
+      // Yakut Üzeri Işıltı Noktası
+      wheelDiskCtx.beginPath();
+      wheelDiskCtx.arc(cx - hubR * 0.15, cy - hubR * 0.15, hubR * 0.12, 0, 2 * Math.PI);
+      wheelDiskCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      wheelDiskCtx.fill();
+      wheelDiskCtx.restore();
     }
 
     function drawWheel(winnerHighlightIndex = -1, speed = 0) {
@@ -886,54 +1026,42 @@
         wheelCtx.restore();
         return;
       }
-      const N = names.length, arc = (2 * Math.PI) / N;
-      const cx = wheelRadius, cy = wheelRadius, r = wheelRadius - 14;
 
-      // 1. Dilimler & İsimler
-      for (let i = 0; i < N; i++) {
-        const a = wheelRotation + i * arc;
-        wheelCtx.beginPath();
-        wheelCtx.fillStyle = casinoPalette[i % casinoPalette.length];
-        wheelCtx.moveTo(cx, cy);
-        wheelCtx.arc(cx, cy, r, a, a + arc);
-        wheelCtx.fill();
-        wheelCtx.strokeStyle = '#d4af37';
-        wheelCtx.lineWidth = 1.4;
-        wheelCtx.stroke();
-
-        // Kazanan Dilim Vurgusu (Altın Aura & Nabız Işıltısı)
-        if (winnerHighlightIndex === i) {
-          wheelCtx.save();
-          wheelCtx.beginPath();
-          wheelCtx.moveTo(cx, cy);
-          wheelCtx.arc(cx, cy, r, a, a + arc);
-          wheelCtx.closePath();
-          wheelCtx.fillStyle = 'rgba(253, 224, 71, 0.42)';
-          wheelCtx.shadowColor = '#eab308';
-          wheelCtx.shadowBlur = 18;
-          wheelCtx.fill();
-          wheelCtx.strokeStyle = '#fef08a';
-          wheelCtx.lineWidth = 3.2;
-          wheelCtx.stroke();
-          wheelCtx.restore();
-        }
-
-        wheelCtx.save();
-        wheelCtx.translate(cx, cy);
-        wheelCtx.rotate(a + arc / 2);
-        wheelCtx.textAlign = 'right';
-        wheelCtx.fillStyle = (winnerHighlightIndex === i) ? '#ffffff' : '#fef3c7';
-        wheelCtx.shadowColor = 'rgba(0,0,0,0.9)';
-        wheelCtx.shadowBlur = (winnerHighlightIndex === i) ? 8 : 4;
-        const fontSize = Math.max(9, Math.min(14, Math.floor(wheelRadius / 17)));
-        wheelCtx.font = (winnerHighlightIndex === i) ? `900 ${fontSize + 1}px sans-serif` : `bold ${fontSize}px sans-serif`;
-        let displayName = names[i];
-        if (displayName.length > 12) displayName = displayName.substring(0, 11) + '…';
-        wheelCtx.fillText(displayName, r - 22, fontSize / 3);
-        wheelCtx.restore();
+      const currentKey = names.join('|') + '_' + Math.round(wheelRadius);
+      if (currentKey !== lastWheelDiskKey || !wheelDiskCanvas) {
+        renderWheelDisk();
+        lastWheelDiskKey = currentKey;
       }
 
-      // 2. 3D Evrensel Küre Aydınlatması & Derinlik Gradyanı (Specular & Vignette)
+      const cx = wheelRadius, cy = wheelRadius, r = wheelRadius - 14;
+
+      // 1. Dönen Diski Tek Hamlede GPU ile Çiz
+      wheelCtx.save();
+      wheelCtx.translate(cx, cy);
+      wheelCtx.rotate(wheelRotation);
+      wheelCtx.drawImage(wheelDiskCanvas, -cx, -cy, wheelRadius * 2, wheelRadius * 2);
+
+      // Kazanan Dilim Vurgusu (Altın Aura & Nabız Işıltısı)
+      if (winnerHighlightIndex >= 0 && winnerHighlightIndex < names.length) {
+        const N = names.length, arc = (2 * Math.PI) / N;
+        const a = winnerHighlightIndex * arc;
+        wheelCtx.save();
+        wheelCtx.beginPath();
+        wheelCtx.moveTo(0, 0);
+        wheelCtx.arc(0, 0, r, a, a + arc);
+        wheelCtx.closePath();
+        wheelCtx.fillStyle = 'rgba(253, 224, 71, 0.42)';
+        wheelCtx.shadowColor = '#eab308';
+        wheelCtx.shadowBlur = 18;
+        wheelCtx.fill();
+        wheelCtx.strokeStyle = '#fef08a';
+        wheelCtx.lineWidth = 3.2;
+        wheelCtx.stroke();
+        wheelCtx.restore();
+      }
+      wheelCtx.restore();
+
+      // 2. 3D Evrensel Sabit Küre Aydınlatması & Derinlik Gradyanı (Specular & Vignette)
       const sphereGrad = wheelCtx.createRadialGradient(cx - r * 0.28, cy - r * 0.35, r * 0.05, cx, cy, r);
       sphereGrad.addColorStop(0, 'rgba(255, 255, 255, 0.20)');
       sphereGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.04)');
@@ -951,97 +1079,6 @@
         wheelCtx.fillStyle = `rgba(255, 255, 255, ${blurAlpha.toFixed(2)})`;
         wheelCtx.fill();
       }
-      wheelCtx.restore();
-
-      // 3. Dış Ahşap & Altın Çember (Lüks Maun ve Altın Kenarlık)
-      const rimGrad = wheelCtx.createRadialGradient(cx, cy, r, cx, cy, r + 14);
-      rimGrad.addColorStop(0, '#1c1917');
-      rimGrad.addColorStop(0.3, '#451a03');
-      rimGrad.addColorStop(0.7, '#291104');
-      rimGrad.addColorStop(1, '#0c0a09');
-
-      wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, r + 7, 0, 2 * Math.PI);
-      wheelCtx.strokeStyle = rimGrad;
-      wheelCtx.lineWidth = 14;
-      wheelCtx.stroke();
-
-      // Altın Yivli Çemberler
-      wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, r + 0.5, 0, 2 * Math.PI);
-      wheelCtx.strokeStyle = '#d4af37';
-      wheelCtx.lineWidth = 2.0;
-      wheelCtx.stroke();
-
-      wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, r + 13.5, 0, 2 * Math.PI);
-      wheelCtx.strokeStyle = '#fef08a';
-      wheelCtx.lineWidth = 1.8;
-      wheelCtx.stroke();
-
-      // 4. Pirinç Pimler (3D Brass Pegs / Çiviler - Gerçek Fizik Temas Noktaları)
-      const pegR = r + 3;
-      for (let i = 0; i < N; i++) {
-        const pa = wheelRotation + i * arc;
-        const px = cx + pegR * Math.cos(pa);
-        const py = cy + pegR * Math.sin(pa);
-
-        // Pim Alt Gölgesi
-        wheelCtx.beginPath();
-        wheelCtx.arc(px + 1.2, py + 1.5, 3.5, 0, 2 * Math.PI);
-        wheelCtx.fillStyle = 'rgba(0,0,0,0.65)';
-        wheelCtx.fill();
-
-        // 3D Pirinç Gövde
-        const pegGrad = wheelCtx.createRadialGradient(px - 1, py - 1, 0.5, px, py, 3.5);
-        pegGrad.addColorStop(0, '#fffbeb');
-        pegGrad.addColorStop(0.35, '#fef08a');
-        pegGrad.addColorStop(0.75, '#ca8a04');
-        pegGrad.addColorStop(1, '#713f12');
-
-        wheelCtx.beginPath();
-        wheelCtx.arc(px, py, 3.5, 0, 2 * Math.PI);
-        wheelCtx.fillStyle = pegGrad;
-        wheelCtx.fill();
-        wheelCtx.strokeStyle = '#854d0e';
-        wheelCtx.lineWidth = 0.8;
-        wheelCtx.stroke();
-      }
-
-      // 5. Lüks 3D Pirinç & Altın Merkez Göbek (Gold Center Hub)
-      const hubR = Math.max(18, r * 0.17);
-      const hubGrad = wheelCtx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, hubR);
-      hubGrad.addColorStop(0, '#fffbeb');
-      hubGrad.addColorStop(0.35, '#fef08a');
-      hubGrad.addColorStop(0.70, '#ca8a04');
-      hubGrad.addColorStop(1, '#713f12');
-
-      wheelCtx.save();
-      wheelCtx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-      wheelCtx.shadowBlur = 9;
-      wheelCtx.shadowOffsetY = 4;
-      wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, hubR, 0, 2 * Math.PI);
-      wheelCtx.fillStyle = hubGrad;
-      wheelCtx.fill();
-      wheelCtx.strokeStyle = '#fef08a';
-      wheelCtx.lineWidth = 2.5;
-      wheelCtx.stroke();
-
-      // Merkez Yakut Somun
-      wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, hubR * 0.45, 0, 2 * Math.PI);
-      wheelCtx.fillStyle = '#b91c1c';
-      wheelCtx.fill();
-      wheelCtx.strokeStyle = '#fef08a';
-      wheelCtx.lineWidth = 1.5;
-      wheelCtx.stroke();
-
-      // Yakut Üzeri Işıltı Noktası
-      wheelCtx.beginPath();
-      wheelCtx.arc(cx - hubR * 0.15, cy - hubR * 0.15, hubR * 0.12, 0, 2 * Math.PI);
-      wheelCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      wheelCtx.fill();
       wheelCtx.restore();
     }
 
@@ -1140,12 +1177,15 @@
       const finalRotation = startRotation + totalDelta;
 
       // DOPAMİN DİNAMİĞİ (%0 ile %100 ARASI KESİNTİSİZ ANALOG ÖLÇEKLEME):
-      // %0: Doğal ve hızlı sönüm, pPeg = 0.88 (son ~0.8s)
-      // %100: Maksimum gerilim ve ağır çekim, pPeg = 0.64 (son 2.5s boyunca pimde sürünme!)
+      // %0 - %11: Standart doğal fiziksel sönüm
+      // %12 - %79: Near-miss gerilimi & pimde ağır çekim sürünme
+      // %80 - %100: KULLANICI KURALI: Uca vurup GERİYE DÖNME (Recoil), Yem diliminde asılı kalma ve son saniyede kazanana fırlama!
+      const isRecoilActive = (effD >= 0.80);
+
+      // Normal Dopamin (12-79%) parametreleri
       const pegRatio = (totalDelta - 0.5 * arc) / totalDelta;
       const pPeg = 0.88 - effD * 0.24; 
       const span2 = 1.0 - pPeg;
-      // Sürünme hızı: %0'da 0.080, %100'de 0.010 (8 kat daha ağır ve gerilimli!)
       const crawlC = 0.080 - effD * 0.070;
       const a = 2.4 + effD * 1.2;
       const vPeg = (pegRatio * crawlC) / pPeg;
@@ -1153,10 +1193,20 @@
       const m1 = 0; // Kazanan dilim merkezine sıfır hızla pürüzsüzce oturur
       let hasOvercomePeg = false;
 
+      // %80-100 Recoil & Yemde Bekleme Parametreleri
+      const pStrike = 0.70; // Uca (sınır pimine) vurma zamanı
+      const pRecoil = 0.80; // Geriye sekip yem diliminin göbeğine varış zamanı
+      const pHoverEnd = 0.88; // Yem üstünde nefes kesen beklemenin bitiş zamanı
+      const strikeTheta = finalRotation - 0.38 * arc; // Pimin hemen eşiği (aşmaya çalışıp zorladığı açı)
+      const recoilTheta = finalRotation - 0.88 * arc; // Yem diliminin merkezine geriye sekme açısı
+      let strikeTickPlayed = false;
+      let recoilTickPlayed = false;
+      let snapTickPlayed = false;
+
       // İbre (flapper) gerilim ve titreme şiddeti: %0'da normal, %100'de kalp krizi seviyesi
       const maxFlapperDeflection = 14.0 + effD * 12.0; // 14° ile 26° arası bükülme
       const flapperTremorAmp = 0.8 + effD * 2.4;
-      const flapperSnapVel = 110 + effD * 90; // Pimi aşınca fırlama ivmesi
+      const flapperSnapVel = 120 + effD * 90; // Pimi aşınca fırlama ivmesi
 
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
@@ -1177,18 +1227,77 @@
         lastFrameTime = now;
         if (dt > 0.05) dt = 0.016;
 
-        // %100 GERÇEK FİZİKSEL SÖNÜM & MONOTONİK ÇARKIFELEK GERİLİM PLATOSU
-        let easeP;
-        let currentSpeed;
+        let currentSpeed = 0;
 
-        if (isDopamineActive) {
+        if (isRecoilActive) {
+          // ==========================================
+          // %80 - %100 SİNEMATİK GERİYE DÖNÜŞ (RECOIL) & YEMDE DURAKSAMA MODU
+          // ==========================================
+          if (progress <= pStrike) {
+            // 1. AŞAMA: Pime doğru yavaşlayarak gelip uca çarpma
+            const u = progress / pStrike;
+            const ease = 1 - Math.pow(1 - u, 2.8);
+            wheelRotation = startRotation + (strikeTheta - startRotation) * ease;
+            const du = (2.8 * Math.pow(1 - u, 1.8)) / pStrike;
+            currentSpeed = Math.max(0, ((strikeTheta - startRotation) / (duration / 1000)) * du);
+
+            if (progress >= pStrike - 0.08) {
+              const tensionP = (progress - (pStrike - 0.08)) / 0.08;
+              flapperDeflection = -maxFlapperDeflection * tensionP;
+            }
+            if (progress >= pStrike - 0.015 && !strikeTickPlayed) {
+              strikeTickPlayed = true;
+              playTick(480); // Tok uca çarpma ve kilitlenme sesi
+            }
+          } else if (progress <= pRecoil) {
+            // 2. AŞAMA: GERİYE SEKME (RECOIL / BOUNCE BACK)
+            // Çark tırnak yayının direnciyle ters yönde geriye döner!
+            const u = (progress - pStrike) / (pRecoil - pStrike);
+            const ease = 0.5 * (1 - Math.cos(u * Math.PI));
+            wheelRotation = strikeTheta - (strikeTheta - recoilTheta) * ease;
+            currentSpeed = 0.012; // görsel dinamik bulanıklık
+
+            // İbre pimin baskısından kurtulup rahatlar
+            flapperDeflection = -maxFlapperDeflection * (1 - u);
+            if (!recoilTickPlayed && u > 0.35) {
+              recoilTickPlayed = true;
+              playTick(410); // Geriye sekme tok çıtırtısı
+            }
+          } else if (progress <= pHoverEnd) {
+            // 3. AŞAMA: YEM DİLİMİNDE ASILI KALMA & DURAKSAMA (SUSPENSE HOLD)
+            // Çark sahte hedefin üstünde durur, hafif bir gerilim titremesi yapar
+            const u = (progress - pRecoil) / (pHoverEnd - pRecoil);
+            const tremor = Math.sin(u * Math.PI * 4) * 0.018 * arc;
+            wheelRotation = recoilTheta + tremor;
+            currentSpeed = 0.002;
+            flapperDeflection = Math.sin(now * 0.04) * 1.5; // gerilim nefesi
+          } else {
+            // 4. AŞAMA: SON SANİYE PİMİ AŞIP KAZANANA FIRLAMA (FINAL SNAP TO WINNER)
+            const u = (progress - pHoverEnd) / (1.0 - pHoverEnd);
+            const ease = 1 - Math.pow(1 - u, 3.2);
+            wheelRotation = recoilTheta + (finalRotation - recoilTheta) * ease;
+            const du = (3.2 * Math.pow(1 - u, 2.2)) / (1.0 - pHoverEnd);
+            currentSpeed = Math.max(0, ((finalRotation - recoilTheta) / (duration / 1000)) * du);
+
+            if (progress >= pHoverEnd + 0.03 && !snapTickPlayed) {
+              snapTickPlayed = true;
+              playTick(960); // Pimi aşma zafer klik sesi
+              flapperSpringVel = flapperSnapVel;
+            }
+            flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+            flapperDeflection += flapperSpringVel * dt;
+          }
+        } else if (isDopamineActive) {
+          // ==========================================
+          // %12 - %79 STANDART DOPAMİN SÜRÜNME MODU
+          // ==========================================
+          let easeP;
           if (progress < pPeg) {
             const pn = progress / pPeg;
             const oneMinusPn = Math.max(0, 1 - pn);
             easeP = pegRatio * ((1 - Math.pow(oneMinusPn, a)) * (1 - crawlC) + crawlC * pn);
             currentSpeed = (pegRatio * totalDelta / (pPeg * (duration / 1000))) * (a * Math.pow(oneMinusPn, a - 1) * (1 - crawlC) + crawlC);
           } else {
-            // PİMİ AŞMA VE KAZANANIN MERKEZİNE YERLEŞME (DOPAMİN SÜRÜNMESİ)
             if (!hasOvercomePeg && progress >= pPeg + 0.06 * (1 - effD * 0.3)) {
               hasOvercomePeg = true;
               playTick(820 + Math.floor(effD * 140));
@@ -1204,46 +1313,92 @@
             const dh = (6*t2 - 6*tRatio)*pegRatio + (-6*t2 + 6*tRatio)*1.0 + (3*t2 - 4*tRatio + 1)*m0 + (3*t2 - 2*tRatio)*m1;
             currentSpeed = Math.max(0, (dh * totalDelta) / (span2 * (duration / 1000)));
           }
+          wheelRotation = startRotation + totalDelta * easeP;
+
+          const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
+          const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
+          const tensionWindow = 0.06 + effD * 0.10;
+
+          if (progress >= pPeg - tensionWindow && progress < pPeg) {
+            const tensionProgress = (progress - (pPeg - tensionWindow)) / tensionWindow;
+            flapperDeflection = -maxFlapperDeflection * tensionProgress - Math.sin(now * (0.04 + effD * 0.03)) * flapperTremorAmp;
+            flapperSpringVel = 0;
+          } else if (phaseInSlice < 0.24) {
+            const pushFraction = phaseInSlice / 0.24;
+            flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
+            if (curIdx !== lastPegIdx) {
+              lastPegIdx = curIdx;
+              playTick(720 + Math.random() * 80);
+              flapperSpringVel = 120;
+            }
+          } else {
+            flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+            flapperDeflection += flapperSpringVel * dt;
+            if (flapperDeflection > 5.0) {
+              flapperDeflection = 5.0;
+              flapperSpringVel = -flapperSpringVel * 0.25;
+            }
+            if (Math.abs(flapperDeflection) < 0.08 && Math.abs(flapperSpringVel) < 1.0) {
+              flapperDeflection = 0;
+              flapperSpringVel = 0;
+            }
+          }
         } else {
-          // %0 Standart Doğal Fiziksel Sönüm (Fakeout Yok)
+          // ==========================================
+          // %0 STANDART DOĞAL FİZİKSEL SÖNÜM (FAKEOUT YOK)
+          // ==========================================
           const pExp = 4.2;
-          easeP = 1 - Math.pow(1 - progress, pExp);
+          const easeP = 1 - Math.pow(1 - progress, pExp);
           currentSpeed = (totalDelta / duration) * (pExp * Math.pow(Math.max(0, 1 - progress), pExp - 1));
+          wheelRotation = startRotation + totalDelta * easeP;
+
+          const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
+          const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
+          if (phaseInSlice < 0.24) {
+            const pushFraction = phaseInSlice / 0.24;
+            flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
+            if (curIdx !== lastPegIdx) {
+              lastPegIdx = curIdx;
+              playTick(720 + Math.random() * 80);
+              flapperSpringVel = 120;
+            }
+          } else {
+            flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+            flapperDeflection += flapperSpringVel * dt;
+            if (flapperDeflection > 5.0) {
+              flapperDeflection = 5.0;
+              flapperSpringVel = -flapperSpringVel * 0.25;
+            }
+            if (Math.abs(flapperDeflection) < 0.08 && Math.abs(flapperSpringVel) < 1.0) {
+              flapperDeflection = 0;
+              flapperSpringVel = 0;
+            }
+          }
         }
 
-        // Çark rotasyonunu güncelle (Monotonik artan, kesintisiz analitik rota)
-        wheelRotation = startRotation + totalDelta * easeP;
-
-        // Tırnak (Pointer Flapper) Fiziksel Temas, Salınım ve Stoper Dinamiği
-        const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
-        const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
-
-        const tensionWindow = 0.06 + effD * 0.10;
-        if (isDopamineActive && progress >= pPeg - tensionWindow && progress < pPeg) {
-          // Pim çentiğinde maksimum bükülme gerilimi ve gerilim titremesi (tremor)
-          const tensionProgress = (progress - (pPeg - tensionWindow)) / tensionWindow;
-          flapperDeflection = -maxFlapperDeflection * tensionProgress - Math.sin(now * (0.04 + effD * 0.03)) * flapperTremorAmp;
-          flapperSpringVel = 0;
-        } else if (phaseInSlice < 0.24) {
-          const pushFraction = phaseInSlice / 0.24;
-          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
-          if (curIdx !== lastPegIdx) {
-            lastPegIdx = curIdx;
-            playTick(720 + Math.random() * 80);
-            flapperSpringVel = 120; // Pimin ucundan fırlama ivmesi
-          }
-        } else {
-          // Kararlı sönümlü harmonik osilatör: k=420, gamma=26 (dt <= 0.016s kararlılık garantili)
-          flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
-          flapperDeflection += flapperSpringVel * dt;
-          // Stoper pimi geri sekmesi (ileriye doğru maksimum 5 dereceye kadar hafif sekip durur)
-          if (flapperDeflection > 5.0) {
-            flapperDeflection = 5.0;
-            flapperSpringVel = -flapperSpringVel * 0.25;
-          }
-          if (Math.abs(flapperDeflection) < 0.08 && Math.abs(flapperSpringVel) < 1.0) {
-            flapperDeflection = 0;
-            flapperSpringVel = 0;
+        // isRecoilActive modunda pStrike öncesi genel tırnak fiziği
+        if (isRecoilActive && progress < pStrike - 0.08) {
+          const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
+          const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
+          if (phaseInSlice < 0.24) {
+            const pushFraction = phaseInSlice / 0.24;
+            flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
+            if (curIdx !== lastPegIdx) {
+              lastPegIdx = curIdx;
+              playTick(720 + Math.random() * 80);
+              flapperSpringVel = 120;
+            }
+          } else {
+            flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+            flapperDeflection += flapperSpringVel * dt;
+            if (flapperDeflection > 5.0) {
+              flapperDeflection = 5.0;
+              flapperSpringVel = -flapperSpringVel * 0.25;
+            }
+            if (Math.abs(flapperDeflection) < 0.08 && Math.abs(flapperSpringVel) < 1.0) {
+              flapperDeflection = 0;
+              flapperSpringVel = 0;
+            }
           }
         }
 
