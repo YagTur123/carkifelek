@@ -3,30 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sınıf Çarkı</title>
+  <title>Şans Çarkı</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; }
+    .casino-felt {
+      background-color: #080d0a;
+      background-image: radial-gradient(#102317 1px, transparent 1px), radial-gradient(#102317 1px, #080d0a 1px);
+      background-size: 40px 40px;
+      background-position: 0 0, 20px 20px;
+    }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col items-center justify-center overflow-hidden select-none font-sans antialiased">
+<body class="casino-felt text-zinc-100 min-h-screen flex flex-col items-center justify-center overflow-hidden select-none font-sans antialiased">
 
   <!-- Üst Bar -->
   <header class="absolute top-5 left-0 right-0 flex items-center justify-between px-6 md:px-8 z-10">
-    <div>
-      <h1 class="text-lg md:text-xl font-semibold text-white tracking-tight">Sınıf Çarkı</h1>
-      <p class="text-xs text-zinc-500">Rastgele Öğrenci Seçici</p>
+    <div class="flex items-center gap-3">
+      <div class="w-2.5 h-7 bg-amber-500 rounded-sm"></div>
+      <div>
+        <h1 class="text-lg md:text-xl font-bold tracking-wider text-amber-100 uppercase font-serif">Casino Çarkı</h1>
+        <p class="text-[11px] text-zinc-400">Tur: <span id="roundCounter" class="text-amber-400 font-mono font-bold">1</span></p>
+      </div>
     </div>
 
-    <!-- Ses ve Tam Ekran Kontrolleri -->
+    <!-- Üst Sağ: Kontroller -->
     <div class="flex items-center gap-2">
-      <button id="soundToggleBtn" title="Sesi Aç/Kapat" class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition">
-        <svg id="soundOnIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+      <!-- Geçmiş Butonu -->
+      <button id="toggleHistoryBtn" title="Çekiliş Geçmişi" class="px-3 py-1.5 rounded-md bg-zinc-900/90 border border-amber-900/40 text-xs text-amber-200/80 hover:text-amber-100 hover:border-amber-700/60 transition flex items-center gap-1.5 backdrop-blur">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Geçmiş (<span id="historyCount">0</span>)</span>
+      </button>
+
+      <!-- Ses -->
+      <button id="soundToggleBtn" title="Sesi Aç/Kapat" class="p-2 rounded-md bg-zinc-900/90 border border-zinc-800 text-zinc-400 hover:text-white transition">
+        <svg id="soundOnIcon" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
         <svg id="soundOffIcon" class="w-4 h-4 hidden text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
       </button>
-      <button id="fullscreenBtn" title="Tam Ekran" class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition">
+
+      <!-- Tam Ekran -->
+      <button id="fullscreenBtn" title="Tam Ekran" class="p-2 rounded-md bg-zinc-900/90 border border-zinc-800 text-zinc-400 hover:text-white transition">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
       </button>
     </div>
@@ -35,49 +53,80 @@
   <!-- Çark Alanı -->
   <main class="relative flex items-center justify-center p-4 my-auto">
     <div class="relative">
-      <!-- Pointer (Ok) - Sade Üçgen Mandal -->
-      <div class="absolute -top-5 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-transform duration-75" id="pointerEl">
-        <div class="w-6 h-8 bg-amber-500 rounded-t-sm" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
+      <!-- Mekanik Altın Gösterge Dili (Pointer) -->
+      <div class="absolute -top-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-transform duration-75 filter drop-shadow-md" id="pointerEl">
+        <div class="w-7 h-10 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
+        <div class="w-2.5 h-2.5 rounded-full bg-amber-100 mx-auto -mt-10 border border-amber-900"></div>
       </div>
 
       <!-- Çark Kanvası -->
-      <canvas id="wheelCanvas" class="rounded-full border border-zinc-800 cursor-pointer shadow-lg"></canvas>
+      <canvas id="wheelCanvas" class="rounded-full cursor-pointer shadow-2xl"></canvas>
 
-      <!-- Çark Merkez Göbeği -->
-      <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-zinc-900 border-2 border-zinc-700 flex flex-col items-center justify-center z-10 transition active:scale-95 hover:border-amber-500">
-        <span class="text-white text-xs font-bold uppercase tracking-wide">Çevir</span>
+      <!-- Çark Merkez Göbeği (Lüks Casino Butonu) -->
+      <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-b from-zinc-800 via-zinc-900 to-black border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-xl">
+        <span class="text-amber-400 text-xs md:text-sm font-black uppercase tracking-widest font-serif">ÇEVİR</span>
       </button>
     </div>
   </main>
 
+  <!-- Sol Alt: Kalan Kişi -->
+  <div class="absolute bottom-4 left-4 z-10 text-xs text-zinc-400 bg-zinc-950/80 px-3 py-1.5 rounded border border-zinc-800/80 backdrop-blur">
+    Kalan: <span id="studentCount" class="text-amber-400 font-bold font-mono">0</span> kişi
+  </div>
+
   <!-- Sağ Alt: Minik Oda Kodu -->
   <footer class="absolute bottom-4 right-4 z-10">
-    <div id="roomBadge" title="Bağlantı Kodunu Kopyala" class="flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 transition cursor-pointer">
-      <span id="statusDot" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-      <span class="font-mono text-[11px]" id="roomIdDisplay">Bağlanıyor...</span>
+    <div id="roomBadge" title="Bağlantı Kodunu Kopyala" class="flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-950/80 border border-zinc-800 text-xs text-zinc-400 hover:text-amber-200 transition cursor-pointer backdrop-blur">
+      <span id="statusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+      <span class="font-mono text-xs" id="roomIdDisplay">Bağlanıyor...</span>
     </div>
   </footer>
 
-  <!-- Sol Alt: Öğrenci Sayacı -->
-  <div class="absolute bottom-4 left-4 z-10 text-xs text-zinc-500">
-    Kayıtlı: <span id="studentCount" class="text-zinc-300 font-medium">0</span>
-  </div>
+  <!-- Çekiliş Geçmişi Yan Paneli -->
+  <aside id="historyPanel" class="fixed top-0 right-0 bottom-0 w-80 bg-zinc-950/95 border-l border-zinc-800 p-5 z-40 transform translate-x-full transition-transform duration-300 flex flex-col backdrop-blur-md shadow-2xl">
+    <div class="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+      <div class="flex items-center gap-2">
+        <h2 class="font-bold text-sm text-amber-200 font-serif">Çekiliş Geçmişi</h2>
+      </div>
+      <button id="closeHistoryBtn" class="text-zinc-400 hover:text-white text-xs px-2 py-1 rounded bg-zinc-900 border border-zinc-800">
+        Kapat
+      </button>
+    </div>
+    
+    <div id="historyList" class="flex-1 overflow-y-auto space-y-2 pr-1">
+      <div class="text-center py-8 text-xs text-zinc-600">Henüz çekiliş yapılmadı.</div>
+    </div>
 
-  <!-- Kazanan Pop-up Modalı (Yalın & Odaklı) -->
-  <div id="winnerModal" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
-    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 max-w-sm w-full text-center shadow-xl" id="modalCard">
-      <p class="text-xs text-zinc-400 mb-1">Seçilen Öğrenci</p>
-      <div id="winnerName" class="text-2xl font-bold text-white tracking-tight my-4 py-2 px-3 bg-zinc-950 border border-zinc-800 rounded-lg">
+    <div class="pt-3 border-t border-zinc-800 flex justify-between items-center">
+      <button id="clearHistoryBtn" class="text-xs text-zinc-500 hover:text-rose-400 transition">
+        Geçmişi Temizle
+      </button>
+      <span class="text-[11px] text-zinc-600" id="totalSpinsCount">Toplam: 0</span>
+    </div>
+  </aside>
+
+  <!-- Kazanan Pop-up Modalı (Casino Tarzı) -->
+  <div id="winnerModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200 backdrop-blur-sm">
+    <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-2 border-amber-500/80 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl relative" id="modalCard">
+      <p class="text-xs text-amber-400/90 font-serif uppercase tracking-widest mb-1">Kazanan</p>
+      
+      <div id="winnerName" class="text-3xl font-black text-amber-100 tracking-tight my-4 py-3 px-4 bg-zinc-900/90 border border-amber-600/40 rounded-xl shadow-inner font-serif">
         Kazanan İsim
       </div>
-      <button id="closeModalBtn" class="w-full py-2.5 px-4 rounded-lg bg-zinc-100 hover:bg-white text-zinc-900 font-semibold text-sm transition">
-        Tamam
-      </button>
+
+      <div class="flex flex-col gap-2 mt-5">
+        <button id="removeWinnerBtn" class="w-full py-2.5 px-4 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider transition">
+          Listeden Çıkar ve Devam Et
+        </button>
+        <button id="keepWinnerBtn" class="w-full py-2 px-4 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition">
+          Listede Tut
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Toast -->
-  <div id="toast" class="fixed bottom-12 right-4 bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs px-3 py-1.5 rounded-md shadow-md opacity-0 transition-opacity pointer-events-none z-50">
+  <div id="toast" class="fixed bottom-14 right-4 bg-zinc-900 border border-amber-600/40 text-amber-200 text-xs px-3 py-1.5 rounded shadow-lg opacity-0 transition-opacity pointer-events-none z-50">
     Kopyalandı
   </div>
 
@@ -88,12 +137,38 @@
       "Gamze", "Can", "Selin", "Kemal", "Büşra", "Deniz"
     ];
 
-    // Dengeli, net ve göz yormayan dilim renkleri
-    const sliceColors = [
-      '#4f46e5', '#db2777', '#7c3aed', '#0d9488', '#d97706',
-      '#2563eb', '#059669', '#e11d48', '#0891b2', '#65a30d',
-      '#9333ea', '#c026d3', '#0284c7', '#ca8a04', '#16a34a', '#dc2626'
+    // Casino Rulet Paleti (Bordo Kırmızı, Derin Zümrüt, Asil Siyah, Kehribar Altın)
+    const casinoPalette = [
+      '#8f1d1d', '#18201d', '#155234', '#18201d', '#b3822a', '#18201d',
+      '#9e2222', '#18201d', '#1b633f', '#18201d', '#996f24', '#18201d'
     ];
+
+    // Geçmiş Kayıtları (Log)
+    let history = [];
+    let currentWinner = null;
+    let round = 1;
+
+    // LocalStorage'dan Geçmişi ve Listeyi Yükle
+    function loadStorage() {
+      const savedNames = localStorage.getItem('cark_names');
+      if (savedNames) {
+        try { names = JSON.parse(savedNames); } catch (e) {}
+      }
+      const savedHistory = localStorage.getItem('cark_history');
+      if (savedHistory) {
+        try { 
+          history = JSON.parse(savedHistory);
+          round = history.length + 1;
+        } catch (e) {}
+      }
+      updateRoundUI();
+      renderHistoryUI();
+    }
+
+    function saveStorage() {
+      localStorage.setItem('cark_names', JSON.stringify(names));
+      localStorage.setItem('cark_history', JSON.stringify(history));
+    }
 
     const canvas = document.getElementById('wheelCanvas');
     const ctx = canvas.getContext('2d');
@@ -101,6 +176,7 @@
     let currentRotation = 0;
     let isSpinning = false;
     let pendingTarget = null;
+    let autoRemoveWinner = false; // Kumandadan yönetilebilir
 
     let audioCtx = null;
     let soundEnabled = true;
@@ -112,6 +188,7 @@
       }
     }
 
+    // Mekanik Casino Ratchet Sesi
     function playTick() {
       if (!soundEnabled) return;
       try {
@@ -120,19 +197,39 @@
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(500, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.03);
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+        osc.frequency.setValueAtTime(750, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.035);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + 0.035);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.03);
+        osc.stop(audioCtx.currentTime + 0.035);
+      } catch (e) {}
+    }
+
+    // Kazanan Kilitlenme Sesi (Chime)
+    function playWinSound() {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.09 + 0.4);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + i * 0.09);
+          osc.stop(audioCtx.currentTime + i * 0.09 + 0.4);
+        });
       } catch (e) {}
     }
 
     function resizeCanvas() {
-      const size = Math.min(window.innerWidth * 0.88, window.innerHeight * 0.72, 560);
+      const size = Math.min(window.innerWidth * 0.88, window.innerHeight * 0.72, 580);
       const dpr = window.devicePixelRatio || 1;
       canvas.width = size * dpr;
       canvas.height = size * dpr;
@@ -144,18 +241,22 @@
     }
 
     function drawWheel() {
-      if (!names.length) return;
+      if (!names.length) {
+        ctx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
+        return;
+      }
       const N = names.length;
       const arc = (2 * Math.PI) / N;
       const cx = wheelRadius;
       const cy = wheelRadius;
-      const r = wheelRadius - 4;
+      const r = wheelRadius - 14;
 
       ctx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
 
+      // 1. Dilimleri Çiz
       for (let i = 0; i < N; i++) {
         const angle = currentRotation + i * arc;
-        const color = sliceColors[i % sliceColors.length];
+        const color = casinoPalette[i % casinoPalette.length];
 
         ctx.beginPath();
         ctx.fillStyle = color;
@@ -164,30 +265,55 @@
         ctx.lineTo(cx, cy);
         ctx.fill();
 
-        ctx.strokeStyle = '#09090b';
-        ctx.lineWidth = 2;
+        // Altın/pirinç ayırıcı çizgiler
+        ctx.strokeStyle = '#d4af37';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
+        // İsim Yazımı
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(angle + arc / 2);
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#fef3c7';
 
-        const fontSize = Math.max(11, Math.min(16, Math.floor(wheelRadius / 16)));
-        ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
+        const fontSize = Math.max(11, Math.min(15, Math.floor(wheelRadius / 17)));
+        ctx.font = `bold ${fontSize}px sans-serif`;
         
         let displayName = names[i];
-        if (displayName.length > 12) displayName = displayName.substring(0, 11) + '…';
-        ctx.fillText(displayName, r - 20, fontSize / 3);
+        if (displayName.length > 13) displayName = displayName.substring(0, 12) + '…';
+        ctx.fillText(displayName, r - 22, fontSize / 3);
         ctx.restore();
       }
 
+      // 2. Dış Çerçeve (Casino Pirinç Perçinli Ahşap/Metal Kasa)
       ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-      ctx.strokeStyle = '#27272a';
-      ctx.lineWidth = 4;
+      ctx.arc(cx, cy, r + 6, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#272017';
+      ctx.lineWidth = 14;
       ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 12, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#b48a3c';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // 3. Çark Çevresindeki Pirinç Pimler (Brass Pins)
+      const pinCount = Math.max(N, 24);
+      for (let i = 0; i < pinCount; i++) {
+        const pinAngle = currentRotation + (i * 2 * Math.PI) / pinCount;
+        const px = cx + (r + 6) * Math.cos(pinAngle);
+        const py = cy + (r + 6) * Math.sin(pinAngle);
+
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = '#fef08a';
+        ctx.fill();
+        ctx.strokeStyle = '#854d0e';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
 
     const POINTER_ANGLE = 1.5 * Math.PI;
@@ -215,7 +341,7 @@
       }
 
       let deltaRotation = 0;
-      const minFullSpins = 5;
+      const minFullSpins = 6;
       const extraSpins = Math.floor(Math.random() * 3);
       const totalTurns = (minFullSpins + extraSpins) * 2 * Math.PI;
 
@@ -234,7 +360,7 @@
 
       const startRotation = currentRotation;
       const finalRotation = startRotation + deltaRotation;
-      const duration = 4800 + Math.random() * 600;
+      const duration = 5200 + Math.random() * 600;
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
 
@@ -250,10 +376,10 @@
         if (currentIndex !== lastTickIndex) {
           playTick();
           lastTickIndex = currentIndex;
-          pointerEl.style.transform = 'translateX(-50%) rotate(-10deg)';
+          pointerEl.style.transform = 'translateX(-50%) rotate(-12deg)';
           setTimeout(() => {
             pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
-          }, 40);
+          }, 35);
         }
 
         if (progress < 1) {
@@ -265,21 +391,72 @@
           drawWheel();
 
           const winnerIdx = getCurrentWinningIndex(currentRotation);
-          const winner = names[winnerIdx];
+          currentWinner = names[winnerIdx];
 
-          triggerCelebration(winner);
-          broadcast({ type: 'spin_end', winner: winner });
+          // Geçmişe ekle
+          addHistoryRecord(currentWinner, round);
+          round++;
+          updateRoundUI();
+
+          playWinSound();
+          triggerCelebration(currentWinner);
+
+          broadcast({ 
+            type: 'spin_end', 
+            winner: currentWinner,
+            history: history,
+            names: names
+          });
         }
       }
 
       requestAnimationFrame(animate);
     }
 
+    function addHistoryRecord(winner, roundNumber) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const record = {
+        round: roundNumber,
+        winner: winner,
+        time: timeStr
+      };
+      history.unshift(record);
+      saveStorage();
+      renderHistoryUI();
+    }
+
+    function renderHistoryUI() {
+      const list = document.getElementById('historyList');
+      document.getElementById('historyCount').textContent = history.length;
+      document.getElementById('totalSpinsCount').textContent = 'Toplam: ' + history.length;
+
+      if (history.length === 0) {
+        list.innerHTML = `<div class="text-center py-8 text-xs text-zinc-600">Henüz çekiliş yapılmadı.</div>`;
+        return;
+      }
+
+      list.innerHTML = history.map(item => `
+        <div class="flex items-center justify-between p-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="text-amber-500 font-mono font-bold">#${item.round}</span>
+            <span class="text-zinc-200 font-semibold">${item.winner}</span>
+          </div>
+          <span class="text-[10px] text-zinc-500 font-mono">${item.time}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateRoundUI() {
+      document.getElementById('roundCounter').textContent = round;
+      document.getElementById('studentCount').textContent = names.length;
+    }
+
     function triggerCelebration(winner) {
       try {
         confetti({
-          particleCount: 80,
-          spread: 70,
+          particleCount: 90,
+          spread: 75,
           origin: { y: 0.6 }
         });
       } catch (e) {}
@@ -294,9 +471,43 @@
       modal.classList.add('opacity-0', 'pointer-events-none');
     }
 
-    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+    // Listeden Çıkar ve Devam Et
+    function removeCurrentWinner() {
+      if (currentWinner) {
+        names = names.filter(n => n !== currentWinner);
+        saveStorage();
+        updateRoundUI();
+        drawWheel();
+        broadcast({ type: 'sync_names', names: names });
+        showToast(currentWinner + ' listeden çıkarıldı');
+      }
+      closeModal();
+    }
+
+    document.getElementById('removeWinnerBtn').addEventListener('click', removeCurrentWinner);
+    document.getElementById('keepWinnerBtn').addEventListener('click', closeModal);
     document.getElementById('winnerModal').addEventListener('click', (e) => {
       if (e.target === document.getElementById('winnerModal')) closeModal();
+    });
+
+    // Geçmiş Paneli Aç/Kapa
+    document.getElementById('toggleHistoryBtn').addEventListener('click', () => {
+      document.getElementById('historyPanel').classList.remove('translate-x-full');
+    });
+
+    document.getElementById('closeHistoryBtn').addEventListener('click', () => {
+      document.getElementById('historyPanel').classList.add('translate-x-full');
+    });
+
+    document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+      if (confirm('Çekiliş geçmişini sıfırlamak istiyor musunuz?')) {
+        history = [];
+        round = 1;
+        saveStorage();
+        renderHistoryUI();
+        updateRoundUI();
+        broadcast({ type: 'history_updated', history: [] });
+      }
     });
 
     document.getElementById('soundToggleBtn').addEventListener('click', () => {
@@ -325,10 +536,7 @@
       pendingTarget = null;
     });
 
-    function updateStudentCount() {
-      document.getElementById('studentCount').textContent = names.length;
-    }
-
+    // --- PeerJS WebRTC ---
     let peer = null;
     let connections = [];
     const randomCode = Math.floor(1000 + Math.random() * 9000);
@@ -339,7 +547,7 @@
 
       peer.on('open', (id) => {
         document.getElementById('roomIdDisplay').textContent = id;
-        document.getElementById('statusDot').className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+        document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-emerald-400';
       });
 
       peer.on('connection', (conn) => {
@@ -348,6 +556,7 @@
           conn.send({
             type: 'init',
             names: names,
+            history: history,
             isSpinning: isSpinning
           });
         });
@@ -367,7 +576,6 @@
           peer = new Peer(fallbackId);
           peer.on('open', (newId) => {
             document.getElementById('roomIdDisplay').textContent = newId;
-            document.getElementById('statusDot').className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
           });
         }
       });
@@ -379,7 +587,8 @@
       if (msg.type === 'sync_names') {
         if (Array.isArray(msg.names) && msg.names.length > 0) {
           names = msg.names;
-          updateStudentCount();
+          saveStorage();
+          updateRoundUI();
           drawWheel();
           broadcast({ type: 'names_updated', names: names });
         }
@@ -388,6 +597,19 @@
         spinWheel(msg.target || null);
       } else if (msg.type === 'set_target') {
         pendingTarget = msg.target || null;
+      } else if (msg.type === 'remove_name') {
+        // Kumandadan isim çıkarıldı
+        names = names.filter(n => n !== msg.name);
+        saveStorage();
+        updateRoundUI();
+        drawWheel();
+        broadcast({ type: 'names_updated', names: names });
+      } else if (msg.type === 'clear_history') {
+        history = [];
+        round = 1;
+        saveStorage();
+        renderHistoryUI();
+        updateRoundUI();
       }
     }
 
@@ -421,7 +643,7 @@
 
     window.addEventListener('resize', resizeCanvas);
     window.addEventListener('DOMContentLoaded', () => {
-      updateStudentCount();
+      loadStorage();
       resizeCanvas();
       initPeer();
     });
