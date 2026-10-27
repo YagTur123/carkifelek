@@ -3,154 +3,257 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Şans Oyunları</title>
+  <title>3D Casino & Şans Oyunları</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     .casino-felt {
-      background-color: #060a08;
-      background-image: radial-gradient(#0f1e14 1px, transparent 1px), radial-gradient(#0f1e14 1px, #060a08 1px);
+      background-color: #050806;
+      background-image: radial-gradient(#0e1b12 1px, transparent 1px), radial-gradient(#0e1b12 1px, #050806 1px);
       background-size: 32px 32px;
       background-position: 0 0, 16px 16px;
     }
-    /* Slot Reel Vignette (3D Silindir Derinlik Hissi) */
-    .reel-vignette {
-      box-shadow: inset 0 25px 25px -10px rgba(0,0,0,0.9), inset 0 -25px 25px -10px rgba(0,0,0,0.9);
+    /* 3D Sahne Perspektifi */
+    .perspective-stage {
+      perspective: 1200px;
+      transform-style: preserve-3d;
+    }
+    .wheel-3d {
+      transform: rotateX(24deg) scale(0.95);
+      box-shadow: 0 40px 60px -15px rgba(0, 0, 0, 0.95), 0 0 40px rgba(212, 175, 55, 0.2);
+    }
+    /* 3D Slot Silindiri */
+    .slot-drum-box {
+      perspective: 800px;
+      transform-style: preserve-3d;
+      box-shadow: inset 0 35px 30px -10px rgba(0,0,0,0.95), inset 0 -35px 30px -10px rgba(0,0,0,0.95);
+    }
+    /* 3D Kart Flip */
+    .card-flipper {
+      transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transform-style: preserve-3d;
+    }
+    .card-flipped {
+      transform: rotateY(180deg);
+    }
+    .card-face {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .card-back {
+      transform: rotateY(180deg);
+    }
+    /* 3D Zar Küpü */
+    .dice-cube {
+      width: 80px;
+      height: 80px;
+      transform-style: preserve-3d;
+      transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+    }
+    .dice-side {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border: 2px solid #854d0e;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #fef08a;
+      background: radial-gradient(#272017, #09090b);
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+    }
+    .side-front  { transform: rotateY(0deg) translateZ(40px); }
+    .side-back   { transform: rotateY(180deg) translateZ(40px); }
+    .side-right  { transform: rotateY(90deg) translateZ(40px); }
+    .side-left   { transform: rotateY(-90deg) translateZ(40px); }
+    .side-top    { transform: rotateX(90deg) translateZ(40px); }
+    .side-bottom { transform: rotateX(-90deg) translateZ(40px); }
+
+    /* 3D Sikke (Coin) */
+    .coin-3d {
+      width: 140px;
+      height: 140px;
+      transform-style: preserve-3d;
+      transition: transform 3.5s cubic-bezier(0.15, 0.9, 0.3, 1.05);
     }
     @keyframes screen-shake {
       0%, 100% { transform: translate(0, 0); }
-      20% { transform: translate(-3px, 3px); }
-      40% { transform: translate(3px, -2px); }
-      60% { transform: translate(-2px, -3px); }
-      80% { transform: translate(2px, 2px); }
+      20% { transform: translate(-4px, 4px); }
+      40% { transform: translate(4px, -3px); }
+      60% { transform: translate(-3px, -4px); }
+      80% { transform: translate(3px, 3px); }
     }
-    .shake {
-      animation: screen-shake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-    }
+    .shake { animation: screen-shake 0.4s both; }
   </style>
 </head>
 <body id="mainBody" class="casino-felt text-zinc-100 min-h-screen flex flex-col items-center justify-between overflow-hidden select-none font-sans antialiased">
 
   <!-- Üst Bar -->
-  <header class="w-full flex items-center justify-between px-6 py-3.5 z-20 bg-zinc-950/85 border-b border-zinc-800/80 backdrop-blur">
+  <header class="w-full flex items-center justify-between px-6 py-3 z-30 bg-zinc-950/90 border-b border-zinc-800/80 backdrop-blur">
     <div class="flex items-center gap-3">
       <div class="w-2.5 h-6 bg-amber-500 rounded-sm"></div>
       <div>
-        <h1 class="text-base md:text-lg font-bold tracking-wider text-amber-100 font-serif uppercase" id="gameTitleDisplay">Casino Çarkı</h1>
+        <h1 class="text-sm md:text-base font-bold tracking-wider text-amber-100 font-serif uppercase" id="gameTitleDisplay">3D Casino Çarkı</h1>
         <p class="text-[11px] text-zinc-400">Tur: <span id="roundCounter" class="text-amber-400 font-mono font-bold">1</span></p>
       </div>
     </div>
 
-    <!-- Oyun Seçici Sekmeler -->
-    <div class="flex items-center bg-zinc-900 border border-zinc-800 p-1 rounded-lg gap-1 text-xs">
-      <button onclick="setGameMode('wheel')" id="btnModeWheel" class="px-3 py-1 rounded bg-amber-500 text-black font-bold transition">Çarkıfelek</button>
-      <button onclick="setGameMode('slot')" id="btnModeSlot" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">Slot Makinesi</button>
-      <button onclick="setGameMode('roulette')" id="btnModeRoulette" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">Rulet</button>
-      <button onclick="setGameMode('plinko')" id="btnModePlinko" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">Plinko</button>
+    <!-- 8 Oyunlu Seçici Menü -->
+    <div class="flex items-center bg-zinc-900 border border-zinc-800 p-1 rounded-lg gap-1 text-xs overflow-x-auto max-w-[620px]">
+      <button onclick="setGameMode('wheel')" id="btnModeWheel" class="px-2.5 py-1 rounded bg-amber-500 text-black font-bold whitespace-nowrap">Çark</button>
+      <button onclick="setGameMode('slot')" id="btnModeSlot" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white whitespace-nowrap">Slot</button>
+      <button onclick="setGameMode('roulette')" id="btnModeRoulette" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white whitespace-nowrap">Rulet</button>
+      <button onclick="setGameMode('plinko')" id="btnModePlinko" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white whitespace-nowrap">Plinko</button>
+      <button onclick="setGameMode('dice')" id="btnModeDice" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white whitespace-nowrap">3D Zar</button>
+      <button onclick="setGameMode('cards')" id="btnModeCards" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white whitespace-nowrap">Kartlar</button>
+      <button onclick="setGameMode('coin')" id="btnModeCoin" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white whitespace-nowrap">Yazı-Tura</button>
+      <button onclick="setGameMode('crash')" id="btnModeCrash" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white whitespace-nowrap">Roket</button>
     </div>
 
     <!-- Sağ Kontroller -->
     <div class="flex items-center gap-2">
-      <button id="openQrBtn" class="px-2.5 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-amber-200 hover:text-white transition flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
-        <span class="hidden md:inline">Kamera Bağlantısı</span>
-      </button>
-
-      <button id="toggleHistoryBtn" class="px-2.5 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-white transition">
-        Geçmiş (<span id="historyCount">0</span>)
-      </button>
-
-      <button id="soundToggleBtn" class="p-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition">
+      <button id="openQrBtn" class="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-xs text-amber-200 hover:text-white">QR Bağlan</button>
+      <button id="toggleHistoryBtn" class="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">Geçmiş (<span id="historyCount">0</span>)</button>
+      <button id="soundToggleBtn" class="p-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
         <svg id="soundOnIcon" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
         <svg id="soundOffIcon" class="w-4 h-4 hidden text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
-      </button>
-
-      <button id="fullscreenBtn" class="p-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
       </button>
     </div>
   </header>
 
-  <!-- OYUN SAHNESİ -->
-  <main class="relative flex-1 w-full flex items-center justify-center p-4">
+  <!-- OYUN SAHNESİ (3D PERSPECTIVE STAGE) -->
+  <main class="relative flex-1 w-full flex items-center justify-center p-4 perspective-stage">
 
-    <!-- 1. ÇARKIFELEK -->
+    <!-- 1. 3D ÇARKIFELEK -->
     <div id="gameWheelView" class="game-view relative flex items-center justify-center">
-      <div class="relative">
-        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-transform duration-75 filter drop-shadow-lg" id="pointerEl">
-          <div class="w-7 h-11 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
-          <div class="w-3 h-3 rounded-full bg-amber-100 mx-auto -mt-11 border border-amber-950"></div>
+      <div class="relative wheel-3d transition-all duration-300">
+        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none filter drop-shadow-xl" id="pointerEl">
+          <div class="w-8 h-12 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
+          <div class="w-3.5 h-3.5 rounded-full bg-amber-100 mx-auto -mt-12 border border-amber-950"></div>
         </div>
-        <canvas id="wheelCanvas" class="rounded-full cursor-pointer shadow-2xl"></canvas>
+        <canvas id="wheelCanvas" class="rounded-full cursor-pointer"></canvas>
         <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-950 border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-2xl">
           <span class="text-amber-400 text-xs md:text-sm font-black uppercase tracking-widest font-serif">ÇEVİR</span>
         </button>
       </div>
     </div>
 
-    <!-- 2. SLOT MAKİNESİ (LÜKS RETRO VEGAS KASASI) -->
+    <!-- 2. 3D VEGAS SLOT MAKİNESİ -->
     <div id="gameSlotView" class="game-view hidden flex flex-col items-center">
       <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-4 border-amber-600 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col items-center gap-6 max-w-lg w-full relative">
-        <div class="text-center">
-          <h2 class="text-amber-300 font-serif font-black text-2xl tracking-widest uppercase drop-shadow">VEGAS SLOTS</h2>
-          <p class="text-[10px] text-zinc-500 tracking-wider">3 EŞLEŞME = BÜYÜK İKRAMİYE</p>
-        </div>
-
-        <!-- 3 Makaralı Slot Penceresi -->
+        <h2 class="text-amber-300 font-serif font-black text-2xl tracking-widest uppercase drop-shadow">3D VEGAS SLOTS</h2>
+        <!-- 3D Makaralar -->
         <div class="flex items-center gap-3 bg-black p-4 rounded-2xl border-2 border-amber-700/80 shadow-2xl w-full justify-center">
-          <!-- Makara 1 -->
-          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative reel-vignette flex items-center justify-center">
+          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative slot-drum-box flex items-center justify-center">
             <div id="slotReel1" class="text-center font-black text-base md:text-lg text-amber-200 font-serif px-2 transition-transform duration-75">---</div>
           </div>
-          <!-- Makara 2 -->
-          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative reel-vignette flex items-center justify-center">
+          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative slot-drum-box flex items-center justify-center">
             <div id="slotReel2" class="text-center font-black text-base md:text-lg text-amber-200 font-serif px-2 transition-transform duration-75">---</div>
           </div>
-          <!-- Makara 3 -->
-          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative reel-vignette flex items-center justify-center">
+          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative slot-drum-box flex items-center justify-center">
             <div id="slotReel3" class="text-center font-black text-base md:text-lg text-amber-200 font-serif px-2 transition-transform duration-75">---</div>
           </div>
         </div>
-
-        <button id="slotSpinBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-sm uppercase tracking-widest shadow-xl transition active:scale-98">
-          KOLU ÇEK (SPIN)
-        </button>
+        <button id="slotSpinBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-black font-black text-sm uppercase tracking-widest shadow-xl transition active:scale-98">KOLU ÇEK (SPIN)</button>
       </div>
     </div>
 
-    <!-- 3. RULET MASASI -->
+    <!-- 3. 3D RULET MASASI -->
     <div id="gameRouletteView" class="game-view hidden flex flex-col items-center gap-4">
-      <div class="relative">
+      <div class="relative wheel-3d">
         <canvas id="rouletteCanvas" class="rounded-full shadow-2xl border-4 border-amber-700/80"></canvas>
-        <button id="rouletteSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-zinc-950 border-2 border-amber-500 text-amber-300 font-bold text-xs uppercase transition hover:border-amber-400 active:scale-95 shadow-xl">
-          Topu At
-        </button>
+        <button id="rouletteSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-zinc-950 border-2 border-amber-500 text-amber-300 font-bold text-xs uppercase hover:border-amber-400 active:scale-95 shadow-xl">Topu At</button>
       </div>
-      <div id="rouletteCurrentNumber" class="text-xs text-amber-200/90 bg-zinc-950/90 px-4 py-1.5 rounded-full border border-zinc-800 backdrop-blur">
-        Krupiye bekleniyor...
-      </div>
+      <div id="rouletteCurrentNumber" class="text-xs text-amber-200/90 bg-zinc-950/90 px-4 py-1.5 rounded-full border border-zinc-800 backdrop-blur">Krupiye bekleniyor...</div>
     </div>
 
-    <!-- 4. PLINKO BOARD -->
+    <!-- 4. 3D PLINKO BOARD -->
     <div id="gamePlinkoView" class="game-view hidden flex flex-col items-center">
-      <div class="relative bg-zinc-950/95 border-2 border-amber-700/60 rounded-2xl p-4 shadow-2xl flex flex-col items-center">
+      <div class="relative bg-zinc-950/95 border-2 border-amber-700/60 rounded-2xl p-4 shadow-2xl flex flex-col items-center" style="transform: rotateX(12deg);">
         <div class="flex items-center justify-between w-full px-2 mb-2">
-          <span class="text-xs text-amber-300 font-serif font-bold uppercase tracking-wider">PLINKO DROP</span>
-          <button id="plinkoDropBtn" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase transition active:scale-95">
-            Topu Bırak
-          </button>
+          <span class="text-xs text-amber-300 font-serif font-bold uppercase tracking-wider">3D PLINKO</span>
+          <button id="plinkoDropBtn" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase transition active:scale-95">Topu Bırak</button>
         </div>
         <canvas id="plinkoCanvas" class="rounded-xl bg-black border border-zinc-800 shadow-inner"></canvas>
       </div>
     </div>
 
+    <!-- 5. 3D CASINO ZARLARI (CRAPS) -->
+    <div id="gameDiceView" class="game-view hidden flex flex-col items-center gap-8">
+      <div class="flex items-center gap-10 py-8 perspective-stage">
+        <!-- 1. Zar -->
+        <div id="diceCube1" class="dice-cube relative">
+          <div class="dice-side side-front">⚀</div>
+          <div class="dice-side side-back">⚅</div>
+          <div class="dice-side side-right">⚂</div>
+          <div class="dice-side side-left">⚃</div>
+          <div class="dice-side side-top">⚄</div>
+          <div class="dice-side side-bottom">⚁</div>
+        </div>
+        <!-- 2. Zar -->
+        <div id="diceCube2" class="dice-cube relative">
+          <div class="dice-side side-front">⚂</div>
+          <div class="dice-side side-back">⚃</div>
+          <div class="dice-side side-right">⚅</div>
+          <div class="dice-side side-left">⚀</div>
+          <div class="dice-side side-top">⚁</div>
+          <div class="dice-side side-bottom">⚄</div>
+        </div>
+      </div>
+      <div id="diceStatus" class="text-sm font-bold text-amber-300 font-serif">Zarları masaya atın!</div>
+      <button id="diceRollBtn" class="px-8 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-sm uppercase tracking-wider transition active:scale-95 shadow-xl">ZARLARI FIRLAT</button>
+    </div>
+
+    <!-- 6. 3D GİZEMLİ KART MASASI (CARDS) -->
+    <div id="gameCardsView" class="game-view hidden flex flex-col items-center gap-6">
+      <div id="cardsGrid" class="grid grid-cols-3 md:grid-cols-4 gap-4 perspective-stage max-w-xl">
+        <!-- JS ile 3D kartlar doldurulacak -->
+      </div>
+      <button id="cardsDealBtn" class="px-8 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-sm uppercase tracking-wider transition active:scale-95 shadow-xl">KARTLARI DAĞIT VE AÇ</button>
+    </div>
+
+    <!-- 7. 3D YAZI-TURA / ALTIN SİKKE (COIN TOSS) -->
+    <div id="gameCoinView" class="game-view hidden flex flex-col items-center gap-8">
+      <div class="py-8 perspective-stage">
+        <div id="coin3d" class="coin-3d relative rounded-full shadow-2xl cursor-pointer">
+          <!-- Tura (Altın Yüz) -->
+          <div class="absolute inset-0 rounded-full border-4 border-amber-500 bg-gradient-to-tr from-amber-600 via-amber-300 to-amber-700 flex flex-col items-center justify-center card-face shadow-inner">
+            <span class="text-3xl font-black text-amber-950 font-serif">★</span>
+            <span class="text-xs font-black text-amber-950 uppercase tracking-widest mt-1">LUCKY</span>
+          </div>
+          <!-- Yazı (Taç Yüz) -->
+          <div class="absolute inset-0 rounded-full border-4 border-amber-500 bg-gradient-to-tr from-amber-700 via-amber-400 to-amber-600 flex flex-col items-center justify-center card-face card-back shadow-inner">
+            <span class="text-2xl font-black text-amber-950 font-serif">👑</span>
+            <span class="text-xs font-black text-amber-950 uppercase tracking-widest mt-1">WINNER</span>
+          </div>
+        </div>
+      </div>
+      <div id="coinStatus" class="text-sm font-bold text-amber-300 font-serif">Altın sikkeyi havaya fırlatın!</div>
+      <button id="coinFlipBtn" class="px-8 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-sm uppercase tracking-wider transition active:scale-95 shadow-xl">SİKKEYİ FIRLAT</button>
+    </div>
+
+    <!-- 8. 3D CRASH / ROKET OYUNU (AVIATOR) -->
+    <div id="gameCrashView" class="game-view hidden flex flex-col items-center gap-4 w-full max-w-lg">
+      <div class="w-full h-72 bg-gradient-to-b from-indigo-950/40 via-black to-zinc-950 border-2 border-amber-600/60 rounded-2xl relative overflow-hidden flex flex-col items-center justify-center shadow-2xl">
+        <!-- Uçan Roket -->
+        <div id="rocketEl" class="text-5xl transition-all duration-100 transform -translate-x-12 translate-y-16">🚀</div>
+        <!-- Çarpan Göstergesi -->
+        <div id="crashMultiplier" class="text-4xl md:text-5xl font-black text-amber-300 font-mono tracking-tight mt-4">1.00x</div>
+        <div id="crashSubtext" class="text-xs text-zinc-400 mt-2 font-medium">Roket yükseliyor...</div>
+      </div>
+      <button id="crashLaunchBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-black font-black text-sm uppercase tracking-widest shadow-xl transition active:scale-98">ROKETİ ATEŞLE</button>
+    </div>
+
   </main>
 
   <!-- Alt Bar -->
-  <footer class="w-full flex items-center justify-between px-6 py-3 bg-zinc-950/85 border-t border-zinc-800/80 backdrop-blur text-xs text-zinc-400">
+  <footer class="w-full flex items-center justify-between px-6 py-3 bg-zinc-950/90 border-t border-zinc-800/80 backdrop-blur text-xs text-zinc-400 z-30">
     <div>Kalan: <span id="studentCount" class="text-amber-400 font-bold font-mono">0</span> kişi</div>
     <div id="roomBadge" class="flex items-center gap-2 cursor-pointer hover:text-amber-200 transition">
       <span id="statusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
@@ -158,16 +261,14 @@
     </div>
   </footer>
 
-  <!-- QR Kod Modalı -->
+  <!-- QR Modal -->
   <div id="qrModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200 backdrop-blur-sm">
     <div class="bg-zinc-950 border border-amber-500/60 rounded-2xl p-6 max-w-xs w-full text-center shadow-2xl flex flex-col items-center gap-4">
       <h3 class="font-bold text-amber-200 text-sm font-serif">Kamerayla Bağlan</h3>
       <div class="p-3 bg-white rounded-xl shadow-inner">
         <img id="qrImage" src="" alt="QR Kod" class="w-48 h-48 block">
       </div>
-      <div class="text-[11px] text-zinc-400 font-mono bg-zinc-900 py-1 px-3 rounded border border-zinc-800 truncate w-full" id="qrRoomCode">
-        Oda: ...
-      </div>
+      <div class="text-[11px] text-zinc-400 font-mono bg-zinc-900 py-1 px-3 rounded border border-zinc-800 truncate w-full" id="qrRoomCode">Oda: ...</div>
       <button id="closeQrBtn" class="w-full py-2 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold">Kapat</button>
     </div>
   </div>
@@ -189,16 +290,10 @@
   <div id="winnerModal" class="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200 backdrop-blur-md">
     <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-2 border-amber-500/80 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl transform scale-95 transition-transform" id="winnerCard">
       <p id="winnerGameLabel" class="text-xs text-amber-400/90 font-serif uppercase tracking-widest mb-1">KAZANAN</p>
-      <div id="winnerName" class="text-3xl font-black text-amber-100 tracking-tight my-4 py-3 px-4 bg-zinc-900/90 border border-amber-600/40 rounded-xl font-serif">
-        Kazanan İsim
-      </div>
+      <div id="winnerName" class="text-3xl font-black text-amber-100 tracking-tight my-4 py-3 px-4 bg-zinc-900/90 border border-amber-600/40 rounded-xl font-serif">Kazanan İsim</div>
       <div class="flex flex-col gap-2 mt-5">
-        <button id="removeWinnerBtn" class="w-full py-2.5 px-4 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider transition">
-          Listeden Çıkar ve Devam Et
-        </button>
-        <button id="keepWinnerBtn" class="w-full py-2 px-4 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition">
-          Listede Tut
-        </button>
+        <button id="removeWinnerBtn" class="w-full py-2.5 px-4 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider transition">Listeden Çıkar ve Devam Et</button>
+        <button id="keepWinnerBtn" class="w-full py-2 px-4 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition">Listede Tut</button>
       </div>
     </div>
   </div>
@@ -217,7 +312,7 @@
     let isPlaying = false;
     let pendingTarget = null;
 
-    // --- GELİŞMİŞ WEB AUDIO SFX MOTORU (CANLI SENTEZLEYİCİ) ---
+    // --- SFX Motoru ---
     let audioCtx = null;
     let soundEnabled = true;
 
@@ -225,61 +320,6 @@
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    // 1. Mekanik Kol Çekilme Sesi (Ratchet Crank)
-    function playLeverCrank() {
-      if (!soundEnabled) return;
-      initAudio();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      for (let i = 0; i < 4; i++) {
-        setTimeout(() => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(220 + i * 40, audioCtx.currentTime);
-          gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start();
-          osc.stop(audioCtx.currentTime + 0.04);
-        }, i * 45);
-      }
-    }
-
-    // 2. Makara Kilitlenme Sesi (Heavy Metal Clunk)
-    function playReelStop() {
-      if (!soundEnabled) return;
-      initAudio();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(140, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.08);
-    }
-
-    // 3. Plinko Çivi Çınlaması (Melodic Bell Ting)
-    function playPlinkoTing(freq) {
-      if (!soundEnabled) return;
-      initAudio();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.09);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.09);
-    }
-
-    // 4. Genel Çark Tıklaması
     function playTick(freq = 700) {
       if (!soundEnabled) return;
       initAudio();
@@ -297,28 +337,49 @@
       osc.stop(audioCtx.currentTime + 0.03);
     }
 
-    // 5. Casino Şıngırdayan Jeton Yağmuru (Coin Shower / Payout)
-    function playCoinPayout() {
+    function playDiceShake() {
       if (!soundEnabled) return;
       initAudio();
-      const freqs = [1318.51, 1567.98, 1760.00, 2093.00, 2637.02];
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 6; i++) {
+        setTimeout(() => playTick(400 + Math.random() * 300), i * 70);
+      }
+    }
+
+    function playCardFlipSound() {
+      if (!soundEnabled) return;
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.06);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.06);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.06);
+    }
+
+    function playCoinChime() {
+      if (!soundEnabled) return;
+      initAudio();
+      [1760, 2093, 2637].forEach((f, i) => {
         setTimeout(() => {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sine';
-          osc.frequency.value = freqs[Math.floor(Math.random() * freqs.length)];
-          gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+          osc.frequency.value = f;
+          gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
           osc.connect(gain);
           gain.connect(audioCtx.destination);
           osc.start();
-          osc.stop(audioCtx.currentTime + 0.12);
-        }, i * 65);
-      }
+          osc.stop(audioCtx.currentTime + 0.15);
+        }, i * 40);
+      });
     }
 
-    // 6. Büyük Zafer Fanfarı
     function playWinSound() {
       if (!soundEnabled) return;
       initAudio();
@@ -334,65 +395,57 @@
         osc.start(audioCtx.currentTime + i * 0.09);
         osc.stop(audioCtx.currentTime + i * 0.09 + 0.4);
       });
-      setTimeout(playCoinPayout, 450);
     }
 
-    // Ekran Titreşimi (Camera Shake)
     function triggerScreenShake() {
       const body = document.getElementById('mainBody');
       body.classList.remove('shake');
-      void body.offsetWidth; // Reflow tetikle
+      void body.offsetWidth;
       body.classList.add('shake');
       setTimeout(() => body.classList.remove('shake'), 400);
     }
 
-    // --- OYUN MODU YÖNETİMİ ---
+    // --- MOD DEĞİŞTİRME ---
     function setGameMode(mode, broadcastSync = true) {
       activeGameMode = mode;
       document.querySelectorAll('.game-view').forEach(el => el.classList.add('hidden'));
 
-      ['wheel', 'slot', 'roulette', 'plinko'].forEach(m => {
+      ['wheel', 'slot', 'roulette', 'plinko', 'dice', 'cards', 'coin', 'crash'].forEach(m => {
         const btn = document.getElementById('btnMode' + m.charAt(0).toUpperCase() + m.slice(1));
         if (btn) {
           btn.className = (m === mode) 
-            ? 'px-3 py-1 rounded bg-amber-500 text-black font-bold transition'
-            : 'px-3 py-1 rounded text-zinc-400 hover:text-white transition';
+            ? 'px-2.5 py-1 rounded bg-amber-500 text-black font-bold whitespace-nowrap'
+            : 'px-2.5 py-1 rounded text-zinc-400 hover:text-white whitespace-nowrap';
         }
       });
 
-      const titleMap = {
-        wheel: 'Casino Çarkı',
-        slot: 'Vegas Slots (Slot Makinesi)',
-        roulette: 'Roulette Masası',
-        plinko: 'Plinko Board'
+      const titles = {
+        wheel: '3D Casino Çarkı', slot: '3D Vegas Slots', roulette: '3D Rulet Masası',
+        plinko: '3D Plinko Board', dice: '3D Casino Zarları', cards: '3D Gizemli Kart Masası',
+        coin: '3D Yazı-Tura (Coin Toss)', crash: '3D Aviator Roket Oyunu'
       };
-      document.getElementById('gameTitleDisplay').textContent = titleMap[mode] || 'Şans Oyunu';
+      document.getElementById('gameTitleDisplay').textContent = titles[mode] || 'Şans Oyunu';
 
-      if (mode === 'wheel') {
-        document.getElementById('gameWheelView').classList.remove('hidden');
-        resizeWheelCanvas();
-      } else if (mode === 'slot') {
-        document.getElementById('gameSlotView').classList.remove('hidden');
-        initSlotDisplay();
-      } else if (mode === 'roulette') {
-        document.getElementById('gameRouletteView').classList.remove('hidden');
-        resizeRouletteCanvas();
-      } else if (mode === 'plinko') {
-        document.getElementById('gamePlinkoView').classList.remove('hidden');
-        resizePlinkoCanvas();
-      }
+      const viewEl = document.getElementById('game' + mode.charAt(0).toUpperCase() + mode.slice(1) + 'View');
+      if (viewEl) viewEl.classList.remove('hidden');
+
+      if (mode === 'wheel') resizeWheelCanvas();
+      else if (mode === 'slot') initSlotDisplay();
+      else if (mode === 'roulette') resizeRouletteCanvas();
+      else if (mode === 'plinko') resizePlinkoCanvas();
+      else if (mode === 'cards') renderCardsGrid();
 
       if (broadcastSync) broadcast({ type: 'game_mode_changed', mode: mode });
     }
 
-    // --- 1. ÇARKIFELEK ---
+    // --- 1. ÇARK ---
     const wheelCanvas = document.getElementById('wheelCanvas');
     const wheelCtx = wheelCanvas.getContext('2d');
     let wheelRadius = 0, wheelRotation = 0, lastWheelTickIndex = -1;
     const casinoPalette = ['#8f1d1d', '#18201d', '#155234', '#18201d', '#b3822a', '#18201d'];
 
     function resizeWheelCanvas() {
-      const size = Math.min(window.innerWidth * 0.85, window.innerHeight * 0.68, 540);
+      const size = Math.min(window.innerWidth * 0.85, window.innerHeight * 0.65, 520);
       const dpr = window.devicePixelRatio || 1;
       wheelCanvas.width = size * dpr;
       wheelCanvas.height = size * dpr;
@@ -405,18 +458,16 @@
 
     function drawWheel() {
       if (!names.length) return;
-      const N = names.length;
-      const arc = (2 * Math.PI) / N;
+      const N = names.length, arc = (2 * Math.PI) / N;
       const cx = wheelRadius, cy = wheelRadius, r = wheelRadius - 12;
       wheelCtx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
 
       for (let i = 0; i < N; i++) {
-        const angle = wheelRotation + i * arc;
+        const a = wheelRotation + i * arc;
         wheelCtx.beginPath();
         wheelCtx.fillStyle = casinoPalette[i % casinoPalette.length];
         wheelCtx.moveTo(cx, cy);
-        wheelCtx.arc(cx, cy, r, angle, angle + arc);
-        wheelCtx.lineTo(cx, cy);
+        wheelCtx.arc(cx, cy, r, a, a + arc);
         wheelCtx.fill();
         wheelCtx.strokeStyle = '#d4af37';
         wheelCtx.lineWidth = 1.5;
@@ -424,18 +475,17 @@
 
         wheelCtx.save();
         wheelCtx.translate(cx, cy);
-        wheelCtx.rotate(angle + arc / 2);
+        wheelCtx.rotate(a + arc / 2);
         wheelCtx.textAlign = 'right';
         wheelCtx.fillStyle = '#fef3c7';
-        const fontSize = Math.max(10, Math.min(15, Math.floor(wheelRadius / 17)));
+        const fontSize = Math.max(10, Math.min(14, Math.floor(wheelRadius / 17)));
         wheelCtx.font = `bold ${fontSize}px sans-serif`;
         let displayName = names[i];
-        if (displayName.length > 13) displayName = displayName.substring(0, 12) + '…';
+        if (displayName.length > 12) displayName = displayName.substring(0, 11) + '…';
         wheelCtx.fillText(displayName, r - 20, fontSize / 3);
         wheelCtx.restore();
       }
 
-      // Kasa ve Pimler
       wheelCtx.beginPath();
       wheelCtx.arc(cx, cy, r + 5, 0, 2 * Math.PI);
       wheelCtx.strokeStyle = '#272017';
@@ -447,17 +497,6 @@
       wheelCtx.strokeStyle = '#b48a3c';
       wheelCtx.lineWidth = 2;
       wheelCtx.stroke();
-
-      const pinCount = Math.max(N, 24);
-      for (let i = 0; i < pinCount; i++) {
-        const pinA = wheelRotation + (i * 2 * Math.PI) / pinCount;
-        const px = cx + (r + 5) * Math.cos(pinA);
-        const py = cy + (r + 5) * Math.sin(pinA);
-        wheelCtx.beginPath();
-        wheelCtx.arc(px, py, 2.5, 0, 2 * Math.PI);
-        wheelCtx.fillStyle = '#fef08a';
-        wheelCtx.fill();
-      }
     }
 
     function spinWheel(targetName = null) {
@@ -465,11 +504,9 @@
       isPlaying = true;
       broadcast({ type: 'spin_start' });
 
-      const N = names.length;
-      const arc = (2 * Math.PI) / N;
+      const N = names.length, arc = (2 * Math.PI) / N;
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
       const totalTurns = (6 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
-
       let deltaRotation = 0;
       const POINTER_ANGLE = 1.5 * Math.PI;
 
@@ -484,10 +521,8 @@
         deltaRotation = totalTurns + Math.random() * 2 * Math.PI;
       }
 
-      const startRot = wheelRotation;
-      const finalRot = startRot + deltaRotation;
-      const duration = 5200 + Math.random() * 500;
-      const startTime = performance.now();
+      const startRot = wheelRotation, finalRot = startRot + deltaRotation;
+      const duration = 5000, startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
 
       function anim(time) {
@@ -497,8 +532,7 @@
         wheelRotation = startRot + deltaRotation * ease;
         drawWheel();
 
-        const norm = ((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-        const curIdx = Math.floor(norm / arc) % N;
+        const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
         if (curIdx !== lastWheelTickIndex) {
           playTick(750);
           lastWheelTickIndex = curIdx;
@@ -506,20 +540,19 @@
           setTimeout(() => pointerEl.style.transform = 'translateX(-50%) rotate(0deg)', 40);
         }
 
-        if (progress < 1) {
-          requestAnimationFrame(anim);
-        } else {
+        if (progress < 1) requestAnimationFrame(anim);
+        else {
           isPlaying = false;
           wheelRotation = finalRot;
           drawWheel();
           const winnerIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
-          finishGame(names[winnerIdx], targetName !== null, 'Çarkıfelek');
+          finishGame(names[winnerIdx], targetName !== null, '3D Çarkıfelek');
         }
       }
       requestAnimationFrame(anim);
     }
 
-    // --- 2. SLOT MAKİNESİ (OVERSHOOT & 3D BOUNCE) ---
+    // --- 2. SLOT ---
     function initSlotDisplay() {
       if (!names.length) return;
       document.getElementById('slotReel1').textContent = names[0];
@@ -530,55 +563,41 @@
     function spinSlot(targetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
-      playLeverCrank();
       broadcast({ type: 'spin_start' });
 
-      let target = targetName;
-      if (!target) target = names[Math.floor(Math.random() * names.length)];
-
+      let target = targetName || names[Math.floor(Math.random() * names.length)];
       const r1 = document.getElementById('slotReel1');
       const r2 = document.getElementById('slotReel2');
       const r3 = document.getElementById('slotReel3');
 
-      let interval1 = setInterval(() => {
-        r1.textContent = names[Math.floor(Math.random() * names.length)];
-        playTick(550);
-      }, 55);
+      let i1 = setInterval(() => { r1.textContent = names[Math.floor(Math.random() * names.length)]; playTick(550); }, 55);
+      let i2 = setInterval(() => { r2.textContent = names[Math.floor(Math.random() * names.length)]; }, 55);
+      let i3 = setInterval(() => { r3.textContent = names[Math.floor(Math.random() * names.length)]; }, 55);
 
-      let interval2 = setInterval(() => {
-        r2.textContent = names[Math.floor(Math.random() * names.length)];
-      }, 55);
-
-      let interval3 = setInterval(() => {
-        r3.textContent = names[Math.floor(Math.random() * names.length)];
-      }, 55);
-
-      function lockReel(reelEl, finalName) {
-        reelEl.textContent = finalName;
-        playReelStop();
-        // Yaylanma animasyonu
-        reelEl.style.transform = 'translateY(12px)';
-        setTimeout(() => reelEl.style.transform = 'translateY(-6px)', 80);
-        setTimeout(() => reelEl.style.transform = 'translateY(0px)', 160);
+      function lock(el, val) {
+        el.textContent = val;
+        el.style.transform = 'translateY(12px)';
+        setTimeout(() => el.style.transform = 'translateY(0px)', 120);
       }
 
-      setTimeout(() => { clearInterval(interval1); lockReel(r1, target); }, 2200);
-      setTimeout(() => { clearInterval(interval2); lockReel(r2, target); }, 3100);
+      setTimeout(() => { clearInterval(i1); lock(r1, target); playTick(900); }, 2000);
+      setTimeout(() => { clearInterval(i2); lock(r2, target); playTick(950); }, 2900);
       setTimeout(() => {
-        clearInterval(interval3);
-        lockReel(r3, target);
+        clearInterval(i3);
+        lock(r3, target);
+        playTick(1100);
         isPlaying = false;
-        finishGame(target, targetName !== null, 'Vegas Slots (Jackpot)');
-      }, 4000);
+        finishGame(target, targetName !== null, '3D Vegas Slots');
+      }, 3800);
     }
 
-    // --- 3. RULET MASASI ---
+    // --- 3. RULET ---
     const rouletteCanvas = document.getElementById('rouletteCanvas');
     const rouletteCtx = rouletteCanvas.getContext('2d');
     let rouletteRadius = 0, rouletteAngle = 0, ballAngle = 0;
 
     function resizeRouletteCanvas() {
-      const size = Math.min(window.innerWidth * 0.85, window.innerHeight * 0.58, 460);
+      const size = Math.min(window.innerWidth * 0.85, window.innerHeight * 0.55, 440);
       const dpr = window.devicePixelRatio || 1;
       rouletteCanvas.width = size * dpr;
       rouletteCanvas.height = size * dpr;
@@ -591,8 +610,7 @@
 
     function drawRoulette(ballDist = null) {
       if (!names.length) return;
-      const N = names.length;
-      const arc = (2 * Math.PI) / N;
+      const N = names.length, arc = (2 * Math.PI) / N;
       const cx = rouletteRadius, cy = rouletteRadius, r = rouletteRadius - 10;
       rouletteCtx.clearRect(0, 0, rouletteRadius * 2, rouletteRadius * 2);
 
@@ -604,31 +622,8 @@
         rouletteCtx.arc(cx, cy, r, a, a + arc);
         rouletteCtx.fill();
         rouletteCtx.strokeStyle = '#d4af37';
-        rouletteCtx.lineWidth = 1;
         rouletteCtx.stroke();
-
-        rouletteCtx.save();
-        rouletteCtx.translate(cx, cy);
-        rouletteCtx.rotate(a + arc / 2);
-        rouletteCtx.textAlign = 'right';
-        rouletteCtx.fillStyle = '#fef3c7';
-        rouletteCtx.font = 'bold 11px sans-serif';
-        let displayName = names[i];
-        if (displayName.length > 10) displayName = displayName.substring(0, 9) + '…';
-        rouletteCtx.fillText(displayName, r - 16, 4);
-        rouletteCtx.restore();
       }
-
-      // Merkez Göbek
-      rouletteCtx.beginPath();
-      rouletteCtx.arc(cx, cy, r * 0.45, 0, 2 * Math.PI);
-      rouletteCtx.fillStyle = '#181512';
-      rouletteCtx.fill();
-      rouletteCtx.strokeStyle = '#d4af37';
-      rouletteCtx.lineWidth = 3;
-      rouletteCtx.stroke();
-
-      // Top
       if (ballDist !== null) {
         const bx = cx + ballDist * Math.cos(ballAngle);
         const by = cy + ballDist * Math.sin(ballAngle);
@@ -636,9 +631,6 @@
         rouletteCtx.arc(bx, by, 5, 0, 2 * Math.PI);
         rouletteCtx.fillStyle = '#ffffff';
         rouletteCtx.fill();
-        rouletteCtx.shadowColor = 'white';
-        rouletteCtx.shadowBlur = 5;
-        rouletteCtx.stroke();
       }
     }
 
@@ -650,129 +642,78 @@
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
       if (targetIndex === -1) targetIndex = Math.floor(Math.random() * names.length);
 
-      const r = rouletteRadius - 10;
-      const duration = 5400;
-      const startTime = performance.now();
+      const r = rouletteRadius - 10, duration = 5000, startTime = performance.now();
 
       function anim(now) {
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        const ease = 1 - Math.pow(1 - progress, 3);
-
         rouletteAngle += 0.035 * (1 - progress * 0.7);
-        ballAngle -= 0.13 * (1 - ease * 0.9);
-
-        // Top içeri sekerken ses
-        const ballDist = (r - 18) - (progress > 0.65 ? (progress - 0.65) * 50 : 0);
-        drawRoulette(ballDist);
-
-        if (Math.random() < 0.22) playTick(800 + Math.random() * 200);
-
-        if (progress < 1) {
-          requestAnimationFrame(anim);
-        } else {
+        ballAngle -= 0.13 * (1 - progress * 0.8);
+        drawRoulette((r - 18) - (progress > 0.65 ? (progress - 0.65) * 45 : 0));
+        if (Math.random() < 0.2) playTick(850);
+        if (progress < 1) requestAnimationFrame(anim);
+        else {
           isPlaying = false;
           drawRoulette(r - 35);
-          finishGame(names[targetIndex], targetName !== null, 'Rulet Masası');
+          finishGame(names[targetIndex], targetName !== null, '3D Rulet');
         }
       }
       requestAnimationFrame(anim);
     }
 
-    // --- 4. PLINKO BOARD (PARLAYAN ÇİVİLER & PENTATONİK SESLER) ---
+    // --- 4. PLINKO ---
     const plinkoCanvas = document.getElementById('plinkoCanvas');
     const plinkoCtx = plinkoCanvas.getContext('2d');
-    let plinkoWidth = 420, plinkoHeight = 440, pegs = [];
-    const plinkoScale = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66];
+    let plinkoWidth = 400, plinkoHeight = 420, pegs = [];
 
     function resizePlinkoCanvas() {
-      const sizeW = Math.min(window.innerWidth * 0.9, 440);
+      const sizeW = Math.min(window.innerWidth * 0.88, 420);
       plinkoWidth = sizeW;
-      plinkoHeight = Math.min(window.innerHeight * 0.62, 460);
+      plinkoHeight = Math.min(window.innerHeight * 0.6, 440);
       const dpr = window.devicePixelRatio || 1;
       plinkoCanvas.width = plinkoWidth * dpr;
       plinkoCanvas.height = plinkoHeight * dpr;
       plinkoCanvas.style.width = sizeW + 'px';
       plinkoCanvas.style.height = plinkoHeight + 'px';
       plinkoCtx.scale(dpr, dpr);
-      createPegs();
-      drawPlinko();
-    }
-
-    function createPegs() {
       pegs = [];
-      const rows = 8;
-      const startY = 45;
-      const rowSpacing = (plinkoHeight - 110) / rows;
-
+      const rows = 8, startY = 45, rowSpacing = (plinkoHeight - 110) / rows;
       for (let r = 0; r < rows; r++) {
-        const count = r + 3;
-        const spacing = (plinkoWidth - 60) / (count - 1);
+        const count = r + 3, spacing = (plinkoWidth - 60) / (count - 1);
         for (let c = 0; c < count; c++) {
-          pegs.push({
-            x: 30 + c * spacing,
-            y: startY + r * rowSpacing,
-            r: 3.5,
-            glow: 0,
-            note: plinkoScale[(r + c) % plinkoScale.length]
-          });
+          pegs.push({ x: 30 + c * spacing, y: startY + r * rowSpacing, r: 3.5, glow: 0 });
         }
       }
+      drawPlinko();
     }
 
     function drawPlinko(ball = null) {
       plinkoCtx.clearRect(0, 0, plinkoWidth, plinkoHeight);
-
-      // Çiviler
       pegs.forEach(p => {
         plinkoCtx.beginPath();
-        plinkoCtx.arc(p.x, p.y, p.r + (p.glow > 0 ? p.glow * 2.5 : 0), 0, 2 * Math.PI);
-        if (p.glow > 0) {
-          plinkoCtx.fillStyle = '#ffffff';
-          plinkoCtx.shadowColor = '#fbbf24';
-          plinkoCtx.shadowBlur = 10;
-          p.glow -= 0.08;
-        } else {
-          plinkoCtx.fillStyle = '#fef08a';
-          plinkoCtx.shadowBlur = 0;
-        }
+        plinkoCtx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
+        plinkoCtx.fillStyle = p.glow > 0 ? '#ffffff' : '#fef08a';
+        if (p.glow > 0) p.glow -= 0.1;
         plinkoCtx.fill();
-        plinkoCtx.strokeStyle = '#854d0e';
-        plinkoCtx.stroke();
       });
-
-      // İsim Yuvaları
-      const binCount = Math.min(names.length, 6);
-      const binW = plinkoWidth / binCount;
-      const binH = 48;
-      const binY = plinkoHeight - binH;
-
+      const binCount = Math.min(names.length, 6), binW = plinkoWidth / binCount, binH = 46, binY = plinkoHeight - binH;
       for (let i = 0; i < binCount; i++) {
-        const bx = i * binW;
         plinkoCtx.fillStyle = (i % 2 === 0) ? '#18201d' : '#272017';
-        plinkoCtx.fillRect(bx, binY, binW, binH);
+        plinkoCtx.fillRect(i * binW, binY, binW, binH);
         plinkoCtx.strokeStyle = '#d4af37';
-        plinkoCtx.strokeRect(bx, binY, binW, binH);
-
+        plinkoCtx.strokeRect(i * binW, binY, binW, binH);
         plinkoCtx.fillStyle = '#fef3c7';
         plinkoCtx.font = 'bold 10px sans-serif';
         plinkoCtx.textAlign = 'center';
-        let displayName = names[i];
-        if (displayName && displayName.length > 8) displayName = displayName.substring(0, 7) + '…';
-        plinkoCtx.fillText(displayName || '', bx + binW / 2, binY + 28);
+        let n = names[i];
+        if (n && n.length > 7) n = n.substring(0, 6) + '…';
+        plinkoCtx.fillText(n || '', i * binW + binW / 2, binY + 26);
       }
-
-      // Top
       if (ball) {
         plinkoCtx.beginPath();
-        plinkoCtx.arc(ball.x, ball.y, ball.r, 0, 2 * Math.PI);
+        plinkoCtx.arc(ball.x, ball.y, 6, 0, 2 * Math.PI);
         plinkoCtx.fillStyle = '#f59e0b';
-        plinkoCtx.shadowColor = '#f59e0b';
-        plinkoCtx.shadowBlur = 8;
         plinkoCtx.fill();
-        plinkoCtx.strokeStyle = '#fff';
-        plinkoCtx.stroke();
-        plinkoCtx.shadowBlur = 0;
       }
     }
 
@@ -780,69 +721,173 @@
       if (isPlaying || !names.length) return;
       isPlaying = true;
       broadcast({ type: 'spin_start' });
-
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
       const binCount = Math.min(names.length, 6);
       if (targetIndex === -1 || targetIndex >= binCount) targetIndex = Math.floor(Math.random() * binCount);
+      const binW = plinkoWidth / binCount, targetX = targetIndex * binW + binW / 2;
 
-      const binW = plinkoWidth / binCount;
-      const targetX = targetIndex * binW + binW / 2;
-
-      let ball = {
-        x: plinkoWidth / 2 + (Math.random() * 16 - 8),
-        y: 15,
-        vx: (Math.random() * 2 - 1),
-        vy: 0,
-        r: 6
-      };
-
-      const gravity = 0.22;
-      const bounce = 0.55;
-
+      let ball = { x: plinkoWidth / 2, y: 15, vx: 0, vy: 0 };
       function anim() {
-        ball.vy += gravity;
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-
-        const biasStrength = 0.045;
-        if (ball.x < targetX) ball.vx += biasStrength;
-        else ball.vx -= biasStrength;
-
+        ball.vy += 0.22; ball.x += ball.vx; ball.y += ball.vy;
+        if (ball.x < targetX) ball.vx += 0.045; else ball.vx -= 0.045;
         pegs.forEach(p => {
-          const dx = ball.x - p.x;
-          const dy = ball.y - p.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < ball.r + p.r) {
-            p.glow = 1.0;
-            playPlinkoTing(p.note);
-            const angle = Math.atan2(dy, dx);
-            ball.vx = Math.cos(angle) * 2.8 + (Math.random() * 0.4 - 0.2);
-            ball.vy = Math.sin(angle) * 2.8 * bounce;
+          if (Math.hypot(ball.x - p.x, ball.y - p.y) < 9.5) {
+            p.glow = 1.0; playTick(900);
+            ball.vx = (Math.random() - 0.5) * 4; ball.vy = 2.5 * 0.55;
           }
         });
-
-        if (ball.x < ball.r) { ball.x = ball.r; ball.vx *= -bounce; }
-        if (ball.x > plinkoWidth - ball.r) { ball.x = plinkoWidth - ball.r; ball.vx *= -bounce; }
-
         drawPlinko(ball);
-
-        if (ball.y < plinkoHeight - 45) {
-          requestAnimationFrame(anim);
-        } else {
+        if (ball.y < plinkoHeight - 45) requestAnimationFrame(anim);
+        else {
           isPlaying = false;
           drawPlinko(ball);
-          finishGame(names[targetIndex], targetName !== null, 'Plinko Drop');
+          finishGame(names[targetIndex], targetName !== null, '3D Plinko');
         }
       }
       requestAnimationFrame(anim);
     }
 
-    // --- TETİKLEME VE BİTİŞ ---
+    // --- 5. 3D ZARLAR (CRAPS) ---
+    function rollDice(targetName = null) {
+      if (isPlaying || !names.length) return;
+      isPlaying = true;
+      playDiceShake();
+      broadcast({ type: 'spin_start' });
+
+      let target = targetName || names[Math.floor(Math.random() * names.length)];
+      const d1 = document.getElementById('diceCube1');
+      const d2 = document.getElementById('diceCube2');
+      const status = document.getElementById('diceStatus');
+      status.textContent = 'Zarlar yuvarlanıyor...';
+
+      const rotX1 = 720 + Math.floor(Math.random() * 4) * 90;
+      const rotY1 = 720 + Math.floor(Math.random() * 4) * 90;
+      const rotX2 = 720 + Math.floor(Math.random() * 4) * 90;
+      const rotY2 = 720 + Math.floor(Math.random() * 4) * 90;
+
+      d1.style.transform = `rotateX(${rotX1}deg) rotateY(${rotY1}deg)`;
+      d2.style.transform = `rotateX(${rotX2}deg) rotateY(${rotY2}deg)`;
+
+      setTimeout(() => {
+        isPlaying = false;
+        status.textContent = 'Zarlar durdu! Kazanan: ' + target;
+        finishGame(target, targetName !== null, '3D Casino Zarları');
+      }, 1600);
+    }
+
+    // --- 6. 3D KARTLAR (CARDS) ---
+    function renderCardsGrid() {
+      const grid = document.getElementById('cardsGrid');
+      grid.innerHTML = '';
+      const displayCount = Math.min(names.length, 8);
+      for (let i = 0; i < displayCount; i++) {
+        const card = document.createElement('div');
+        card.className = 'w-24 h-36 relative cursor-pointer card-flipper';
+        card.id = 'cardItem_' + i;
+        card.innerHTML = `
+          <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-red-950 to-zinc-950 border-2 border-amber-600 flex items-center justify-center card-face shadow-lg">
+            <span class="text-2xl text-amber-500 font-serif">♠</span>
+          </div>
+          <div class="absolute inset-0 rounded-xl bg-gradient-to-tr from-zinc-900 to-zinc-950 border-2 border-amber-400 flex flex-col items-center justify-center card-face card-back p-2 shadow-2xl">
+            <span class="text-xs text-amber-400 font-serif">KAZANAN</span>
+            <span class="text-xs font-bold text-white text-center mt-2">${names[i]}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      }
+    }
+
+    function dealCards(targetName = null) {
+      if (isPlaying || !names.length) return;
+      isPlaying = true;
+      broadcast({ type: 'spin_start' });
+      playCardFlipSound();
+
+      let target = targetName || names[Math.floor(Math.random() * Math.min(names.length, 8))];
+      let targetIdx = names.indexOf(target);
+      if (targetIdx === -1 || targetIdx >= 8) targetIdx = 0;
+
+      // Tüm kartları resetle
+      document.querySelectorAll('.card-flipper').forEach(c => c.classList.remove('card-flipped'));
+
+      setTimeout(() => {
+        const targetCard = document.getElementById('cardItem_' + targetIdx);
+        if (targetCard) {
+          playCardFlipSound();
+          targetCard.classList.add('card-flipped');
+        }
+        setTimeout(() => {
+          isPlaying = false;
+          finishGame(target, targetName !== null, '3D Gizemli Kart');
+        }, 1200);
+      }, 1000);
+    }
+
+    // --- 7. 3D YAZI-TURA (COIN) ---
+    let coinRot = 0;
+    function flipCoin(targetName = null) {
+      if (isPlaying || !names.length) return;
+      isPlaying = true;
+      broadcast({ type: 'spin_start' });
+      playCoinChime();
+
+      let target = targetName || names[Math.floor(Math.random() * names.length)];
+      const coin = document.getElementById('coin3d');
+      const status = document.getElementById('coinStatus');
+      status.textContent = 'Sikke havada dönüyor...';
+
+      coinRot += 1800 + (Math.random() > 0.5 ? 180 : 0);
+      coin.style.transform = `rotateY(${coinRot}deg) translateY(-40px) scale(1.15)`;
+
+      setTimeout(() => {
+        coin.style.transform = `rotateY(${coinRot}deg) translateY(0px) scale(1.0)`;
+        playCoinChime();
+        isPlaying = false;
+        status.textContent = 'Sikke düştü! Kazanan: ' + target;
+        finishGame(target, targetName !== null, '3D Yazı-Tura');
+      }, 3400);
+    }
+
+    // --- 8. 3D CRASH / ROKET ---
+    function launchRocket(targetName = null) {
+      if (isPlaying || !names.length) return;
+      isPlaying = true;
+      broadcast({ type: 'spin_start' });
+
+      let target = targetName || names[Math.floor(Math.random() * names.length)];
+      const rocket = document.getElementById('rocketEl');
+      const mult = document.getElementById('crashMultiplier');
+      const sub = document.getElementById('crashSubtext');
+
+      let currentMult = 1.00;
+      rocket.style.transform = 'translate(-30px, 40px) rotate(45deg)';
+
+      let crashInterval = setInterval(() => {
+        currentMult += 0.05 + currentMult * 0.03;
+        mult.textContent = currentMult.toFixed(2) + 'x';
+        playTick(600 + currentMult * 100);
+        rocket.style.transform = `translate(${Math.min(120, currentMult * 20)}px, ${Math.max(-80, 40 - currentMult * 18)}px) rotate(45deg)`;
+      }, 100);
+
+      setTimeout(() => {
+        clearInterval(crashInterval);
+        mult.textContent = currentMult.toFixed(2) + 'x';
+        sub.textContent = '🚀 BÜYÜK UÇUŞ TAMAMLANDI!';
+        isPlaying = false;
+        finishGame(target, targetName !== null, '3D Aviator Roket');
+      }, 4200);
+    }
+
+    // --- GENEL TETİKLEME ---
     function triggerGame(target = null) {
       if (activeGameMode === 'wheel') spinWheel(target);
       else if (activeGameMode === 'slot') spinSlot(target);
       else if (activeGameMode === 'roulette') spinRoulette(target);
       else if (activeGameMode === 'plinko') dropPlinko(target);
+      else if (activeGameMode === 'dice') rollDice(target);
+      else if (activeGameMode === 'cards') dealCards(target);
+      else if (activeGameMode === 'coin') flipCoin(target);
+      else if (activeGameMode === 'crash') launchRocket(target);
     }
 
     function finishGame(winner, wasTargeted, gameLabel) {
@@ -864,10 +909,7 @@
     }
 
     function triggerCelebration(winner, gameLabel) {
-      try {
-        confetti({ particleCount: 110, spread: 80, origin: { y: 0.6 } });
-      } catch (e) {}
-
+      try { confetti({ particleCount: 110, spread: 80, origin: { y: 0.6 } }); } catch (e) {}
       document.getElementById('winnerName').textContent = winner;
       document.getElementById('winnerGameLabel').textContent = gameLabel || 'KAZANAN';
       const modal = document.getElementById('winnerModal');
@@ -888,12 +930,10 @@
       const list = document.getElementById('historyList');
       document.getElementById('historyCount').textContent = history.length;
       document.getElementById('totalSpinsCount').textContent = 'Toplam: ' + history.length;
-
       if (!history.length) {
         list.innerHTML = `<div class="text-center py-8 text-xs text-zinc-600">Henüz çekiliş yapılmadı.</div>`;
         return;
       }
-
       list.innerHTML = history.map(item => `
         <div class="flex items-center justify-between p-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs">
           <div>
@@ -917,12 +957,7 @@
       const sNames = localStorage.getItem('cark_names');
       if (sNames) { try { names = JSON.parse(sNames); } catch (e) {} }
       const sHist = localStorage.getItem('cark_history');
-      if (sHist) {
-        try {
-          history = JSON.parse(sHist);
-          round = history.length + 1;
-        } catch (e) {}
-      }
+      if (sHist) { try { history = JSON.parse(sHist); round = history.length + 1; } catch (e) {} }
       updateRoundUI();
       renderHistoryUI();
     }
@@ -942,8 +977,7 @@
         saveStorage();
         updateRoundUI();
         if (activeGameMode === 'wheel') drawWheel();
-        else if (activeGameMode === 'roulette') drawRoulette();
-        else if (activeGameMode === 'plinko') drawPlinko();
+        else if (activeGameMode === 'cards') renderCardsGrid();
         broadcast({ type: 'sync_names', names: names });
       }
       closeModal();
@@ -955,10 +989,15 @@
       if (e.target === document.getElementById('winnerModal')) closeModal();
     });
 
+    // Buton Tetikleyicileri
     document.getElementById('centerSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('slotSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('rouletteSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('plinkoDropBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
+    document.getElementById('diceRollBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
+    document.getElementById('cardsDealBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
+    document.getElementById('coinFlipBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
+    document.getElementById('crashLaunchBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
 
     document.getElementById('toggleHistoryBtn').addEventListener('click', () => document.getElementById('historyPanel').classList.remove('translate-x-full'));
     document.getElementById('closeHistoryBtn').addEventListener('click', () => document.getElementById('historyPanel').classList.add('translate-x-full'));
@@ -986,11 +1025,6 @@
       document.getElementById('soundOffIcon').classList.toggle('hidden', soundEnabled);
     });
 
-    document.getElementById('fullscreenBtn').addEventListener('click', () => {
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
-      else document.exitFullscreen().catch(() => {});
-    });
-
     // --- PeerJS & MQTT ---
     let peer = null, connections = [], mqttClient = null;
     const randomCode = Math.floor(1000 + Math.random() * 9000);
@@ -1013,7 +1047,7 @@
       if (mqttClient && mqttClient.connected) {
         mqttClient.publish('carkifelek_public_rooms', JSON.stringify({
           roomId: roomId,
-          title: 'Casino Masası #' + randomCode,
+          title: '3D Casino Masası #' + randomCode,
           gameMode: activeGameMode,
           studentCount: names.length,
           lastSeen: Date.now()
@@ -1048,8 +1082,7 @@
             saveStorage();
             updateRoundUI();
             if (activeGameMode === 'wheel') drawWheel();
-            else if (activeGameMode === 'roulette') drawRoulette();
-            else if (activeGameMode === 'plinko') drawPlinko();
+            else if (activeGameMode === 'cards') renderCardsGrid();
           } else if (data.type === 'spin') {
             closeModal();
             triggerGame(data.target || null);
@@ -1062,8 +1095,7 @@
             saveStorage();
             updateRoundUI();
             if (activeGameMode === 'wheel') drawWheel();
-            else if (activeGameMode === 'roulette') drawRoulette();
-            else if (activeGameMode === 'plinko') drawPlinko();
+            else if (activeGameMode === 'cards') renderCardsGrid();
           }
         });
 

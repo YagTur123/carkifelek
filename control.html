@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Şans Oyunları Kumandası</title>
+  <title>3D Casino Kumandası</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
@@ -16,13 +16,13 @@
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col font-sans select-none pb-6 antialiased">
 
-  <!-- Üst Bar: Bağlantı & Durum -->
+  <!-- Üst Bar -->
   <header class="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-30">
     <div class="max-w-md mx-auto flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div class="w-2 h-4 bg-amber-500 rounded-sm"></div>
-          <h1 class="font-bold text-sm text-amber-100 font-serif">Oyun Kumandası</h1>
+          <h1 class="font-bold text-sm text-amber-100 font-serif">3D Oyun Kumandası</h1>
         </div>
         <div id="connBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
           <span id="connDot" class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
@@ -30,16 +30,14 @@
         </div>
       </div>
 
-      <!-- Canlı Açık Tahtalar (Lobi Keşfi) -->
+      <!-- Canlı Açık Masalar (Lobi Keşfi) -->
       <div id="lobbyContainer" class="flex flex-col gap-1.5 bg-zinc-950 p-2.5 rounded border border-zinc-800">
         <div class="flex items-center justify-between">
           <span class="text-[11px] font-semibold text-zinc-400 flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             Açık Masalar (Canlı Keşif)
           </span>
-          <button id="toggleManualCodeBtn" class="text-[11px] text-amber-400 hover:text-amber-300">
-            Manuel Kod
-          </button>
+          <button id="toggleManualCodeBtn" class="text-[11px] text-amber-400 hover:text-amber-300">Manuel Kod</button>
         </div>
 
         <div id="activeRoomsList" class="space-y-1.5 mt-1">
@@ -47,36 +45,23 @@
         </div>
 
         <div id="manualCodeArea" class="hidden flex gap-2 pt-2 border-t border-zinc-800/80">
-          <input 
-            type="text" 
-            id="roomIdInput" 
-            placeholder="Oda Kodu (örn: cark-4921)" 
-            class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 font-mono"
-          />
-          <button 
-            id="connectBtn" 
-            class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded text-xs transition">
-            Bağlan
-          </button>
+          <input type="text" id="roomIdInput" placeholder="Oda Kodu (örn: cark-4921)" class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 font-mono" />
+          <button id="connectBtn" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded text-xs transition">Bağlan</button>
         </div>
       </div>
 
-      <!-- Oyun Seçici Düğmeler (Tahtadaki Oyunu Değiştirir) -->
+      <!-- 8 Oyunlu Mod Seçici -->
       <div class="flex flex-col gap-1">
-        <span class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Aktif Oyun Modu</span>
+        <span class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">3D Oyun Modu Seç</span>
         <div class="grid grid-cols-4 gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800 text-xs">
-          <button onclick="changeGameMode('wheel')" id="btnCtrlWheel" class="py-1.5 rounded bg-amber-500 text-black font-bold transition text-center">
-            Çark
-          </button>
-          <button onclick="changeGameMode('slot')" id="btnCtrlSlot" class="py-1.5 rounded text-zinc-400 hover:text-white transition text-center">
-            Slot
-          </button>
-          <button onclick="changeGameMode('roulette')" id="btnCtrlRoulette" class="py-1.5 rounded text-zinc-400 hover:text-white transition text-center">
-            Rulet
-          </button>
-          <button onclick="changeGameMode('plinko')" id="btnCtrlPlinko" class="py-1.5 rounded text-zinc-400 hover:text-white transition text-center">
-            Plinko
-          </button>
+          <button onclick="changeGameMode('wheel')" id="btnCtrlWheel" class="py-1 rounded bg-amber-500 text-black font-bold text-center">Çark</button>
+          <button onclick="changeGameMode('slot')" id="btnCtrlSlot" class="py-1 rounded text-zinc-400 hover:text-white text-center">Slot</button>
+          <button onclick="changeGameMode('roulette')" id="btnCtrlRoulette" class="py-1 rounded text-zinc-400 hover:text-white text-center">Rulet</button>
+          <button onclick="changeGameMode('plinko')" id="btnCtrlPlinko" class="py-1 rounded text-zinc-400 hover:text-white text-center">Plinko</button>
+          <button onclick="changeGameMode('dice')" id="btnCtrlDice" class="py-1 rounded text-zinc-400 hover:text-white text-center">3D Zar</button>
+          <button onclick="changeGameMode('cards')" id="btnCtrlCards" class="py-1 rounded text-zinc-400 hover:text-white text-center">Kartlar</button>
+          <button onclick="changeGameMode('coin')" id="btnCtrlCoin" class="py-1 rounded text-zinc-400 hover:text-white text-center">Sikke</button>
+          <button onclick="changeGameMode('crash')" id="btnCtrlCrash" class="py-1 rounded text-zinc-400 hover:text-white text-center">Roket</button>
         </div>
       </div>
 
@@ -91,22 +76,13 @@
       <div class="flex items-center justify-between border-b border-zinc-800 pb-2.5">
         <div>
           <span class="text-[11px] text-zinc-400 font-medium">Hedef Kurban</span>
-          <div id="targetStatusText" class="text-sm font-bold text-zinc-200 mt-0.5">
-            Rastgele (Hedef Yok)
-          </div>
+          <div id="targetStatusText" class="text-sm font-bold text-zinc-200 mt-0.5">Rastgele (Hedef Yok)</div>
         </div>
-        <button 
-          id="resetTargetBtn" 
-          class="px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs text-zinc-300 transition">
-          Hedefi Sıfırla
-        </button>
+        <button id="resetTargetBtn" class="px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs text-zinc-300 transition">Hedefi Sıfırla</button>
       </div>
 
       <!-- BÜYÜK TETİKLEME BUTONU -->
-      <button 
-        id="triggerSpinBtn" 
-        disabled
-        class="w-full py-4 px-4 rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-98 disabled:opacity-30 disabled:pointer-events-none text-black font-black text-sm tracking-wider transition shadow-lg uppercase">
+      <button id="triggerSpinBtn" disabled class="w-full py-4 px-4 rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-98 disabled:opacity-30 disabled:pointer-events-none text-black font-black text-sm tracking-wider transition shadow-lg uppercase">
         <span id="triggerBtnText">ÇARKI UZAKTAN ÇEVİR</span>
       </button>
 
@@ -126,39 +102,21 @@
         <span class="text-[10px] text-amber-400 uppercase tracking-wider font-semibold">Son Kazanan</span>
         <div id="lastWinnerName" class="text-base font-bold text-white font-serif">Ahmet</div>
       </div>
-      <button 
-        id="removeLastWinnerBtn" 
-        class="px-3 py-1.5 rounded bg-rose-950 border border-rose-800 hover:bg-rose-900 text-rose-300 text-xs font-semibold transition">
-        Listeden Çıkar
-      </button>
+      <button id="removeLastWinnerBtn" class="px-3 py-1.5 rounded bg-rose-950 border border-rose-800 hover:bg-rose-900 text-rose-300 text-xs font-semibold transition">Listeden Çıkar</button>
     </div>
 
     <!-- Sekmeler -->
     <div class="flex border-b border-zinc-800 text-xs font-medium">
-      <button id="tabStudentsBtn" class="flex-1 py-2 text-center text-amber-400 border-b-2 border-amber-500 font-semibold">
-        Öğrenciler (<span id="tabStudentCount">0</span>)
-      </button>
-      <button id="tabHistoryBtn" class="flex-1 py-2 text-center text-zinc-400 hover:text-zinc-200">
-        Geçmiş Logu (<span id="tabHistoryCount">0</span>)
-      </button>
+      <button id="tabStudentsBtn" class="flex-1 py-2 text-center text-amber-400 border-b-2 border-amber-500 font-semibold">Öğrenciler (<span id="tabStudentCount">0</span>)</button>
+      <button id="tabHistoryBtn" class="flex-1 py-2 text-center text-zinc-400 hover:text-zinc-200">Geçmiş Logu (<span id="tabHistoryCount">0</span>)</button>
     </div>
 
     <!-- Öğrenci Listesi Sekmesi -->
     <section id="studentsSection" class="flex flex-col gap-3">
       <div class="flex items-center justify-between">
-        <input 
-          type="text" 
-          id="searchInput" 
-          placeholder="Öğrenci ara..." 
-          class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 mr-2"
-        />
-        <button 
-          id="toggleListEditorBtn" 
-          class="text-xs text-amber-300 hover:text-amber-200 font-medium px-2 py-2 rounded bg-zinc-900 border border-zinc-800 whitespace-nowrap">
-          Düzenle
-        </button>
+        <input type="text" id="searchInput" placeholder="Öğrenci ara..." class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 mr-2" />
+        <button id="toggleListEditorBtn" class="text-xs text-amber-300 hover:text-amber-200 font-medium px-2 py-2 rounded bg-zinc-900 border border-zinc-800 whitespace-nowrap">Düzenle</button>
       </div>
-
       <div id="studentsGrid" class="grid grid-cols-2 gap-2 max-h-[340px] overflow-y-auto custom-scroll pr-1"></div>
     </section>
 
@@ -171,7 +129,7 @@
       <div id="historyLogList" class="space-y-2 max-h-[340px] overflow-y-auto custom-scroll pr-1"></div>
     </section>
 
-    <!-- Liste Düzenleyici Modal -->
+    <!-- Liste Düzenleme Modalı -->
     <div id="listEditorPanel" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 hidden">
       <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 max-w-sm w-full flex flex-col gap-3">
         <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
@@ -191,10 +149,7 @@
 
   </main>
 
-  <!-- Toast -->
-  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 border border-amber-600/50 text-amber-200 text-xs px-3.5 py-1.5 rounded shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50">
-    İşlem tamam
-  </div>
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 border border-amber-600/50 text-amber-200 text-xs px-3.5 py-1.5 rounded shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50">İşlem tamam</div>
 
   <script>
     const DEFAULT_NAMES = [
@@ -206,7 +161,7 @@
     let names = [];
     let history = [];
     let selectedTarget = null;
-    let currentGameMode = 'wheel'; // 'wheel' | 'slot' | 'roulette' | 'plinko'
+    let currentGameMode = 'wheel';
     let isConnected = false;
     let isGameRunning = false;
     let lastWinner = null;
@@ -229,23 +184,20 @@
       localStorage.setItem('cark_history', JSON.stringify(history));
     }
 
-    // Oyun Modunu Değiştir
     function changeGameMode(mode) {
       currentGameMode = mode;
-      const modes = ['wheel', 'slot', 'roulette', 'plinko'];
+      const modes = ['wheel', 'slot', 'roulette', 'plinko', 'dice', 'cards', 'coin', 'crash'];
       modes.forEach(m => {
         const btn = document.getElementById('btnCtrl' + m.charAt(0).toUpperCase() + m.slice(1));
         if (btn) {
-          if (m === mode) btn.className = 'py-1.5 rounded bg-amber-500 text-black font-bold transition text-center';
-          else btn.className = 'py-1.5 rounded text-zinc-400 hover:text-white transition text-center';
+          btn.className = (m === mode) 
+            ? 'py-1 rounded bg-amber-500 text-black font-bold text-center' 
+            : 'py-1 rounded text-zinc-400 hover:text-white text-center';
         }
       });
 
       updateTriggerBtnText();
-
-      if (conn && conn.open) {
-        conn.send({ type: 'set_game_mode', mode: mode });
-      }
+      if (conn && conn.open) conn.send({ type: 'set_game_mode', mode: mode });
     }
 
     function updateTriggerBtnText() {
@@ -253,12 +205,16 @@
         wheel: 'ÇARKI UZAKTAN ÇEVİR',
         slot: 'SLOT KOLUNU ÇEK (SPIN)',
         roulette: 'RULET TOPUNU AT',
-        plinko: 'PLINKO TOPUNU DÜŞÜR'
+        plinko: 'PLINKO TOPUNU DÜŞÜR',
+        dice: 'ZARLARI FIRLAT',
+        cards: 'KARTLARI DAĞIT VE AÇ',
+        coin: 'SİKKEYİ FIRLAT',
+        crash: 'ROKETİ ATEŞLE'
       };
       document.getElementById('triggerBtnText').textContent = textMap[currentGameMode] || 'OYNA';
     }
 
-    // --- MQTT Lobi ---
+    // --- MQTT Lobi Keşfi ---
     function initLobbyDiscovery() {
       try {
         mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
@@ -266,10 +222,7 @@
           clean: true, connectTimeout: 4000
         });
 
-        mqttClient.on('connect', () => {
-          mqttClient.subscribe('carkifelek_public_rooms');
-        });
-
+        mqttClient.on('connect', () => mqttClient.subscribe('carkifelek_public_rooms'));
         mqttClient.on('message', (topic, message) => {
           try {
             const data = JSON.parse(message.toString());
@@ -298,7 +251,7 @@
       const listEl = document.getElementById('activeRoomsList');
       const rooms = Array.from(discoveredRooms.values());
 
-      if (rooms.length === 0) {
+      if (!rooms.length) {
         listEl.innerHTML = `<div class="text-[11px] text-zinc-500 py-1 text-center italic">Açık masa aranıyor...</div>`;
         return;
       }
@@ -312,11 +265,7 @@
               <div class="text-[10px] text-zinc-500 font-mono">${room.roomId} · ${room.studentCount || 0} kişi</div>
             </div>
           </div>
-          <button 
-            onclick="connectToRoom('${room.roomId}')"
-            class="px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition">
-            Bağlan
-          </button>
+          <button onclick="connectToRoom('${room.roomId}')" class="px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition">Bağlan</button>
         </div>
       `).join('');
     }
@@ -375,12 +324,10 @@
     function renderHistoryUI() {
       const list = document.getElementById('historyLogList');
       document.getElementById('tabHistoryCount').textContent = history.length;
-
       if (!history.length) {
         list.innerHTML = `<div class="text-center py-6 text-xs text-zinc-600">Henüz çekiliş kaydı yok.</div>`;
         return;
       }
-
       list.innerHTML = history.map(item => `
         <div class="flex items-center justify-between p-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs">
           <div>
@@ -400,19 +347,14 @@
       if (navigator.vibrate) navigator.vibrate(20);
     }
 
-    // --- PeerJS Bağlantısı ---
     function initConnection() {
       const targetRoom = document.getElementById('roomIdInput').value.trim();
-      if (!targetRoom) {
-        showToast('Lütfen geçerli bir Oda Kodu girin');
-        return;
-      }
+      if (!targetRoom) { showToast('Geçerli Oda Kodu girin'); return; }
 
       localStorage.setItem('cark_last_room', targetRoom);
       setConnectionStatus('connecting', 'Bağlanıyor...');
 
       if (peer) { try { peer.destroy(); } catch (e) {} }
-
       peer = new Peer();
 
       peer.on('open', () => {
@@ -423,24 +365,16 @@
           setConnectionStatus('connected', 'Bağlandı (' + targetRoom + ')');
           showToast('Masaya bağlandı!');
           document.getElementById('triggerSpinBtn').disabled = false;
-
-          conn.send({
-            type: 'sync_names',
-            names: names
-          });
+          conn.send({ type: 'sync_names', names: names });
         });
 
         conn.on('data', (data) => {
           if (!data || !data.type) return;
-
           if (data.type === 'init') {
             if (data.history) history = data.history;
             if (data.names && data.names.length) names = data.names;
             if (data.gameMode) changeGameMode(data.gameMode);
-            saveStorage();
-            renderGrid();
-            renderHistoryUI();
-            setSpinningState(data.isSpinning);
+            saveStorage(); renderGrid(); renderHistoryUI(); setSpinningState(data.isSpinning);
           } else if (data.type === 'spin_start') {
             setSpinningState(true);
           } else if (data.type === 'spin_end') {
@@ -448,10 +382,8 @@
             lastWinner = data.winner;
             document.getElementById('lastWinnerCard').classList.remove('hidden');
             document.getElementById('lastWinnerName').textContent = lastWinner;
-
             if (data.history) history = data.history;
-            saveStorage();
-            renderHistoryUI();
+            saveStorage(); renderHistoryUI();
 
             if (document.getElementById('autoRemoveToggle').checked) {
               removeStudent(lastWinner);
@@ -500,7 +432,6 @@
       isGameRunning = spinning;
       const btn = document.getElementById('triggerSpinBtn');
       const text = document.getElementById('triggerBtnText');
-
       if (spinning) {
         btn.disabled = true;
         text.textContent = 'OYUN ÇALIŞIYOR...';
@@ -515,10 +446,7 @@
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);
       document.getElementById('lastWinnerCard').classList.add('hidden');
-
-      if (conn && conn.open) {
-        conn.send({ type: 'remove_name', name: studentName });
-      }
+      if (conn && conn.open) conn.send({ type: 'remove_name', name: studentName });
       showToast(studentName + ' elendi');
     }
 
@@ -526,14 +454,10 @@
       if (lastWinner) removeStudent(lastWinner);
     });
 
-    // Uzaktan Tetikle
     document.getElementById('triggerSpinBtn').addEventListener('click', () => {
       if (!isConnected || !conn || !conn.open || isGameRunning) return;
       vibrate();
-      conn.send({
-        type: 'spin',
-        target: selectedTarget
-      });
+      conn.send({ type: 'spin', target: selectedTarget });
       showToast(selectedTarget ? `Hedefle tetiklendi: ${selectedTarget}` : 'Rastgele tetiklendi');
     });
 
@@ -546,7 +470,6 @@
       showToast('Hedef sıfırlandı');
     });
 
-    // Sekmeler
     const tabStudentsBtn = document.getElementById('tabStudentsBtn');
     const tabHistoryBtn = document.getElementById('tabHistoryBtn');
     const studentsSection = document.getElementById('studentsSection');
@@ -597,7 +520,7 @@
 
     document.getElementById('saveAndSyncBtn').addEventListener('click', () => {
       const parsed = textarea.value.split('\n').map(n => n.trim()).filter(n => n.length > 0);
-      if (!parsed.length) { showToast('En az 1 isim girmelisiniz'); return; }
+      if (!parsed.length) { showToast('En az 1 isim girin'); return; }
       names = parsed;
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);
