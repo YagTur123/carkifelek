@@ -22,22 +22,38 @@
       transform-style: preserve-3d;
     }
 
-    /* 3D Çark Derinliği */
+    /* 3D Çark Derinliği & Sinematik Kamera */
     .wheel-3d {
-      transform: rotateX(22deg) scale(0.96);
-      box-shadow: 0 45px 65px -15px rgba(0, 0, 0, 0.95), 0 0 45px rgba(212, 175, 55, 0.2);
+      transform-style: preserve-3d;
+      perspective: 1200px;
+      transform: rotateX(8deg) scale(0.98);
+      transition: transform 0.75s cubic-bezier(0.2, 0.85, 0.25, 1), box-shadow 0.75s ease;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 35px rgba(212, 175, 55, 0.15);
+      border-radius: 9999px;
+    }
+    .wheel-3d.wheel-spinning-cam {
+      transform: rotateX(18deg) scale(0.96);
+      box-shadow: 0 50px 80px -10px rgba(0, 0, 0, 0.95), 0 0 55px rgba(212, 175, 55, 0.35);
+    }
+    .wheel-3d.wheel-zoom-winner {
+      transform: rotateX(0deg) scale(1.04);
+      box-shadow: 0 30px 60px -8px rgba(0, 0, 0, 0.9), 0 0 75px rgba(234, 179, 8, 0.6);
     }
 
-    /* 3D Rulet Çanağı (Tam Yukarıdan Bakış - Top Down View) */
+    /* 3D Rulet Çanağı & Sinematik Kamera */
     .roulette-stage-3d {
+      transform-style: preserve-3d;
+      perspective: 1200px;
       transform: rotateX(0deg) scale(1);
-      transition: transform 0.6s cubic-bezier(0.2, 0.85, 0.25, 1);
+      transition: transform 0.75s cubic-bezier(0.2, 0.85, 0.25, 1), box-shadow 0.75s ease;
     }
     .roulette-stage-3d.roulette-spinning-cam {
-      transform: scale(1.02);
+      transform: rotateX(14deg) scale(1.02);
+      box-shadow: 0 35px 60px -10px rgba(0, 0, 0, 0.92), 0 0 45px rgba(212, 175, 55, 0.3);
     }
     .roulette-stage-3d.roulette-zoom-winner {
-      transform: scale(1.06);
+      transform: rotateX(4deg) scale(1.07);
+      box-shadow: 0 40px 70px -10px rgba(0, 0, 0, 0.96), 0 0 70px rgba(234, 179, 8, 0.55);
     }
     .roulette-cylinder-skirt {
       box-shadow: 
@@ -261,10 +277,29 @@
 
     <!-- 1. 3D ÇARKIFELEK -->
     <div id="gameWheelView" class="game-view relative flex items-center justify-center">
-      <div class="relative wheel-3d transition-all duration-300">
-        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none filter drop-shadow-xl" id="pointerEl" style="transform-origin: 50% 4px; transition: transform 0.05s ease-out;">
-          <div class="w-8 h-12 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
-          <div class="w-3.5 h-3.5 rounded-full bg-amber-100 mx-auto -mt-12 border border-amber-950"></div>
+      <div id="wheel3DStage" class="relative wheel-3d">
+        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none filter drop-shadow-[0_8px_14px_rgba(0,0,0,0.85)]" id="pointerEl" style="transform-origin: 50% 6px;">
+          <!-- 3D Lüks Şevli İbre (Bevelled Needle) -->
+          <div class="relative w-8 h-12 flex flex-col items-center">
+            <svg class="w-8 h-12" viewBox="0 0 32 48" fill="none">
+              <!-- İbre Gövdesi (Altın Gradyan) -->
+              <polygon points="16,46 2,4 30,4" fill="url(#wheelPointerGoldGrad)" stroke="#78350f" stroke-width="1.2" />
+              <!-- Sol Işıltı Yansıması -->
+              <polygon points="16,44 16,6 4,6" fill="rgba(255,255,255,0.42)" />
+              <!-- Sağ Gölge Şevi -->
+              <polygon points="16,44 16,6 28,6" fill="rgba(0,0,0,0.28)" />
+              <defs>
+                <linearGradient id="wheelPointerGoldGrad" x1="0" y1="0" x2="32" y2="48" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#fffbeb" />
+                  <stop offset="30%" stop-color="#fef08a" />
+                  <stop offset="70%" stop-color="#d97706" />
+                  <stop offset="100%" stop-color="#78350f" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <!-- 3D Yakut Pivot Somun -->
+            <div class="w-4 h-4 rounded-full bg-gradient-to-tr from-red-950 via-red-600 to-amber-200 absolute top-1 left-1/2 -translate-x-1/2 border border-amber-300 shadow-md"></div>
+          </div>
         </div>
         <canvas id="wheelCanvas" class="rounded-full cursor-pointer"></canvas>
         <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-950 border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-2xl">
@@ -833,7 +868,7 @@
       drawWheel();
     }
 
-    function drawWheel() {
+    function drawWheel(winnerHighlightIndex = -1, speed = 0) {
       if (!wheelCanvas) return;
       wheelCtx.clearRect(0, 0, wheelRadius * 2, wheelRadius * 2);
       if (!names.length) {
@@ -861,35 +896,85 @@
         wheelCtx.lineWidth = 1.4;
         wheelCtx.stroke();
 
+        // Kazanan Dilim Vurgusu (Altın Aura & Nabız Işıltısı)
+        if (winnerHighlightIndex === i) {
+          wheelCtx.save();
+          wheelCtx.beginPath();
+          wheelCtx.moveTo(cx, cy);
+          wheelCtx.arc(cx, cy, r, a, a + arc);
+          wheelCtx.closePath();
+          wheelCtx.fillStyle = 'rgba(253, 224, 71, 0.42)';
+          wheelCtx.shadowColor = '#eab308';
+          wheelCtx.shadowBlur = 18;
+          wheelCtx.fill();
+          wheelCtx.strokeStyle = '#fef08a';
+          wheelCtx.lineWidth = 3.2;
+          wheelCtx.stroke();
+          wheelCtx.restore();
+        }
+
         wheelCtx.save();
         wheelCtx.translate(cx, cy);
         wheelCtx.rotate(a + arc / 2);
         wheelCtx.textAlign = 'right';
-        wheelCtx.fillStyle = '#fef3c7';
-        wheelCtx.shadowColor = 'rgba(0,0,0,0.85)';
-        wheelCtx.shadowBlur = 4;
+        wheelCtx.fillStyle = (winnerHighlightIndex === i) ? '#ffffff' : '#fef3c7';
+        wheelCtx.shadowColor = 'rgba(0,0,0,0.9)';
+        wheelCtx.shadowBlur = (winnerHighlightIndex === i) ? 8 : 4;
         const fontSize = Math.max(9, Math.min(14, Math.floor(wheelRadius / 17)));
-        wheelCtx.font = `bold ${fontSize}px sans-serif`;
+        wheelCtx.font = (winnerHighlightIndex === i) ? `900 ${fontSize + 1}px sans-serif` : `bold ${fontSize}px sans-serif`;
         let displayName = names[i];
         if (displayName.length > 12) displayName = displayName.substring(0, 11) + '…';
         wheelCtx.fillText(displayName, r - 22, fontSize / 3);
         wheelCtx.restore();
       }
 
-      // 2. Dış Ahşap & Altın Çember
+      // 2. 3D Evrensel Küre Aydınlatması & Derinlik Gradyanı (Specular & Vignette)
+      const sphereGrad = wheelCtx.createRadialGradient(cx - r * 0.28, cy - r * 0.35, r * 0.05, cx, cy, r);
+      sphereGrad.addColorStop(0, 'rgba(255, 255, 255, 0.20)');
+      sphereGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.04)');
+      sphereGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.06)');
+      sphereGrad.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
+      wheelCtx.save();
       wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, r + 4, 0, 2 * Math.PI);
-      wheelCtx.strokeStyle = '#272017';
+      wheelCtx.arc(cx, cy, r, 0, 2 * Math.PI);
+      wheelCtx.fillStyle = sphereGrad;
+      wheelCtx.fill();
+
+      // Hızlı Dönüş Dinamik Bulanıklığı (Motion Sheen)
+      if (speed > 0.008) {
+        const blurAlpha = Math.min(0.24, speed * 25);
+        wheelCtx.fillStyle = `rgba(255, 255, 255, ${blurAlpha.toFixed(2)})`;
+        wheelCtx.fill();
+      }
+      wheelCtx.restore();
+
+      // 3. Dış Ahşap & Altın Çember (Lüks Maun ve Altın Kenarlık)
+      const rimGrad = wheelCtx.createRadialGradient(cx, cy, r, cx, cy, r + 14);
+      rimGrad.addColorStop(0, '#1c1917');
+      rimGrad.addColorStop(0.3, '#451a03');
+      rimGrad.addColorStop(0.7, '#291104');
+      rimGrad.addColorStop(1, '#0c0a09');
+
+      wheelCtx.beginPath();
+      wheelCtx.arc(cx, cy, r + 7, 0, 2 * Math.PI);
+      wheelCtx.strokeStyle = rimGrad;
       wheelCtx.lineWidth = 14;
       wheelCtx.stroke();
 
+      // Altın Yivli Çemberler
       wheelCtx.beginPath();
-      wheelCtx.arc(cx, cy, r + 11, 0, 2 * Math.PI);
-      wheelCtx.strokeStyle = '#b48a3c';
-      wheelCtx.lineWidth = 2.5;
+      wheelCtx.arc(cx, cy, r + 0.5, 0, 2 * Math.PI);
+      wheelCtx.strokeStyle = '#d4af37';
+      wheelCtx.lineWidth = 2.0;
       wheelCtx.stroke();
 
-      // 3. Pirinç Pimler (3D Brass Pegs / Çiviler - Gerçek Fizik Temas Noktaları)
+      wheelCtx.beginPath();
+      wheelCtx.arc(cx, cy, r + 13.5, 0, 2 * Math.PI);
+      wheelCtx.strokeStyle = '#fef08a';
+      wheelCtx.lineWidth = 1.8;
+      wheelCtx.stroke();
+
+      // 4. Pirinç Pimler (3D Brass Pegs / Çiviler - Gerçek Fizik Temas Noktaları)
       const pegR = r + 3;
       for (let i = 0; i < N; i++) {
         const pa = wheelRotation + i * arc;
@@ -918,7 +1003,7 @@
         wheelCtx.stroke();
       }
 
-      // 4. Lüks 3D Pirinç & Altın Merkez Göbek (Gold Center Hub)
+      // 5. Lüks 3D Pirinç & Altın Merkez Göbek (Gold Center Hub)
       const hubR = Math.max(18, r * 0.17);
       const hubGrad = wheelCtx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, hubR);
       hubGrad.addColorStop(0, '#fffbeb');
@@ -1053,6 +1138,11 @@
 
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
+      const wheelStageEl = document.getElementById('wheel3DStage');
+      if (wheelStageEl) {
+        wheelStageEl.classList.remove('wheel-zoom-winner');
+        wheelStageEl.classList.add('wheel-spinning-cam');
+      }
       let lastPegIdx = -1;
       let flapperDeflection = 0;
       let flapperSpringVel = 0;
@@ -1066,13 +1156,14 @@
         if (dt > 0.05) dt = 0.016;
 
         // %100 GERÇEK FİZİKSEL SÖNÜM (MONOTONİK AZALAN HIZ - ASLA GERİYE VE İLERİYE SIÇRAMA YOK)
-        // Standart mod: p = 4.0 (Akıcı pürüzsüz sönüm)
-        // Yüksek dopamin: p = 5.2 (Son metrelerde kalp durduran ultra-yavaş sürünme; durup tekrar hızlanma YOK!)
         const pExp = isHighDopamine ? (4.0 + (dopamineLevel / 100) * 1.4) : 4.0;
         const easeP = 1 - Math.pow(1 - progress, pExp);
 
         // Çark rotasyonunu güncelle (Kesintisiz, sürekli ve analitik)
         wheelRotation = startRotation + totalDelta * easeP;
+
+        // Anlık açısal hız (motion sheen için)
+        const currentSpeed = (totalDelta / duration) * (pExp * Math.pow(Math.max(0, 1 - progress), pExp - 1));
 
         // Tırnak (Pointer Flapper) Fiziksel Temas, Salınım ve Stoper Dinamiği (DeepSeek Çözümü)
         const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
@@ -1105,16 +1196,20 @@
           pointerEl.style.transform = `translateX(-50%) rotate(${flapperDeflection.toFixed(2)}deg)`;
         }
 
-        drawWheel();
+        drawWheel(-1, currentSpeed);
 
         if (progress < 1) {
           requestAnimationFrame(animLoop);
         } else {
-          // Süre bittiğinde kesin tam hedef merkezine pürüzsüzce otur
+          // Süre bittiğinde kesin tam hedef merkezine pürüzsüzce otur ve kazananı vurgula
           isPlaying = false;
           wheelRotation = finalRotation;
           if (pointerEl) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
-          drawWheel();
+          if (wheelStageEl) {
+            wheelStageEl.classList.remove('wheel-spinning-cam');
+            wheelStageEl.classList.add('wheel-zoom-winner');
+          }
+          drawWheel(targetIndex, 0);
 
           const winnerName = names[targetIndex];
           setTimeout(() => {
@@ -1419,7 +1514,7 @@
       renderRouletteTable();
     }
 
-    function drawRoulette(ballDist = null, ballZ = 0) {
+    function drawRoulette(ballDist = null, ballZ = 0, winnerHighlightIndex = -1, trail = [], sparks = []) {
       if (!rouletteCanvas) return;
       rouletteCtx.clearRect(0, 0, rouletteRadius * 2, rouletteRadius * 2);
       if (!names.length) {
@@ -1539,10 +1634,29 @@
         rouletteCtx.fillStyle = pocketGrad;
         rouletteCtx.fill();
 
-        // Pirinç Ayırıcı Perdeler (Frets)
-        rouletteCtx.strokeStyle = '#d4af37';
-        rouletteCtx.lineWidth = 1.4;
-        rouletteCtx.stroke();
+        // Kazanan Cep Altın Işıltı & Aura
+        if (winnerHighlightIndex === i) {
+          rouletteCtx.save();
+          rouletteCtx.beginPath();
+          rouletteCtx.moveTo(cx + rPocketsInner * Math.cos(a), cy + rPocketsInner * Math.sin(a));
+          rouletteCtx.arc(cx, cy, rPocketsOuter, a, a + arc);
+          rouletteCtx.lineTo(cx + rPocketsInner * Math.cos(a + arc), cy + rPocketsInner * Math.sin(a + arc));
+          rouletteCtx.arc(cx, cy, rPocketsInner, a + arc, a, true);
+          rouletteCtx.closePath();
+          rouletteCtx.fillStyle = 'rgba(250, 204, 21, 0.45)';
+          rouletteCtx.shadowColor = '#eab308';
+          rouletteCtx.shadowBlur = 14;
+          rouletteCtx.fill();
+          rouletteCtx.strokeStyle = '#fef08a';
+          rouletteCtx.lineWidth = 2.8;
+          rouletteCtx.stroke();
+          rouletteCtx.restore();
+        } else {
+          // Pirinç Ayırıcı Perdeler (Frets)
+          rouletteCtx.strokeStyle = '#d4af37';
+          rouletteCtx.lineWidth = 1.4;
+          rouletteCtx.stroke();
+        }
 
         // Cep İçi İsim & Numara Yazıları (Net, Kontrastlı ve Radyal Hizalı)
         rouletteCtx.save();
@@ -1568,6 +1682,19 @@
 
         rouletteCtx.restore();
       }
+
+      // 3D Kavisli Maun Çanak Derinlik & Avize Işıltısı (Casino Chandelier Specular Sheen)
+      const bowlSheen = rouletteCtx.createRadialGradient(cx - R * 0.28, cy - R * 0.35, R * 0.05, cx, cy, R);
+      bowlSheen.addColorStop(0, 'rgba(255, 255, 255, 0.16)');
+      bowlSheen.addColorStop(0.35, 'rgba(255, 255, 255, 0.02)');
+      bowlSheen.addColorStop(0.7, 'rgba(0, 0, 0, 0.06)');
+      bowlSheen.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
+      rouletteCtx.save();
+      rouletteCtx.beginPath();
+      rouletteCtx.arc(cx, cy, rMahoganyOuter, 0, 2 * Math.PI);
+      rouletteCtx.fillStyle = bowlSheen;
+      rouletteCtx.fill();
+      rouletteCtx.restore();
 
       // 5. Pirinç Merkez Kule (Turret Cone & Spindle)
       const coneGrad = rouletteCtx.createRadialGradient(cx, cy, 0, cx, cy, rPocketsInner);
@@ -1629,15 +1756,42 @@
       rouletteCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
       rouletteCtx.fill();
 
-      // 6. 3D Parlak Fildişi Top (Dinamik Yükseklik, Kenar Çarpma ve Işık-Gölge Simülasyonu)
+      // 6. 3D Parlak Fildişi Top (Dinamik Yükseklik, Kenar Çarpma, Hareket İzi ve Kıvılcım Efekti)
       if (ballDist !== null) {
         const bx = cx + ballDist * Math.cos(ballAngle);
         const by = cy + ballDist * Math.sin(ballAngle);
 
         const z = Math.max(0, Math.min(1, ballZ));
-
-        // Derinlik Perspektif Büyüklüğü (Yukarıdayken kameraya daha yakın, daha büyük)
         const ballSize = 6.2 + 2.8 * z;
+
+        // Fildişi Top Hızlı Dönüş İzi (Motion Trail Particles)
+        if (trail && trail.length > 0) {
+          for (let t = 0; t < trail.length; t++) {
+            const pt = trail[t];
+            const alpha = ((t + 1) / trail.length) * 0.32;
+            rouletteCtx.save();
+            rouletteCtx.beginPath();
+            rouletteCtx.arc(pt.x, pt.y, pt.size * 0.78, 0, 2 * Math.PI);
+            rouletteCtx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+            rouletteCtx.shadowColor = 'rgba(255, 255, 255, 0.7)';
+            rouletteCtx.shadowBlur = 4;
+            rouletteCtx.fill();
+            rouletteCtx.restore();
+          }
+        }
+
+        // Pirinç Çarpışma Kıvılcım Halkaları (Deflector Spark Ripples)
+        if (sparks && sparks.length > 0) {
+          for (let s of sparks) {
+            rouletteCtx.save();
+            rouletteCtx.beginPath();
+            rouletteCtx.arc(s.x, s.y, s.r, 0, 2 * Math.PI);
+            rouletteCtx.strokeStyle = `rgba(254, 240, 138, ${Math.max(0, s.alpha).toFixed(2)})`;
+            rouletteCtx.lineWidth = 1.8;
+            rouletteCtx.stroke();
+            rouletteCtx.restore();
+          }
+        }
 
         // Dinamik Zemin Gölgesi (Sol-üstten ışık, yüksekteyken gölge uzağa düşer ve yayılır)
         const shadowDist = 2.0 + 8.0 * z;
@@ -1792,6 +1946,8 @@
       let hitDeflector1 = false;
       let hitDeflector2 = false;
       let fretBounceCount = 0;
+      const ballTrail = [];
+      let sparks = [];
 
       function anim(now) {
         const elapsed = now - startTime;
@@ -1855,6 +2011,9 @@
             if (!hitDeflector1) {
               hitDeflector1 = true;
               playDeflectorHit();
+              const spX = cx + baseDist * Math.cos(currentBallAngle);
+              const spY = cy + baseDist * Math.sin(currentBallAngle);
+              sparks.push({ x: spX, y: spY, r: 3, alpha: 1.0 });
             }
           }
 
@@ -1865,6 +2024,9 @@
             if (!hitDeflector2) {
               hitDeflector2 = true;
               playDeflectorHit();
+              const spX = cx + baseDist * Math.cos(currentBallAngle);
+              const spY = cy + baseDist * Math.sin(currentBallAngle);
+              sparks.push({ x: spX, y: spY, r: 3, alpha: 1.0 });
             }
           }
 
@@ -1917,7 +2079,20 @@
         }
 
         ballAngle = currentBallAngle;
-        drawRoulette(ballDist, ballZ);
+
+        // Fildişi Top Hareket İzi & Kıvılcım Güncelleme
+        const bX = cx + ballDist * Math.cos(ballAngle);
+        const bY = cy + ballDist * Math.sin(ballAngle);
+        if (progress < 0.76) {
+          ballTrail.push({ x: bX, y: bY, size: 6.2 + 2.8 * Math.max(0, Math.min(1, ballZ)) });
+          if (ballTrail.length > 5) ballTrail.shift();
+        } else {
+          if (ballTrail.length > 0) ballTrail.shift();
+        }
+        sparks.forEach(s => { s.r += 1.6; s.alpha -= 0.12; });
+        sparks = sparks.filter(s => s.alpha > 0);
+
+        drawRoulette(ballDist, ballZ, -1, ballTrail, sparks);
 
         // Fildişi Top Tıkırtıları (Dış parkurda)
         if (progress < 0.48) {
@@ -1934,7 +2109,7 @@
           rouletteWinningIndex = targetIndex;
           rouletteAngle = finalWheelAngle;
           ballAngle = targetPocketAngle;
-          drawRoulette(rPocketCenter, 0);
+          drawRoulette(rPocketCenter, 0, targetIndex, [], []);
           playIvoryBallClick(620, 0.25);
           playDollySound();
 
@@ -2265,13 +2440,18 @@
 
     function closeModal() {
       document.getElementById('winnerModal').classList.add('opacity-0', 'pointer-events-none');
-      if (activeGameMode === 'cards' && cardsState === 'revealed') {
+      if (activeGameMode === 'wheel') {
+        const stageEl = document.getElementById('wheel3DStage');
+        if (stageEl) stageEl.classList.remove('wheel-spinning-cam', 'wheel-zoom-winner');
+        drawWheel(-1, 0);
+      } else if (activeGameMode === 'cards' && cardsState === 'revealed') {
         renderFullCardsShowcase();
       } else if (activeGameMode === 'roulette') {
         const stage3D = document.getElementById('roulette3DStage');
         if (stage3D) stage3D.classList.remove('roulette-spinning-cam', 'roulette-zoom-winner');
         const statusBadge = document.getElementById('rouletteStatusBadge');
         if (statusBadge) statusBadge.textContent = 'Krupiye: Çark çevrilmeye hazır';
+        drawRoulette();
         renderRouletteTable();
       } else if (activeGameMode === 'slot') {
         clearSlotSosLine();
