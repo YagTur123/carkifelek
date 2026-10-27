@@ -11,17 +11,31 @@
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     .casino-felt {
-      background-color: #070c09;
-      background-image: radial-gradient(#112217 1px, transparent 1px), radial-gradient(#112217 1px, #070c09 1px);
-      background-size: 36px 36px;
-      background-position: 0 0, 18px 18px;
+      background-color: #060a08;
+      background-image: radial-gradient(#0f1e14 1px, transparent 1px), radial-gradient(#0f1e14 1px, #060a08 1px);
+      background-size: 32px 32px;
+      background-position: 0 0, 16px 16px;
+    }
+    /* Slot Reel Vignette (3D Silindir Derinlik Hissi) */
+    .reel-vignette {
+      box-shadow: inset 0 25px 25px -10px rgba(0,0,0,0.9), inset 0 -25px 25px -10px rgba(0,0,0,0.9);
+    }
+    @keyframes screen-shake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-3px, 3px); }
+      40% { transform: translate(3px, -2px); }
+      60% { transform: translate(-2px, -3px); }
+      80% { transform: translate(2px, 2px); }
+    }
+    .shake {
+      animation: screen-shake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
     }
   </style>
 </head>
-<body class="casino-felt text-zinc-100 min-h-screen flex flex-col items-center justify-between overflow-hidden select-none font-sans antialiased">
+<body id="mainBody" class="casino-felt text-zinc-100 min-h-screen flex flex-col items-center justify-between overflow-hidden select-none font-sans antialiased">
 
   <!-- Üst Bar -->
-  <header class="w-full flex items-center justify-between px-6 py-4 z-20 bg-zinc-950/80 border-b border-zinc-800/80 backdrop-blur">
+  <header class="w-full flex items-center justify-between px-6 py-3.5 z-20 bg-zinc-950/85 border-b border-zinc-800/80 backdrop-blur">
     <div class="flex items-center gap-3">
       <div class="w-2.5 h-6 bg-amber-500 rounded-sm"></div>
       <div>
@@ -30,25 +44,17 @@
       </div>
     </div>
 
-    <!-- Oyun Seçici Sekmeler (Üst Menü) -->
+    <!-- Oyun Seçici Sekmeler -->
     <div class="flex items-center bg-zinc-900 border border-zinc-800 p-1 rounded-lg gap-1 text-xs">
-      <button onclick="setGameMode('wheel')" id="btnModeWheel" class="px-3 py-1 rounded bg-amber-500 text-black font-bold transition">
-        Çarkıfelek
-      </button>
-      <button onclick="setGameMode('slot')" id="btnModeSlot" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
-        Slot Makinesi
-      </button>
-      <button onclick="setGameMode('roulette')" id="btnModeRoulette" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
-        Rulet
-      </button>
-      <button onclick="setGameMode('plinko')" id="btnModePlinko" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
-        Plinko
-      </button>
+      <button onclick="setGameMode('wheel')" id="btnModeWheel" class="px-3 py-1 rounded bg-amber-500 text-black font-bold transition">Çarkıfelek</button>
+      <button onclick="setGameMode('slot')" id="btnModeSlot" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">Slot Makinesi</button>
+      <button onclick="setGameMode('roulette')" id="btnModeRoulette" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">Rulet</button>
+      <button onclick="setGameMode('plinko')" id="btnModePlinko" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">Plinko</button>
     </div>
 
     <!-- Sağ Kontroller -->
     <div class="flex items-center gap-2">
-      <button id="openQrBtn" title="Kamera ile Bağlan" class="px-2.5 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-amber-200 hover:text-white transition flex items-center gap-1.5">
+      <button id="openQrBtn" class="px-2.5 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-amber-200 hover:text-white transition flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
         <span class="hidden md:inline">Kamera Bağlantısı</span>
       </button>
@@ -68,85 +74,83 @@
     </div>
   </header>
 
-  <!-- OYUN ALANLARI (CONTAINER) -->
+  <!-- OYUN SAHNESİ -->
   <main class="relative flex-1 w-full flex items-center justify-center p-4">
 
-    <!-- 1. OYUN: ÇARKIFELEK -->
+    <!-- 1. ÇARKIFELEK -->
     <div id="gameWheelView" class="game-view relative flex items-center justify-center">
       <div class="relative">
-        <div class="absolute -top-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-transform duration-75 filter drop-shadow" id="pointerEl">
-          <div class="w-7 h-10 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
-          <div class="w-2.5 h-2.5 rounded-full bg-amber-100 mx-auto -mt-10 border border-amber-900"></div>
+        <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-transform duration-75 filter drop-shadow-lg" id="pointerEl">
+          <div class="w-7 h-11 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-700" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
+          <div class="w-3 h-3 rounded-full bg-amber-100 mx-auto -mt-11 border border-amber-950"></div>
         </div>
         <canvas id="wheelCanvas" class="rounded-full cursor-pointer shadow-2xl"></canvas>
-        <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-900 border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-xl">
+        <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-950 border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-2xl">
           <span class="text-amber-400 text-xs md:text-sm font-black uppercase tracking-widest font-serif">ÇEVİR</span>
         </button>
       </div>
     </div>
 
-    <!-- 2. OYUN: SLOT MAKİNESİ -->
+    <!-- 2. SLOT MAKİNESİ (LÜKS RETRO VEGAS KASASI) -->
     <div id="gameSlotView" class="game-view hidden flex flex-col items-center">
       <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-4 border-amber-600 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col items-center gap-6 max-w-lg w-full relative">
         <div class="text-center">
-          <h2 class="text-amber-300 font-serif font-black text-xl tracking-widest uppercase">LUCKY SLOTS</h2>
-          <p class="text-[10px] text-zinc-500 tracking-wider">3 EŞLEŞME = JACKPOT</p>
+          <h2 class="text-amber-300 font-serif font-black text-2xl tracking-widest uppercase drop-shadow">VEGAS SLOTS</h2>
+          <p class="text-[10px] text-zinc-500 tracking-wider">3 EŞLEŞME = BÜYÜK İKRAMİYE</p>
         </div>
 
         <!-- 3 Makaralı Slot Penceresi -->
-        <div class="flex items-center gap-3 bg-black p-4 rounded-2xl border-2 border-amber-700/80 shadow-inner w-full justify-center">
+        <div class="flex items-center gap-3 bg-black p-4 rounded-2xl border-2 border-amber-700/80 shadow-2xl w-full justify-center">
           <!-- Makara 1 -->
-          <div class="w-28 md:w-32 h-36 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden relative shadow-inner flex items-center justify-center">
-            <div id="slotReel1" class="text-center font-bold text-base md:text-lg text-amber-200 transition-all font-serif px-2">---</div>
+          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative reel-vignette flex items-center justify-center">
+            <div id="slotReel1" class="text-center font-black text-base md:text-lg text-amber-200 font-serif px-2 transition-transform duration-75">---</div>
           </div>
           <!-- Makara 2 -->
-          <div class="w-28 md:w-32 h-36 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden relative shadow-inner flex items-center justify-center">
-            <div id="slotReel2" class="text-center font-bold text-base md:text-lg text-amber-200 transition-all font-serif px-2">---</div>
+          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative reel-vignette flex items-center justify-center">
+            <div id="slotReel2" class="text-center font-black text-base md:text-lg text-amber-200 font-serif px-2 transition-transform duration-75">---</div>
           </div>
           <!-- Makara 3 -->
-          <div class="w-28 md:w-32 h-36 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden relative shadow-inner flex items-center justify-center">
-            <div id="slotReel3" class="text-center font-bold text-base md:text-lg text-amber-200 transition-all font-serif px-2">---</div>
+          <div class="w-28 md:w-32 h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden relative reel-vignette flex items-center justify-center">
+            <div id="slotReel3" class="text-center font-black text-base md:text-lg text-amber-200 font-serif px-2 transition-transform duration-75">---</div>
           </div>
         </div>
 
-        <!-- Kolu Çek / Spin Butonu -->
-        <button id="slotSpinBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-sm uppercase tracking-widest shadow-lg transition active:scale-98">
+        <button id="slotSpinBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-sm uppercase tracking-widest shadow-xl transition active:scale-98">
           KOLU ÇEK (SPIN)
         </button>
       </div>
     </div>
 
-    <!-- 3. OYUN: RULET MASASI -->
+    <!-- 3. RULET MASASI -->
     <div id="gameRouletteView" class="game-view hidden flex flex-col items-center gap-4">
       <div class="relative">
         <canvas id="rouletteCanvas" class="rounded-full shadow-2xl border-4 border-amber-700/80"></canvas>
-        <button id="rouletteSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-zinc-950 border-2 border-amber-500 text-amber-300 font-bold text-xs uppercase transition hover:border-amber-400 active:scale-95">
+        <button id="rouletteSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-zinc-950 border-2 border-amber-500 text-amber-300 font-bold text-xs uppercase transition hover:border-amber-400 active:scale-95 shadow-xl">
           Topu At
         </button>
       </div>
-      <!-- Masa Bahis / İsim Görünümü -->
-      <div id="rouletteCurrentNumber" class="text-xs text-amber-200/80 bg-zinc-950 px-4 py-1.5 rounded-full border border-zinc-800">
+      <div id="rouletteCurrentNumber" class="text-xs text-amber-200/90 bg-zinc-950/90 px-4 py-1.5 rounded-full border border-zinc-800 backdrop-blur">
         Krupiye bekleniyor...
       </div>
     </div>
 
-    <!-- 4. OYUN: PLINKO BOARD -->
+    <!-- 4. PLINKO BOARD -->
     <div id="gamePlinkoView" class="game-view hidden flex flex-col items-center">
-      <div class="relative bg-zinc-950/90 border-2 border-amber-700/60 rounded-2xl p-4 shadow-2xl flex flex-col items-center">
+      <div class="relative bg-zinc-950/95 border-2 border-amber-700/60 rounded-2xl p-4 shadow-2xl flex flex-col items-center">
         <div class="flex items-center justify-between w-full px-2 mb-2">
           <span class="text-xs text-amber-300 font-serif font-bold uppercase tracking-wider">PLINKO DROP</span>
           <button id="plinkoDropBtn" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase transition active:scale-95">
             Topu Bırak
           </button>
         </div>
-        <canvas id="plinkoCanvas" class="rounded-xl bg-black border border-zinc-800"></canvas>
+        <canvas id="plinkoCanvas" class="rounded-xl bg-black border border-zinc-800 shadow-inner"></canvas>
       </div>
     </div>
 
   </main>
 
-  <!-- Alt Bar Bilgileri -->
-  <footer class="w-full flex items-center justify-between px-6 py-3 bg-zinc-950/80 border-t border-zinc-800/80 backdrop-blur text-xs text-zinc-400">
+  <!-- Alt Bar -->
+  <footer class="w-full flex items-center justify-between px-6 py-3 bg-zinc-950/85 border-t border-zinc-800/80 backdrop-blur text-xs text-zinc-400">
     <div>Kalan: <span id="studentCount" class="text-amber-400 font-bold font-mono">0</span> kişi</div>
     <div id="roomBadge" class="flex items-center gap-2 cursor-pointer hover:text-amber-200 transition">
       <span id="statusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
@@ -168,7 +172,7 @@
     </div>
   </div>
 
-  <!-- Geçmiş Yan Paneli -->
+  <!-- Geçmiş Paneli -->
   <aside id="historyPanel" class="fixed top-0 right-0 bottom-0 w-80 bg-zinc-950/95 border-l border-zinc-800 p-5 z-40 transform translate-x-full transition-transform duration-300 flex flex-col backdrop-blur-md shadow-2xl">
     <div class="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
       <h2 class="font-bold text-sm text-amber-200 font-serif">Çekiliş Geçmişi</h2>
@@ -182,8 +186,8 @@
   </aside>
 
   <!-- Kazanan Pop-up Modalı -->
-  <div id="winnerModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200 backdrop-blur-sm">
-    <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-2 border-amber-500/80 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+  <div id="winnerModal" class="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200 backdrop-blur-md">
+    <div class="bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-2 border-amber-500/80 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl transform scale-95 transition-transform" id="winnerCard">
       <p id="winnerGameLabel" class="text-xs text-amber-400/90 font-serif uppercase tracking-widest mb-1">KAZANAN</p>
       <div id="winnerName" class="text-3xl font-black text-amber-100 tracking-tight my-4 py-3 px-4 bg-zinc-900/90 border border-amber-600/40 rounded-xl font-serif">
         Kazanan İsim
@@ -209,11 +213,11 @@
     let history = [];
     let currentWinner = null;
     let round = 1;
-    let activeGameMode = 'wheel'; // 'wheel' | 'slot' | 'roulette' | 'plinko'
+    let activeGameMode = 'wheel';
     let isPlaying = false;
     let pendingTarget = null;
 
-    // --- Web Audio Sentezleyici ---
+    // --- GELİŞMİŞ WEB AUDIO SFX MOTORU (CANLI SENTEZLEYİCİ) ---
     let audioCtx = null;
     let soundEnabled = true;
 
@@ -221,64 +225,144 @@
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    function playTick(freq = 700) {
+    // 1. Mekanik Kol Çekilme Sesi (Ratchet Crank)
+    function playLeverCrank() {
       if (!soundEnabled) return;
-      try {
-        initAudio();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.03);
-        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + 0.03);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.03);
-      } catch (e) {}
+      initAudio();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      for (let i = 0; i < 4; i++) {
+        setTimeout(() => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220 + i * 40, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.04);
+        }, i * 45);
+      }
     }
 
-    function playWinSound() {
+    // 2. Makara Kilitlenme Sesi (Heavy Metal Clunk)
+    function playReelStop() {
       if (!soundEnabled) return;
-      try {
-        initAudio();
-        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.08);
+    }
+
+    // 3. Plinko Çivi Çınlaması (Melodic Bell Ting)
+    function playPlinkoTing(freq) {
+      if (!soundEnabled) return;
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.09);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.09);
+    }
+
+    // 4. Genel Çark Tıklaması
+    function playTick(freq = 700) {
+      if (!soundEnabled) return;
+      initAudio();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.03);
+      gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + 0.03);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.03);
+    }
+
+    // 5. Casino Şıngırdayan Jeton Yağmuru (Coin Shower / Payout)
+    function playCoinPayout() {
+      if (!soundEnabled) return;
+      initAudio();
+      const freqs = [1318.51, 1567.98, 1760.00, 2093.00, 2637.02];
+      for (let i = 0; i < 16; i++) {
+        setTimeout(() => {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.08 + 0.35);
+          osc.frequency.value = freqs[Math.floor(Math.random() * freqs.length)];
+          gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
           osc.connect(gain);
           gain.connect(audioCtx.destination);
-          osc.start(audioCtx.currentTime + i * 0.08);
-          osc.stop(audioCtx.currentTime + i * 0.08 + 0.35);
-        });
-      } catch (e) {}
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.12);
+        }, i * 65);
+      }
     }
 
-    // --- Oyun Modu Yönetimi ---
+    // 6. Büyük Zafer Fanfarı
+    function playWinSound() {
+      if (!soundEnabled) return;
+      initAudio();
+      [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.09 + 0.4);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + i * 0.09);
+        osc.stop(audioCtx.currentTime + i * 0.09 + 0.4);
+      });
+      setTimeout(playCoinPayout, 450);
+    }
+
+    // Ekran Titreşimi (Camera Shake)
+    function triggerScreenShake() {
+      const body = document.getElementById('mainBody');
+      body.classList.remove('shake');
+      void body.offsetWidth; // Reflow tetikle
+      body.classList.add('shake');
+      setTimeout(() => body.classList.remove('shake'), 400);
+    }
+
+    // --- OYUN MODU YÖNETİMİ ---
     function setGameMode(mode, broadcastSync = true) {
       activeGameMode = mode;
       document.querySelectorAll('.game-view').forEach(el => el.classList.add('hidden'));
 
-      const modes = ['wheel', 'slot', 'roulette', 'plinko'];
-      modes.forEach(m => {
+      ['wheel', 'slot', 'roulette', 'plinko'].forEach(m => {
         const btn = document.getElementById('btnMode' + m.charAt(0).toUpperCase() + m.slice(1));
         if (btn) {
-          if (m === mode) {
-            btn.className = 'px-3 py-1 rounded bg-amber-500 text-black font-bold transition';
-          } else {
-            btn.className = 'px-3 py-1 rounded text-zinc-400 hover:text-white transition';
-          }
+          btn.className = (m === mode) 
+            ? 'px-3 py-1 rounded bg-amber-500 text-black font-bold transition'
+            : 'px-3 py-1 rounded text-zinc-400 hover:text-white transition';
         }
       });
 
       const titleMap = {
         wheel: 'Casino Çarkı',
-        slot: 'Lucky Slots (Slot Makinesi)',
+        slot: 'Vegas Slots (Slot Makinesi)',
         roulette: 'Roulette Masası',
         plinko: 'Plinko Board'
       };
@@ -298,17 +382,13 @@
         resizePlinkoCanvas();
       }
 
-      if (broadcastSync) {
-        broadcast({ type: 'game_mode_changed', mode: mode });
-      }
+      if (broadcastSync) broadcast({ type: 'game_mode_changed', mode: mode });
     }
 
-    // --- 1. ÇARKIFELEK KODLARI ---
+    // --- 1. ÇARKIFELEK ---
     const wheelCanvas = document.getElementById('wheelCanvas');
     const wheelCtx = wheelCanvas.getContext('2d');
-    let wheelRadius = 0;
-    let wheelRotation = 0;
-    let lastWheelTickIndex = -1;
+    let wheelRadius = 0, wheelRotation = 0, lastWheelTickIndex = -1;
     const casinoPalette = ['#8f1d1d', '#18201d', '#155234', '#18201d', '#b3822a', '#18201d'];
 
     function resizeWheelCanvas() {
@@ -355,6 +435,7 @@
         wheelCtx.restore();
       }
 
+      // Kasa ve Pimler
       wheelCtx.beginPath();
       wheelCtx.arc(cx, cy, r + 5, 0, 2 * Math.PI);
       wheelCtx.strokeStyle = '#272017';
@@ -366,6 +447,17 @@
       wheelCtx.strokeStyle = '#b48a3c';
       wheelCtx.lineWidth = 2;
       wheelCtx.stroke();
+
+      const pinCount = Math.max(N, 24);
+      for (let i = 0; i < pinCount; i++) {
+        const pinA = wheelRotation + (i * 2 * Math.PI) / pinCount;
+        const px = cx + (r + 5) * Math.cos(pinA);
+        const py = cy + (r + 5) * Math.sin(pinA);
+        wheelCtx.beginPath();
+        wheelCtx.arc(px, py, 2.5, 0, 2 * Math.PI);
+        wheelCtx.fillStyle = '#fef08a';
+        wheelCtx.fill();
+      }
     }
 
     function spinWheel(targetName = null) {
@@ -394,7 +486,7 @@
 
       const startRot = wheelRotation;
       const finalRot = startRot + deltaRotation;
-      const duration = 5000 + Math.random() * 500;
+      const duration = 5200 + Math.random() * 500;
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
 
@@ -410,8 +502,8 @@
         if (curIdx !== lastWheelTickIndex) {
           playTick(750);
           lastWheelTickIndex = curIdx;
-          pointerEl.style.transform = 'translateX(-50%) rotate(-12deg)';
-          setTimeout(() => pointerEl.style.transform = 'translateX(-50%) rotate(0deg)', 35);
+          pointerEl.style.transform = 'translateX(-50%) rotate(-15deg)';
+          setTimeout(() => pointerEl.style.transform = 'translateX(-50%) rotate(0deg)', 40);
         }
 
         if (progress < 1) {
@@ -427,7 +519,7 @@
       requestAnimationFrame(anim);
     }
 
-    // --- 2. SLOT MAKİNESİ KODLARI ---
+    // --- 2. SLOT MAKİNESİ (OVERSHOOT & 3D BOUNCE) ---
     function initSlotDisplay() {
       if (!names.length) return;
       document.getElementById('slotReel1').textContent = names[0];
@@ -438,63 +530,52 @@
     function spinSlot(targetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
+      playLeverCrank();
       broadcast({ type: 'spin_start' });
 
       let target = targetName;
-      if (!target) {
-        target = names[Math.floor(Math.random() * names.length)];
-      }
+      if (!target) target = names[Math.floor(Math.random() * names.length)];
 
       const r1 = document.getElementById('slotReel1');
       const r2 = document.getElementById('slotReel2');
       const r3 = document.getElementById('slotReel3');
 
-      let speed1 = 60, speed2 = 60, speed3 = 60;
-      let interval1, interval2, interval3;
-
-      interval1 = setInterval(() => {
+      let interval1 = setInterval(() => {
         r1.textContent = names[Math.floor(Math.random() * names.length)];
-        playTick(600);
-      }, speed1);
+        playTick(550);
+      }, 55);
 
-      interval2 = setInterval(() => {
+      let interval2 = setInterval(() => {
         r2.textContent = names[Math.floor(Math.random() * names.length)];
-      }, speed2);
+      }, 55);
 
-      interval3 = setInterval(() => {
+      let interval3 = setInterval(() => {
         r3.textContent = names[Math.floor(Math.random() * names.length)];
-      }, speed3);
+      }, 55);
 
-      // 1. Makara Durur
-      setTimeout(() => {
-        clearInterval(interval1);
-        r1.textContent = target;
-        playTick(900);
-      }, 2500);
+      function lockReel(reelEl, finalName) {
+        reelEl.textContent = finalName;
+        playReelStop();
+        // Yaylanma animasyonu
+        reelEl.style.transform = 'translateY(12px)';
+        setTimeout(() => reelEl.style.transform = 'translateY(-6px)', 80);
+        setTimeout(() => reelEl.style.transform = 'translateY(0px)', 160);
+      }
 
-      // 2. Makara Durur
-      setTimeout(() => {
-        clearInterval(interval2);
-        r2.textContent = target;
-        playTick(950);
-      }, 3400);
-
-      // 3. Makara Durur (JACKPOT!)
+      setTimeout(() => { clearInterval(interval1); lockReel(r1, target); }, 2200);
+      setTimeout(() => { clearInterval(interval2); lockReel(r2, target); }, 3100);
       setTimeout(() => {
         clearInterval(interval3);
-        r3.textContent = target;
-        playTick(1100);
+        lockReel(r3, target);
         isPlaying = false;
-        finishGame(target, targetName !== null, 'Slot Makinesi (Jackpot)');
-      }, 4300);
+        finishGame(target, targetName !== null, 'Vegas Slots (Jackpot)');
+      }, 4000);
     }
 
-    // --- 3. RULET MASASI KODLARI ---
+    // --- 3. RULET MASASI ---
     const rouletteCanvas = document.getElementById('rouletteCanvas');
     const rouletteCtx = rouletteCanvas.getContext('2d');
-    let rouletteRadius = 0;
-    let rouletteAngle = 0;
-    let ballAngle = 0;
+    let rouletteRadius = 0, rouletteAngle = 0, ballAngle = 0;
 
     function resizeRouletteCanvas() {
       const size = Math.min(window.innerWidth * 0.85, window.innerHeight * 0.58, 460);
@@ -515,7 +596,6 @@
       const cx = rouletteRadius, cy = rouletteRadius, r = rouletteRadius - 10;
       rouletteCtx.clearRect(0, 0, rouletteRadius * 2, rouletteRadius * 2);
 
-      // Dilimler
       for (let i = 0; i < N; i++) {
         const a = rouletteAngle + i * arc;
         rouletteCtx.beginPath();
@@ -542,13 +622,13 @@
       // Merkez Göbek
       rouletteCtx.beginPath();
       rouletteCtx.arc(cx, cy, r * 0.45, 0, 2 * Math.PI);
-      rouletteCtx.fillStyle = '#1c1917';
+      rouletteCtx.fillStyle = '#181512';
       rouletteCtx.fill();
       rouletteCtx.strokeStyle = '#d4af37';
       rouletteCtx.lineWidth = 3;
       rouletteCtx.stroke();
 
-      // Top Çizimi
+      // Top
       if (ballDist !== null) {
         const bx = cx + ballDist * Math.cos(ballAngle);
         const by = cy + ballDist * Math.sin(ballAngle);
@@ -557,7 +637,7 @@
         rouletteCtx.fillStyle = '#ffffff';
         rouletteCtx.fill();
         rouletteCtx.shadowColor = 'white';
-        rouletteCtx.shadowBlur = 4;
+        rouletteCtx.shadowBlur = 5;
         rouletteCtx.stroke();
       }
     }
@@ -570,25 +650,23 @@
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
       if (targetIndex === -1) targetIndex = Math.floor(Math.random() * names.length);
 
-      const N = names.length;
-      const arc = (2 * Math.PI) / N;
+      const r = rouletteRadius - 10;
       const duration = 5400;
       const startTime = performance.now();
-      const r = rouletteRadius - 10;
 
       function anim(now) {
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
         const ease = 1 - Math.pow(1 - progress, 3);
 
-        rouletteAngle += 0.04 * (1 - progress * 0.7);
-        ballAngle -= 0.12 * (1 - ease * 0.9);
+        rouletteAngle += 0.035 * (1 - progress * 0.7);
+        ballAngle -= 0.13 * (1 - ease * 0.9);
 
-        // Top raydan iç cebe doğru iner
-        const ballDist = (r - 18) - (progress > 0.6 ? (progress - 0.6) * 45 : 0);
+        // Top içeri sekerken ses
+        const ballDist = (r - 18) - (progress > 0.65 ? (progress - 0.65) * 50 : 0);
         drawRoulette(ballDist);
 
-        if (Math.random() < 0.25) playTick(800 + Math.random() * 200);
+        if (Math.random() < 0.22) playTick(800 + Math.random() * 200);
 
         if (progress < 1) {
           requestAnimationFrame(anim);
@@ -601,12 +679,11 @@
       requestAnimationFrame(anim);
     }
 
-    // --- 4. PLINKO BOARD KODLARI ---
+    // --- 4. PLINKO BOARD (PARLAYAN ÇİVİLER & PENTATONİK SESLER) ---
     const plinkoCanvas = document.getElementById('plinkoCanvas');
     const plinkoCtx = plinkoCanvas.getContext('2d');
-    let plinkoWidth = 420;
-    let plinkoHeight = 440;
-    let pegs = [];
+    let plinkoWidth = 420, plinkoHeight = 440, pegs = [];
+    const plinkoScale = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66];
 
     function resizePlinkoCanvas() {
       const sizeW = Math.min(window.innerWidth * 0.9, 440);
@@ -615,7 +692,7 @@
       const dpr = window.devicePixelRatio || 1;
       plinkoCanvas.width = plinkoWidth * dpr;
       plinkoCanvas.height = plinkoHeight * dpr;
-      plinkoCanvas.style.width = plinkoWidth + 'px';
+      plinkoCanvas.style.width = sizeW + 'px';
       plinkoCanvas.style.height = plinkoHeight + 'px';
       plinkoCtx.scale(dpr, dpr);
       createPegs();
@@ -625,16 +702,20 @@
     function createPegs() {
       pegs = [];
       const rows = 8;
-      const startY = 50;
-      const rowSpacing = (plinkoHeight - 120) / rows;
+      const startY = 45;
+      const rowSpacing = (plinkoHeight - 110) / rows;
 
       for (let r = 0; r < rows; r++) {
         const count = r + 3;
         const spacing = (plinkoWidth - 60) / (count - 1);
         for (let c = 0; c < count; c++) {
-          const px = 30 + c * spacing;
-          const py = startY + r * rowSpacing;
-          pegs.push({ x: px, y: py, r: 3.5 });
+          pegs.push({
+            x: 30 + c * spacing,
+            y: startY + r * rowSpacing,
+            r: 3.5,
+            glow: 0,
+            note: plinkoScale[(r + c) % plinkoScale.length]
+          });
         }
       }
     }
@@ -642,20 +723,28 @@
     function drawPlinko(ball = null) {
       plinkoCtx.clearRect(0, 0, plinkoWidth, plinkoHeight);
 
-      // Çiviler (Pirinç Pimler)
+      // Çiviler
       pegs.forEach(p => {
         plinkoCtx.beginPath();
-        plinkoCtx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
-        plinkoCtx.fillStyle = '#fef08a';
+        plinkoCtx.arc(p.x, p.y, p.r + (p.glow > 0 ? p.glow * 2.5 : 0), 0, 2 * Math.PI);
+        if (p.glow > 0) {
+          plinkoCtx.fillStyle = '#ffffff';
+          plinkoCtx.shadowColor = '#fbbf24';
+          plinkoCtx.shadowBlur = 10;
+          p.glow -= 0.08;
+        } else {
+          plinkoCtx.fillStyle = '#fef08a';
+          plinkoCtx.shadowBlur = 0;
+        }
         plinkoCtx.fill();
         plinkoCtx.strokeStyle = '#854d0e';
         plinkoCtx.stroke();
       });
 
-      // Alt Kovalar (İsim Kutucukları)
+      // İsim Yuvaları
       const binCount = Math.min(names.length, 6);
       const binW = plinkoWidth / binCount;
-      const binH = 50;
+      const binH = 48;
       const binY = plinkoHeight - binH;
 
       for (let i = 0; i < binCount; i++) {
@@ -673,14 +762,17 @@
         plinkoCtx.fillText(displayName || '', bx + binW / 2, binY + 28);
       }
 
-      // Düşen Top
+      // Top
       if (ball) {
         plinkoCtx.beginPath();
         plinkoCtx.arc(ball.x, ball.y, ball.r, 0, 2 * Math.PI);
         plinkoCtx.fillStyle = '#f59e0b';
+        plinkoCtx.shadowColor = '#f59e0b';
+        plinkoCtx.shadowBlur = 8;
         plinkoCtx.fill();
         plinkoCtx.strokeStyle = '#fff';
         plinkoCtx.stroke();
+        plinkoCtx.shadowBlur = 0;
       }
     }
 
@@ -691,15 +783,13 @@
 
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
       const binCount = Math.min(names.length, 6);
-      if (targetIndex === -1 || targetIndex >= binCount) {
-        targetIndex = Math.floor(Math.random() * binCount);
-      }
+      if (targetIndex === -1 || targetIndex >= binCount) targetIndex = Math.floor(Math.random() * binCount);
 
       const binW = plinkoWidth / binCount;
       const targetX = targetIndex * binW + binW / 2;
 
       let ball = {
-        x: plinkoWidth / 2 + (Math.random() * 20 - 10),
+        x: plinkoWidth / 2 + (Math.random() * 16 - 8),
         y: 15,
         vx: (Math.random() * 2 - 1),
         vy: 0,
@@ -714,25 +804,23 @@
         ball.x += ball.vx;
         ball.y += ball.vy;
 
-        // Hedefe doğru akıllıca saptırma (Bias)
-        const biasStrength = 0.04;
+        const biasStrength = 0.045;
         if (ball.x < targetX) ball.vx += biasStrength;
         else ball.vx -= biasStrength;
 
-        // Çivilere çarpışma
         pegs.forEach(p => {
           const dx = ball.x - p.x;
           const dy = ball.y - p.y;
           const dist = Math.hypot(dx, dy);
           if (dist < ball.r + p.r) {
-            playTick(800 + Math.random() * 150);
+            p.glow = 1.0;
+            playPlinkoTing(p.note);
             const angle = Math.atan2(dy, dx);
             ball.vx = Math.cos(angle) * 2.8 + (Math.random() * 0.4 - 0.2);
             ball.vy = Math.sin(angle) * 2.8 * bounce;
           }
         });
 
-        // Duvar sınırları
         if (ball.x < ball.r) { ball.x = ball.r; ball.vx *= -bounce; }
         if (ball.x > plinkoWidth - ball.r) { ball.x = plinkoWidth - ball.r; ball.vx *= -bounce; }
 
@@ -749,7 +837,7 @@
       requestAnimationFrame(anim);
     }
 
-    // --- GENEL TETİKLEME FONKSİYONU ---
+    // --- TETİKLEME VE BİTİŞ ---
     function triggerGame(target = null) {
       if (activeGameMode === 'wheel') spinWheel(target);
       else if (activeGameMode === 'slot') spinSlot(target);
@@ -757,13 +845,13 @@
       else if (activeGameMode === 'plinko') dropPlinko(target);
     }
 
-    // Oyun Bitiş & Sonuç Bildirimi
     function finishGame(winner, wasTargeted, gameLabel) {
       currentWinner = winner;
       addHistoryRecord(winner, round, wasTargeted, gameLabel);
       round++;
       updateRoundUI();
 
+      triggerScreenShake();
       playWinSound();
       triggerCelebration(winner, gameLabel);
 
@@ -777,12 +865,16 @@
 
     function triggerCelebration(winner, gameLabel) {
       try {
-        confetti({ particleCount: 90, spread: 75, origin: { y: 0.6 } });
+        confetti({ particleCount: 110, spread: 80, origin: { y: 0.6 } });
       } catch (e) {}
 
       document.getElementById('winnerName').textContent = winner;
       document.getElementById('winnerGameLabel').textContent = gameLabel || 'KAZANAN';
-      document.getElementById('winnerModal').classList.remove('opacity-0', 'pointer-events-none');
+      const modal = document.getElementById('winnerModal');
+      const card = document.getElementById('winnerCard');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      card.classList.remove('scale-95');
+      card.classList.add('scale-100');
     }
 
     function addHistoryRecord(winner, roundNumber, wasTargeted, gameLabel) {
@@ -809,7 +901,7 @@
               <span class="text-amber-500 font-mono font-bold">#${item.round}</span>
               <span class="text-zinc-200 font-semibold">${item.winner}</span>
             </div>
-            <div class="text-[10px] text-zinc-500">${item.game || 'Çark'}</div>
+            <div class="text-[10px] text-zinc-500">${item.game || 'Oyun'}</div>
           </div>
           <span class="text-[10px] text-zinc-500 font-mono">${item.time}</span>
         </div>
@@ -863,13 +955,11 @@
       if (e.target === document.getElementById('winnerModal')) closeModal();
     });
 
-    // Buton Tetikleyicileri
     document.getElementById('centerSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('slotSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('rouletteSpinBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
     document.getElementById('plinkoDropBtn').addEventListener('click', () => { triggerGame(pendingTarget); pendingTarget = null; });
 
-    // Geçmiş & QR
     document.getElementById('toggleHistoryBtn').addEventListener('click', () => document.getElementById('historyPanel').classList.remove('translate-x-full'));
     document.getElementById('closeHistoryBtn').addEventListener('click', () => document.getElementById('historyPanel').classList.add('translate-x-full'));
     document.getElementById('clearHistoryBtn').addEventListener('click', () => {
