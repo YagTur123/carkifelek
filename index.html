@@ -889,7 +889,7 @@
     }
 
     // --- GELİŞMİŞ ANALİTİK FİZİK & DOPAMİN NEAR-MISS MOTORU İLE ÇARKIFELEK ---
-    function spinWheel(targetName = null) {
+    function spinWheel(targetName = null, fakeTargetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
       broadcast({ type: 'spin_start' });
@@ -900,9 +900,18 @@
       let targetIndex = targetName ? names.findIndex(n => n.trim().toLowerCase() === targetName.trim().toLowerCase()) : -1;
       if (targetIndex === -1) targetIndex = Math.floor(Math.random() * N);
 
+      // Sahte Hedef (Yem / Troll / Near-Miss Hedefi)
+      let fakeTargetIndex = -1;
+      if (fakeTargetName) {
+        fakeTargetIndex = names.findIndex(n => n.trim().toLowerCase() === fakeTargetName.trim().toLowerCase());
+      }
+      if (fakeTargetIndex === -1 || fakeTargetIndex === targetIndex) {
+        fakeTargetIndex = (targetIndex + 1) % N;
+      }
+
       // Kumandadan gelen süre ve dopamin seviyesi
       const duration = Math.max(3000, spinDuration * 1000);
-      const isHighDopamine = (dopamineLevel > 60);
+      const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
 
       // Hedeflenen dilimin tam merkezinin tepe ibresiyle (POINTER_ANGLE) çakışması için gereken açı
       const targetCenterAngle = (targetIndex + 0.5) * arc;
@@ -916,6 +925,16 @@
       const baseTurns = Math.max(4, Math.floor(duration / 1000 * 1.1));
       const totalDelta = baseTurns * (2 * Math.PI) + deltaAngle;
       const startRotation = wheelRotation;
+      const finalRotation = startRotation + totalDelta;
+
+      // Sahte hedefin merkezinin ibre altına geldiği son açı (Near-Miss duraklama açısı)
+      const fakeCenterAngle = (fakeTargetIndex + 0.5) * arc;
+      const fakeModulo = ((POINTER_ANGLE - fakeCenterAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const finalModulo = (finalRotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      let fakeBackDiff = (finalModulo - fakeModulo) % (2 * Math.PI);
+      if (fakeBackDiff <= 0.08) fakeBackDiff += 2 * Math.PI;
+      const fakeStopRotation = finalRotation - fakeBackDiff;
+      const fakeStopRatio = Math.max(0.75, Math.min(0.96, (fakeStopRotation - startRotation) / totalDelta));
 
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
@@ -933,19 +952,20 @@
 
         let easeP = 0;
         if (isHighDopamine) {
-          // YÜKSEK DOPAMİN: Son saniye Near-Miss gerilimi (Komşu pimde takılma ve hedefe sıçrama!)
-          if (progress < 0.85) {
-            const pSub = progress / 0.85;
-            easeP = 0.88 * (1 - Math.pow(1 - pSub, 3.8));
-          } else if (progress >= 0.85 && progress < 0.93) {
-            // Komşu pimin ucunda asılı kalma (Kalp durduran duraklama!)
-            const pSub = (progress - 0.85) / 0.08;
-            easeP = 0.88 + pSub * 0.035;
+          // YÜKSEK DOPAMİN: Seçilen sahte hedefin diliminde asılı kalma ve son saniyede hedefe sıçrama!
+          if (progress < 0.83) {
+            const pSub = progress / 0.83;
+            easeP = fakeStopRatio * (1 - Math.pow(1 - pSub, 3.8));
+          } else if (progress >= 0.83 && progress < 0.92) {
+            // Sahte hedefin merkezinde / pimin ucunda nefes kesen duraklama!
+            const pSub = (progress - 0.83) / 0.09;
+            const creep = Math.sin(pSub * Math.PI * 0.5) * 0.008;
+            easeP = fakeStopRatio + creep;
           } else {
-            // Son anda tırnak pimi aşar ve hedefin tam merkezine oturur!
-            const pSub = (progress - 0.93) / 0.07;
+            // Son anda tırnak pimi aşar ve asıl hedefin merkezine oturur!
+            const pSub = (progress - 0.92) / 0.08;
             const easeOutSub = Math.sin(pSub * Math.PI * 0.5);
-            easeP = 0.915 + 0.085 * easeOutSub;
+            easeP = fakeStopRatio + (1.0 - fakeStopRatio) * easeOutSub;
           }
         } else {
           // STANDART / İPEKSİ MOD: Kesintisiz pürüzsüz quintic sönüm
@@ -984,7 +1004,7 @@
         } else {
           // Süre bittiğinde kesin tam hedef merkezine pürüzsüzce otur
           isPlaying = false;
-          wheelRotation = startRotation + totalDelta;
+          wheelRotation = finalRotation;
           if (pointerEl) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
           drawWheel();
 
@@ -1101,7 +1121,7 @@
       }
     }
 
-    function spinSlot(targetName = null) {
+    function spinSlot(targetName = null, fakeTargetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
       clearSlotSosLine();
@@ -1116,6 +1136,15 @@
         target = names.find(n => n.trim().toLowerCase() === target.trim().toLowerCase());
       }
       target = target || names[0] || 'Şanslı Kişi';
+
+      // Sahte Hedef (Yem / Troll / Near-Miss)
+      let fakeTarget = fakeTargetName;
+      if (fakeTarget && names.some(n => n.trim().toLowerCase() === fakeTarget.trim().toLowerCase())) {
+        fakeTarget = names.find(n => n.trim().toLowerCase() === fakeTarget.trim().toLowerCase());
+      } else {
+        const others = names.filter(n => n.trim().toLowerCase() !== target.trim().toLowerCase());
+        fakeTarget = others.length ? others[0] : target;
+      }
 
       const col1 = document.getElementById('slotReelCol1');
       const col2 = document.getElementById('slotReelCol2');
@@ -1146,7 +1175,7 @@
 
       const CELL_HEIGHT = 74;
       const slotDuration = Math.max(2500, spinDuration * 750);
-      const isHighDopamine = (dopamineLevel > 50);
+      const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
 
       const reelConfigs = [
         { col: col1, count: 26, duration: Math.floor(slotDuration * 0.65), targetRow: targetRowPerCol[0], colIdx: 0 },
@@ -1164,16 +1193,28 @@
         html += createSlotNameCell(getOtherName());
 
         // Dönen ara şerit: Sadece sınıftaki diğer katılımcıların isimleri!
-        for (let i = 1; i < cfg.count - 3; i++) {
+        for (let i = 1; i < cfg.count - 4; i++) {
           const randomPerson = names[Math.floor(Math.random() * names.length)];
           html += createSlotNameCell(randomPerson);
+        }
+
+        // Makara 3'te veya komşularda sahte hedef hücresi:
+        // cfg.count - 4 pozisyonu (ilk duruşta sahte hedef satırına denk gelen hücre)
+        if (cfg.colIdx === 2 && isHighDopamine) {
+          html += createSlotNameCell(fakeTarget, '🎭');
+        } else {
+          html += createSlotNameCell(getOtherName());
         }
 
         // Son 3 hücre (3x3 Pencere):
         // cfg.targetRow hangi indeksteyse (0, 1, 2) o hücreye KAZANAN KİŞİ yerleştirilir!
         for (let r = 0; r < 3; r++) {
           const isWinnerCell = (r === cfg.targetRow);
-          const cellName = isWinnerCell ? target : getOtherName();
+          // Eğer 3. makara değilse ama sahte hedef varsa, diğer satırlara sahte hedefi serpiştir (az daha o kazanıyordu hissi)
+          let cellName = isWinnerCell ? target : getOtherName();
+          if (!isWinnerCell && cfg.colIdx < 2 && Math.random() < 0.5) {
+            cellName = fakeTarget;
+          }
           const cellId = `slotCell_${cfg.colIdx}_${r}`;
           html += createSlotNameCell(cellName, isWinnerCell ? '👑' : null, isWinnerCell, cellId);
         }
@@ -1193,7 +1234,7 @@
           // Son 3 hücrenin pencereye oturması için hedef Y
           const finalY = -(cfg.count - 3) * CELL_HEIGHT;
 
-          // DOPAMİN: Son makara (idx === 2) yüksek dopaminde önce 1 hücre yukarıda (başka isimde) durur gibi olur!
+          // DOPAMİN: Son makara (idx === 2) yüksek dopaminde önce 1 hücre yukarıda (sahte hedefte) durur!
           const fakeY = (idx === 2 && isHighDopamine) ? (finalY + CELL_HEIGHT) : finalY;
 
           cfg.col.style.transition = `transform ${cfg.duration}ms cubic-bezier(0.12, 0.84, 0.35, 1.14)`;
@@ -1210,7 +1251,8 @@
 
               if (isHighDopamine) {
                 // SON SANİYEDE DÜŞÜŞ (NUDGE DROP):
-                // 350ms bekleyip makara 3'ü hedeflenen satıra kaydır!
+                // 380ms bekleyip makara 3'ü hedeflenen asıl satıra kaydır!
+                if (meter) meter.textContent = `AZ DAHA: ${fakeTarget}?!`;
                 setTimeout(() => {
                   cfg.col.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.25)';
                   cfg.col.style.transform = `translateY(${finalY}px)`;
@@ -1219,7 +1261,7 @@
 
                   // Çapraz SOS çizgisini çiz ve kutla
                   finalizeSlotWin(target, targetName, chosenPattern, meter);
-                }, 380);
+                }, 400);
               } else {
                 finalizeSlotWin(target, targetName, chosenPattern, meter);
               }
@@ -1549,7 +1591,7 @@
       }
     }
 
-    function spinRoulette(targetName = null) {
+    function spinRoulette(targetName = null, fakeTargetName = null) {
       if (isPlaying || !names.length) return;
       isPlaying = true;
       broadcast({ type: 'spin_start' });
@@ -1577,11 +1619,17 @@
       const rDeflector = (rMahoganyInner + rPocketsOuter) / 2;
 
       const duration = Math.max(4000, spinDuration * 1000);
-      const isHighDopamine = (dopamineLevel > 50);
+      const isHighDopamine = (dopamineLevel > 50) || (fakeTargetName !== null);
       const startTime = performance.now();
 
-      // Dopamin yüksekse son saniye perdeden sekme (Fakeout) için sahte komşu cep
-      const fakeTargetIndex = (targetIndex + (Math.random() > 0.5 ? 1 : N - 1)) % N;
+      // Sahte Hedef (Yem / Near-Miss kurbanı)
+      let fakeTargetIndex = -1;
+      if (fakeTargetName) {
+        fakeTargetIndex = names.findIndex(n => n.trim().toLowerCase() === fakeTargetName.trim().toLowerCase());
+      }
+      if (fakeTargetIndex === -1 || fakeTargetIndex === targetIndex) {
+        fakeTargetIndex = (targetIndex + (Math.random() > 0.5 ? 1 : N - 1)) % N;
+      }
       let fakeoutTriggered = false;
 
       const startWheelAngle = rouletteAngle;
@@ -1682,11 +1730,13 @@
           const baseDist = rDeflector - pSub * (rDeflector - rPocketCenter);
           ballDist = baseDist + radialHop;
 
-          // YÜKSEK DOPAMİN: Top bu aşamada komşu cepte duracak gibi yavaşlar!
-          if (isHighDopamine && pSub > 0.65) {
+          // YÜKSEK DOPAMİN: Top bu aşamada komşu sahte cepte duracak gibi yavaşlar!
+          if (isHighDopamine && pSub > 0.60) {
             currentBallAngle = fakePocketAngle - (1 - pSub) * arc * 0.7;
             const fakeName = names[fakeTargetIndex];
-            if (statusBadge) statusBadge.textContent = `Krupiye: Top ${fakeName} cebinde duruyor mu?!`;
+            if (statusBadge) statusBadge.textContent = `⚡ Krupiye: Top ${fakeName} cebinde duruyor mu?!`;
+            const fakeCell = document.getElementById(`rouletteCell_${fakeTargetIndex}`);
+            if (fakeCell) fakeCell.classList.add('ring-2', 'ring-amber-400', 'bg-amber-500/20');
           }
 
           const currentBounceIndex = Math.floor(pSub * hops);
@@ -1704,6 +1754,8 @@
             if (!fakeoutTriggered) {
               fakeoutTriggered = true;
               playIvoryBallClick(1700, 0.35); // Sert pirinç perdeye çarpış
+              const fakeCell = document.getElementById(`rouletteCell_${fakeTargetIndex}`);
+              if (fakeCell) fakeCell.classList.remove('ring-2', 'ring-amber-400', 'bg-amber-500/20');
               if (statusBadge) statusBadge.textContent = `⚡ DİKKAT! Top perdeden sekti ➔ ${names[targetIndex]}!`;
             }
             // Zıplama yüksekliği ve hedefe atlama kavis eğrisi
@@ -1943,11 +1995,12 @@
     }
 
     // --- GENEL TETİKLEME ---
-    function triggerGame(target = null) {
+    function triggerGame(target = null, fakeTarget = null) {
       pendingTarget = target;
-      if (activeGameMode === 'wheel') spinWheel(target);
-      else if (activeGameMode === 'slot') spinSlot(target);
-      else if (activeGameMode === 'roulette') spinRoulette(target);
+      pendingFakeTarget = fakeTarget;
+      if (activeGameMode === 'wheel') spinWheel(target, fakeTarget);
+      else if (activeGameMode === 'slot') spinSlot(target, fakeTarget);
+      else if (activeGameMode === 'roulette') spinRoulette(target, fakeTarget);
       else if (activeGameMode === 'cards') {
         pickRandomCard();
       }
@@ -2184,13 +2237,22 @@
             if (validTarget && !names.some(n => n.trim().toLowerCase() === validTarget.trim().toLowerCase())) {
               validTarget = null;
             }
-            triggerGame(validTarget);
+            let validFakeTarget = data.fakeTarget;
+            if (validFakeTarget && !names.some(n => n.trim().toLowerCase() === validFakeTarget.trim().toLowerCase())) {
+              validFakeTarget = null;
+            }
+            triggerGame(validTarget, validFakeTarget);
           } else if (data.type === 'set_target') {
             let validTarget = data.target;
             if (validTarget && !names.some(n => n.trim().toLowerCase() === validTarget.trim().toLowerCase())) {
               validTarget = null;
             }
             pendingTarget = validTarget;
+            let validFakeTarget = data.fakeTarget;
+            if (validFakeTarget && !names.some(n => n.trim().toLowerCase() === validFakeTarget.trim().toLowerCase())) {
+              validFakeTarget = null;
+            }
+            pendingFakeTarget = validFakeTarget;
           } else if (data.type === 'set_game_mode') {
             setGameMode(data.mode, false);
           } else if (data.type === 'remove_name') {

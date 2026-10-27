@@ -69,12 +69,35 @@
 
     <!-- 1. Hedef ve Ana Tetikleme Butonu -->
     <section class="bg-zinc-900 border border-amber-900/40 rounded-xl p-4 flex flex-col gap-3 shadow-md">
-      <div class="flex items-center justify-between border-b border-zinc-800 pb-2.5">
-        <div>
-          <span class="text-[11px] text-zinc-400 font-medium">Hedef Kurban</span>
-          <div id="targetStatusText" class="text-sm font-bold text-zinc-200 mt-0.5">Rastgele (Hedef Yok)</div>
+      <!-- 1. HEDEF VE YEM/TROLL SEÇİM KARTLARI -->
+      <div class="grid grid-cols-2 gap-2 border-b border-zinc-800 pb-3">
+        <!-- Asıl Kazanan -->
+        <div class="bg-zinc-950/80 p-2.5 rounded-lg border border-amber-600/50 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                <span>👑</span> Asıl Kazanan
+              </span>
+              <button id="resetTargetBtn" class="text-[10px] text-zinc-500 hover:text-rose-400">Sıfırla</button>
+            </div>
+            <div id="targetStatusText" class="text-xs md:text-sm font-bold text-amber-200 truncate mt-1">Rastgele (Hedef Yok)</div>
+          </div>
+          <div class="text-[9px] text-zinc-500 mt-1">Nihai kazanan kişi</div>
         </div>
-        <button id="resetTargetBtn" class="px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs text-zinc-300 transition">Hedefi Sıfırla</button>
+
+        <!-- Yem / Troll Kurban (Near-Miss) -->
+        <div class="bg-zinc-950/80 p-2.5 rounded-lg border border-purple-600/50 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-purple-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                <span>🎭</span> Yem / Troll
+              </span>
+              <button id="resetFakeTargetBtn" class="text-[10px] text-zinc-500 hover:text-rose-400">Sıfırla</button>
+            </div>
+            <div id="fakeTargetStatusText" class="text-xs md:text-sm font-bold text-purple-200 truncate mt-1">Otomatik / Rastgele</div>
+          </div>
+          <div class="text-[9px] text-zinc-500 mt-1">Az daha kazanan kişi</div>
+        </div>
       </div>
 
       <!-- BÜYÜK TETİKLEME BUTONU -->
@@ -151,7 +174,17 @@
     </div>
 
     <!-- Öğrenci Listesi Sekmesi -->
-    <section id="studentsSection" class="flex flex-col gap-3">
+    <section id="studentsSection" class="flex flex-col gap-2.5">
+      <!-- Hedef Atama Modu Seçici (Kazanan vs Yem) -->
+      <div class="flex gap-1.5 p-1 bg-zinc-950 rounded-lg border border-zinc-800 text-xs">
+        <button id="setModeTargetBtn" class="flex-1 py-1.5 rounded font-bold transition flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow">
+          <span>👑</span> Kazananı Seç
+        </button>
+        <button id="setModeFakeBtn" class="flex-1 py-1.5 rounded font-bold transition flex items-center justify-center gap-1.5 text-zinc-400 hover:text-purple-300">
+          <span>🎭</span> Yem / Troll'ü Seç
+        </button>
+      </div>
+
       <div class="flex items-center justify-between">
         <input type="text" id="searchInput" placeholder="Öğrenci ara..." class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-600 mr-2" />
         <button id="toggleListEditorBtn" class="text-xs text-amber-300 hover:text-amber-200 font-medium px-2.5 py-2 rounded bg-zinc-900 border border-zinc-800 whitespace-nowrap">Düzenle</button>
@@ -200,6 +233,8 @@
     let names = [];
     let history = [];
     let selectedTarget = null;
+    let selectedFakeTarget = null;
+    let currentAssignMode = 'target'; // 'target' | 'fake'
     let currentGameMode = 'wheel';
     let isConnected = false;
     let isGameRunning = false;
@@ -344,6 +379,22 @@
       });
     }
 
+    function setAssignMode(mode) {
+      currentAssignMode = mode;
+      const btnTarget = document.getElementById('setModeTargetBtn');
+      const btnFake = document.getElementById('setModeFakeBtn');
+
+      if (btnTarget && btnFake) {
+        if (mode === 'target') {
+          btnTarget.className = 'flex-1 py-1.5 rounded font-bold transition flex items-center justify-center gap-1.5 bg-amber-500 text-black shadow';
+          btnFake.className = 'flex-1 py-1.5 rounded font-bold transition flex items-center justify-center gap-1.5 text-zinc-400 hover:text-purple-300';
+        } else {
+          btnFake.className = 'flex-1 py-1.5 rounded font-bold transition flex items-center justify-center gap-1.5 bg-purple-600 text-white shadow';
+          btnTarget.className = 'flex-1 py-1.5 rounded font-bold transition flex items-center justify-center gap-1.5 text-zinc-400 hover:text-amber-300';
+        }
+      }
+    }
+
     function renderGrid(filter = '') {
       const grid = document.getElementById('studentsGrid');
       grid.innerHTML = '';
@@ -356,24 +407,58 @@
       }
 
       filtered.forEach(name => {
-        const isSelected = selectedTarget === name;
+        const isTarget = (selectedTarget === name);
+        const isFake = (selectedFakeTarget === name);
+
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `p-2.5 rounded border text-left flex items-center justify-between transition text-xs ${
-          isSelected 
-            ? 'bg-amber-500/20 text-amber-200 border-amber-500 font-bold' 
-            : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
-        }`;
+
+        let btnClass = 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white';
+        let badgeHtml = '';
+
+        if (isTarget) {
+          btnClass = 'bg-amber-500/20 text-amber-200 border-amber-500 font-bold shadow-sm';
+          badgeHtml = '<span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-0.5">👑 Hedef</span>';
+        } else if (isFake) {
+          btnClass = 'bg-purple-500/20 text-purple-200 border-purple-500 font-bold shadow-sm';
+          badgeHtml = '<span class="text-[10px] text-purple-400 font-bold uppercase tracking-wider flex items-center gap-0.5">🎭 Yem</span>';
+        }
+
+        btn.className = `p-2.5 rounded border text-left flex items-center justify-between transition text-xs ${btnClass}`;
         btn.innerHTML = `
-          <span class="truncate max-w-[120px]">${escapeHtml(name)}</span>
-          ${isSelected ? '<span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Hedef</span>' : ''}
+          <span class="truncate max-w-[110px]">${escapeHtml(name)}</span>
+          ${badgeHtml}
         `;
+
         btn.addEventListener('click', () => {
           vibrate();
-          selectedTarget = (selectedTarget === name) ? null : name;
+          if (currentAssignMode === 'target') {
+            // Asıl hedef seçimi
+            if (selectedTarget === name) {
+              selectedTarget = null;
+            } else {
+              selectedTarget = name;
+              if (selectedFakeTarget === name) selectedFakeTarget = null;
+            }
+          } else {
+            // Yem / Troll hedef seçimi
+            if (selectedFakeTarget === name) {
+              selectedFakeTarget = null;
+            } else {
+              selectedFakeTarget = name;
+              if (selectedTarget === name) selectedTarget = null;
+            }
+          }
+
           updateTargetUI();
           renderGrid(document.getElementById('searchInput').value);
-          if (conn && conn.open) conn.send({ type: 'set_target', target: selectedTarget });
+          if (conn && conn.open) {
+            conn.send({
+              type: 'set_target',
+              target: selectedTarget,
+              fakeTarget: selectedFakeTarget
+            });
+          }
         });
         grid.appendChild(btn);
       });
@@ -382,11 +467,20 @@
     function updateTargetUI() {
       const targetText = document.getElementById('targetStatusText');
       if (selectedTarget) {
-        targetText.className = 'text-sm font-bold text-amber-400';
+        targetText.className = 'text-xs md:text-sm font-bold text-amber-400 truncate mt-1';
         targetText.textContent = selectedTarget;
       } else {
-        targetText.className = 'text-sm font-semibold text-zinc-200';
+        targetText.className = 'text-xs md:text-sm font-semibold text-zinc-400 truncate mt-1';
         targetText.textContent = 'Rastgele (Hedef Yok)';
+      }
+
+      const fakeText = document.getElementById('fakeTargetStatusText');
+      if (selectedFakeTarget) {
+        fakeText.className = 'text-xs md:text-sm font-bold text-purple-300 truncate mt-1';
+        fakeText.textContent = selectedFakeTarget;
+      } else {
+        fakeText.className = 'text-xs md:text-sm font-semibold text-zinc-500 truncate mt-1';
+        fakeText.textContent = 'Otomatik / Rastgele';
       }
     }
 
@@ -461,6 +555,7 @@
 
             showToast('Kazanan: ' + data.winner);
             selectedTarget = null;
+            selectedFakeTarget = null;
             updateTargetUI();
             renderGrid(document.getElementById('searchInput').value);
           } else if (data.type === 'game_mode_changed') {
@@ -601,11 +696,16 @@
       conn.send({
         type: 'spin',
         target: selectedTarget,
+        fakeTarget: selectedFakeTarget,
         mode: currentGameMode,
         duration: currentDuration,
         dopamine: currentDopamine
       });
-      showToast(selectedTarget ? `Hedefle tetiklendi: ${selectedTarget}` : 'Rastgele tetiklendi');
+      let toastMsg = 'Rastgele tetiklendi';
+      if (selectedTarget && selectedFakeTarget) toastMsg = `👑 ${selectedTarget} (Yem: 🎭 ${selectedFakeTarget})`;
+      else if (selectedTarget) toastMsg = `👑 Hedef: ${selectedTarget}`;
+      else if (selectedFakeTarget) toastMsg = `🎭 Yem: ${selectedFakeTarget} (Rastgele Kazanan)`;
+      showToast(toastMsg);
     });
 
     document.getElementById('resetTargetBtn').addEventListener('click', () => {
@@ -613,9 +713,21 @@
       selectedTarget = null;
       updateTargetUI();
       renderGrid(document.getElementById('searchInput').value);
-      if (conn && conn.open) conn.send({ type: 'set_target', target: null });
-      showToast('Hedef sıfırlandı');
+      if (conn && conn.open) conn.send({ type: 'set_target', target: null, fakeTarget: selectedFakeTarget });
+      showToast('Asıl hedef sıfırlandı');
     });
+
+    document.getElementById('resetFakeTargetBtn').addEventListener('click', () => {
+      vibrate();
+      selectedFakeTarget = null;
+      updateTargetUI();
+      renderGrid(document.getElementById('searchInput').value);
+      if (conn && conn.open) conn.send({ type: 'set_target', target: selectedTarget, fakeTarget: null });
+      showToast('Yem hedef sıfırlandı');
+    });
+
+    document.getElementById('setModeTargetBtn').addEventListener('click', () => setAssignMode('target'));
+    document.getElementById('setModeFakeBtn').addEventListener('click', () => setAssignMode('fake'));
 
     const tabStudentsBtn = document.getElementById('tabStudentsBtn');
     const tabHistoryBtn = document.getElementById('tabHistoryBtn');
