@@ -2732,6 +2732,7 @@
         else if (activeGameMode === 'cards') renderFullCardsShowcase();
         else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
         else if (activeGameMode === 'slot') initSlotDisplay();
+        broadcast({ type: 'sync_names', names: names });
       }
     }
 
