@@ -1808,12 +1808,24 @@
       rouletteCtx.fill();
 
       // 6. 3D Parlak Fildişi Top (Dinamik Yükseklik, Kenar Çarpma, Hareket İzi ve Kıvılcım Efekti)
-      if (ballDist !== null) {
-        const bx = cx + ballDist * Math.cos(ballAngle);
-        const by = cy + ballDist * Math.sin(ballAngle);
+      // Top bekleme durumunda veya oyun öncesinde de ceplerin birinde daima hazır görünür
+      const rPocketCenter = (rPocketsOuter + rPocketsInner) / 2;
+      let effectiveBallDist = ballDist;
+      let effectiveBallAngle = ballAngle;
+      if (effectiveBallDist === null) {
+        effectiveBallDist = rPocketCenter;
+        const pocketIdx = (winnerHighlightIndex >= 0 && winnerHighlightIndex < N)
+          ? winnerHighlightIndex
+          : ((rouletteWinningIndex !== null && rouletteWinningIndex >= 0 && rouletteWinningIndex < N) ? rouletteWinningIndex : 0);
+        effectiveBallAngle = rouletteAngle + pocketIdx * arc + arc / 2;
+      }
+
+      if (effectiveBallDist !== null) {
+        const bx = cx + effectiveBallDist * Math.cos(effectiveBallAngle);
+        const by = cy + effectiveBallDist * Math.sin(effectiveBallAngle);
 
         const z = Math.max(0, Math.min(1, ballZ));
-        const ballSize = 6.2 + 2.8 * z;
+        const ballSize = 7.0 + 3.0 * z;
 
         // Fildişi Top Hızlı Dönüş İzi (Motion Trail Particles)
         if (trail && trail.length > 0) {
@@ -1846,14 +1858,14 @@
 
         // Dinamik Zemin Gölgesi (Sol-üstten ışık, yüksekteyken gölge uzağa düşer ve yayılır)
         const shadowDist = 2.0 + 8.0 * z;
-        const shadowBlur = 2.0 + 7.5 * z;
-        const shadowOpacity = 0.72 - 0.28 * z;
+        const shadowBlur = 2.5 + 8.0 * z;
+        const shadowOpacity = 0.75 - 0.28 * z;
 
         rouletteCtx.save();
         rouletteCtx.beginPath();
         rouletteCtx.arc(bx + shadowDist * 0.7, by + shadowDist * 0.7, ballSize * (1 + 0.2 * z), 0, 2 * Math.PI);
         rouletteCtx.fillStyle = `rgba(0, 0, 0, ${shadowOpacity})`;
-        rouletteCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        rouletteCtx.shadowColor = 'rgba(0, 0, 0, 0.85)';
         rouletteCtx.shadowBlur = shadowBlur;
         rouletteCtx.fill();
         rouletteCtx.restore();
@@ -1879,14 +1891,14 @@
         rouletteCtx.beginPath();
         rouletteCtx.arc(bx, by, ballSize, 0, 2 * Math.PI);
         rouletteCtx.fillStyle = ballGrad;
-        rouletteCtx.shadowColor = 'rgba(255, 255, 255, 0.6)';
-        rouletteCtx.shadowBlur = 4;
+        rouletteCtx.shadowColor = 'rgba(255, 255, 255, 0.7)';
+        rouletteCtx.shadowBlur = 5;
         rouletteCtx.fill();
 
-        // Top Yüzey Parıltısı
+        // Top Yüzey Parıltısı (Specular Highlight)
         rouletteCtx.beginPath();
-        rouletteCtx.arc(bx + lightOffsetX, by + lightOffsetY, ballSize * 0.25, 0, 2 * Math.PI);
-        rouletteCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        rouletteCtx.arc(bx + lightOffsetX, by + lightOffsetY, ballSize * 0.28, 0, 2 * Math.PI);
+        rouletteCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
         rouletteCtx.fill();
 
         rouletteCtx.restore();
@@ -1954,6 +1966,7 @@
       // Rulet ceplerinde kazananın hemen komşu cebi: (targetIndex + 1) % N
       let fakeTargetIndex = (targetIndex + 1) % N;
 
+      const cx = rouletteRadius, cy = rouletteRadius;
       const R = rouletteRadius - 6;
       const rMahoganyInner = R - 16;
       const rPocketsOuter = R - 36;
@@ -1993,6 +2006,11 @@
       if (trackDiff < 0) trackDiff += 2 * Math.PI;
       const totalTrackTurns = (Math.max(5, Math.floor(duration / 750)) * 2 * Math.PI) + trackDiff;
 
+      // C^0 sürekliliği için 2*PI wrap dengelemesi
+      const angleJustBeforeDrop = startBallAngle - totalTrackTurns;
+      const angleAtDrop = wheelAtDrop + entryRel;
+      const wrapOffset = Math.round((angleJustBeforeDrop - angleAtDrop) / (2 * Math.PI)) * (2 * Math.PI);
+
       let lastPipTime = 0;
       let hitRim1 = false;
       let hitDeflector1 = false;
@@ -2002,6 +2020,7 @@
       let sparks = [];
 
       function anim(now) {
+        const cx = rouletteRadius, cy = rouletteRadius;
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
 
@@ -2027,10 +2046,10 @@
             const directEase = 1 - Math.pow(1 - pSub, 2.0);
             currentRel = entryRel + (targetRel - entryRel) * directEase;
           }
-          currentBallAngle = rouletteAngle + currentRel;
+          currentBallAngle = rouletteAngle + currentRel + wrapOffset;
         } else {
           // Cebe kilitlenme: Çarkla %100 senkron dönüş (bağıl hız = 0, sıfır kayma)
-          currentBallAngle = rouletteAngle + targetRel;
+          currentBallAngle = rouletteAngle + targetRel + wrapOffset;
         }
 
         // --- ÇOK AŞAMALI FİZİK: DÜŞÜŞ, KENARA ÇARPMA, VE DOPAMİN FAKEOUT SEKME SİMÜLASYONU ---
