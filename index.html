@@ -2081,7 +2081,7 @@
       }, 2000);
     }
 
-    // KART SEÇİMİ VE SİHİRBAZLIK AÇILIŞI (FORCED MAGIC TRICK & NEAR-MISS)
+    // KART SEÇİMİ VE SİHİRBAZLIK AÇILIŞI (KARTLARDA FAKE YOK - DOĞRUDAN TEMİZ AÇILIŞ)
     function revealCard(clickedIndex) {
       if (isPlaying || cardsState !== 'closed_ready') return;
       isPlaying = true;
@@ -2099,18 +2099,8 @@
         winner = names[Math.floor(Math.random() * names.length)] || names[0] || 'Şanslı Kişi';
       }
 
-      // Sahte Hedef (Near-Miss Kurbanı)
-      let fakeVictim = pendingFakeTarget;
-      if (fakeVictim && names.some(n => trNormalize(n) === trNormalize(fakeVictim))) {
-        fakeVictim = names.find(n => trNormalize(n) === trNormalize(fakeVictim));
-      } else {
-        const othersPool = names.filter(n => trNormalize(n) !== trNormalize(winner));
-        fakeVictim = othersPool.length ? othersPool[0] : null;
-      }
-
-      // Kalan isimleri diğer kartlara paylaştır
-      const remainingNames = names.filter(n => n !== winner && n !== fakeVictim).sort(() => Math.random() - 0.5);
-      const fakeCardIndex = (clickedIndex + 1) % names.length;
+      // KARTLARDA FAKE YOK: Kazanan hariç diğer isimleri diğer kartlara rastgele paylaştır
+      const remainingNames = names.filter(n => n !== winner).sort(() => Math.random() - 0.5);
 
       let remIdx = 0;
       names.forEach((_, i) => {
@@ -2120,56 +2110,32 @@
         if (!nameSpan) return;
         if (i === clickedIndex) {
           nameSpan.textContent = winner;
-        } else if (i === fakeCardIndex && fakeVictim) {
-          nameSpan.textContent = fakeVictim;
         } else {
           nameSpan.textContent = remainingNames[remIdx++] || names[i];
         }
       });
 
       const selectedCard = document.getElementById('cardIndex_' + clickedIndex);
-      const fakeCard = document.getElementById('cardIndex_' + fakeCardIndex);
 
-      if (fakeVictim && (dopamineLevel > 50 || pendingFakeTarget)) {
-        // YÜKSEK GERİLİM: Önce sahte kart havaya kalkar, mor neonla parlar ve titrer!
-        if (fakeCard) {
-          fakeCard.classList.add('ring-4', 'ring-purple-500', 'shadow-2xl', 'shadow-purple-500/50', 'scale-110', '-translate-y-3');
-          document.getElementById('cardsStatusLabel').textContent = `Az daha bu kart açılıyordu: ${fakeVictim}?!`;
-          playTick(820);
-        }
-
-        setTimeout(() => {
-          if (fakeCard) fakeCard.classList.remove('ring-4', 'ring-purple-500', 'shadow-2xl', 'shadow-purple-500/50', 'scale-110', '-translate-y-3');
-          playCardDealSound();
-          playWinSound();
-          selectedCard.classList.remove('card-flipped');
-          selectedCard.classList.add('card-selected-reveal');
-          document.getElementById('cardsStatusLabel').textContent = `👑 KAZANAN KART: ${winner}!`;
-
-          setTimeout(() => {
-            isPlaying = false;
-            finishGame(winner, pendingTarget !== null, '3D Gizemli Kart Masası');
-          }, 1500);
-        }, 440);
-
-      } else {
-        // Standart doğrudan açılış
-        playWinSound();
+      // Doğrudan pürüzsüz kart açılışı (fakeout / neon gecikmesi YOK)
+      playCardDealSound();
+      playWinSound();
+      if (selectedCard) {
         selectedCard.classList.remove('card-flipped');
         selectedCard.classList.add('card-selected-reveal');
-        document.getElementById('cardsStatusLabel').textContent = `Seçilen Kart Açıldı: ${winner}!`;
-
-        setTimeout(() => {
-          isPlaying = false;
-          finishGame(winner, pendingTarget !== null, '3D Gizemli Kart Masası');
-        }, 1500);
       }
+      document.getElementById('cardsStatusLabel').textContent = `👑 Seçilen Kart Açıldı: ${winner}!`;
+
+      setTimeout(() => {
+        isPlaying = false;
+        finishGame(winner, pendingTarget !== null, '3D Gizemli Kart Masası');
+      }, 1500);
     }
 
     function pickRandomCard(target = null, fakeTarget = null) {
       if (isPlaying) return;
       if (target) pendingTarget = target;
-      if (fakeTarget) pendingFakeTarget = fakeTarget;
+      pendingFakeTarget = null; // KARTLARDA FAKE YOK
       if (cardsState === 'closed_ready') {
         const randIdx = Math.floor(Math.random() * names.length);
         revealCard(randIdx);
