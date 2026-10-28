@@ -1224,6 +1224,27 @@
       const flapperTremorAmp = 0.8 + effD * 2.4;
       const flapperSnapVel = 120 + effD * 90; // Pimi aşınca fırlama ivmesi
 
+      // ============================================================
+      // 1. AŞAMA: BALİSTİK İLK HIZ & DİFERANSİYEL SÜRTÜNME MOTORU
+      // ============================================================
+      const alphaC = 1.68; // Kuru rulman sürtünmesi (rad/s^2)
+      const beta = 0.25;   // Viskoz hava direnci katsayısı (1/s)
+
+      // Balistik İlk Hız (Kapalı Formül: Hedef Δθ açısına ve T süresine tam ulaştıran analitik ω0)
+      function calcInitialOmega(delta, tSec) {
+        const T = Math.max(2.5, tSec);
+        const u = beta * T;
+        const D = Math.max(0.001, 1 - Math.exp(-u));
+        const w0 = (beta * delta + alphaC * T) / D - (alphaC / beta);
+        return Math.max(4.0, Number.isFinite(w0) ? w0 : 15.0);
+      }
+
+      const activeTargetDelta = isRecoilActive ? (fakeStopRotation - startRotation) : totalDelta;
+      const targetTimeSec = duration / 1000;
+      let currentOmega = Math.min(80, Math.max(4.0, calcInitialOmega(activeTargetDelta, targetTimeSec)));
+      let isRecoilPhase = false;
+      let recoilStartTime = 0;
+
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
       const wheelStageEl = document.getElementById('wheel3DStage');
@@ -1237,178 +1258,70 @@
       let lastFrameTime = startTime;
 
       function animLoop(now) {
-        const elapsed = now - startTime;
-        const progress = Math.min(elapsed / duration, 1);
         let dt = (now - lastFrameTime) / 1000;
         lastFrameTime = now;
-        if (dt > 0.05) dt = 0.016;
+        if (dt > 0.04) dt = 0.016;
 
-        let currentSpeed = 0;
+        let currentSpeed = currentOmega;
 
-        if (isRecoilActive) {
-          // ==========================================
-          // %80 - %100 SİNEMATİK: YEMDE DURUŞ & YEMDEN GERÇEK KAZANANA GERİ DÖNÜŞ (RECOIL)
-          // ==========================================
-          if (progress <= pStop) {
-            // 1. AŞAMA: Çark hızla döner ve YEM DİLİMİNİN MERKEZİNDE TAMAMEN DURUR
-            const u = progress / pStop;
-            const ease = 1 - Math.pow(1 - u, 3.4); // Doğal sürtünme ve yavaşlama
-            wheelRotation = startRotation + (fakeStopRotation - startRotation) * ease;
-            const du = (3.4 * Math.pow(1 - u, 2.4)) / pStop;
-            currentSpeed = Math.max(0, ((fakeStopRotation - startRotation) / (duration / 1000)) * du);
+        // Tırnak açısı ve konumu
+        const curRelative = ((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const curIdx = Math.floor(curRelative / arc) % N;
+        const phaseInSlice = (curRelative % arc) / arc;
 
-            if (progress >= pStop - 0.05) {
-              flapperDeflection = flapperDeflection * 0.85; // Yem merkezinde ibre durulur
-            }
-          } else if (progress <= pHoverEnd) {
-            // 2. AŞAMA: YEMDE TAM DURUŞ & ASILI KALMA (HERKES YEM KAZANDI SANIR!)
-            // Çark YEM diliminin tam ortasında durmuştur
-            const u = (progress - pStop) / (pHoverEnd - pStop);
-            const tremor = Math.sin(u * Math.PI * 2) * 0.006 * arc;
-            wheelRotation = fakeStopRotation + tremor;
-            currentSpeed = 0.001; // durdu
-            flapperDeflection = Math.sin(now * 0.04) * 0.8; // hafif nefes
-          } else {
-            // 3. AŞAMA: YEMDEN YAVAŞ YAVAŞ GERÇEK KAZANANA GERİ DÖNÜŞ (RECOIL / ROLL BACK)
-            // Çark yay direnciyle saat yönünün tersine geriye döner (fakeStopRotation -> finalRotation)
-            const u = (progress - pHoverEnd) / (1.0 - pHoverEnd);
-            const ease = 0.5 * (1 - Math.cos(u * Math.PI)); // Pürüzsüz S-Curve geriye akış
-            wheelRotation = fakeStopRotation - (fakeStopRotation - finalRotation) * ease;
-            const du = (0.5 * Math.PI * Math.sin(u * Math.PI)) / (1.0 - pHoverEnd);
-            currentSpeed = Math.max(0, ((fakeStopRotation - finalRotation) / (duration / 1000)) * du);
+        // 1. DİFERANSİYEL İBRE VE TIRNAK DİRENCİ ETKİLEŞİMİ
+        let pegResistanceTorque = 0;
+        if (phaseInSlice < pegContactSpan) {
+          const pushFraction = phaseInSlice / pegContactSpan;
+          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * maxFlapperDeflection;
+          pegResistanceTorque = (0.45 + effD * 0.35) * Math.sin(pushFraction * Math.PI); // Pimin çarka tork freni
 
-            // Geri dönerken sınır pimini ters yönde aşarken ibre sağa (+12°) esner
-            if (u > 0.35 && u < 0.70) {
-              flapperDeflection = 12.0 * Math.sin(((u - 0.35) / 0.35) * Math.PI);
-              if (!recoilTickPlayed && u > 0.50) {
-                recoilTickPlayed = true;
-                playTick(540); // Pimi geriye aşma tok tok sesi
-              }
-            } else {
-              // Semi-implicit Euler yay sönümleyici (Symplectic Euler - dt jank ve aşırı titreşim kalkanı)
-              flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
-              flapperDeflection += flapperSpringVel * dt;
-            }
+          if (curIdx !== lastPegIdx) {
+            lastPegIdx = curIdx;
+            const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentOmega * 28) + (Math.random() * 20 - 10)));
+            playTick(dynFreq);
+            flapperSpringVel = flapperSnapVel;
           }
-        } else if (isDopamineActive) {
-          // ==========================================
-          // %12 - %79 STANDART DOPAMİN SÜRÜNME MODU
-          // ==========================================
-          let easeP;
-          if (progress < pPeg) {
-            const pn = progress / pPeg;
-            const oneMinusPn = Math.max(0, 1 - pn);
-            easeP = pegRatio * ((1 - Math.pow(oneMinusPn, a)) * (1 - crawlC) + crawlC * pn);
-            currentSpeed = (pegRatio * totalDelta / (pPeg * (duration / 1000))) * (a * Math.pow(oneMinusPn, a - 1) * (1 - crawlC) + crawlC);
-          } else {
-            if (!hasOvercomePeg && progress >= pPeg + 0.06 * (1 - effD * 0.3)) {
-              hasOvercomePeg = true;
-              playTick(820 + Math.floor(effD * 140));
-              flapperSpringVel = flapperSnapVel;
-            }
-            const tRatio = (progress - pPeg) / span2;
-            const t2 = tRatio * tRatio, t3 = t2 * tRatio;
-            const h00 = 2*t3 - 3*t2 + 1;
-            const h10 = t3 - 2*t2 + tRatio;
-            const h01 = -2*t3 + 3*t2;
-            const h11 = t3 - t2;
-            easeP = h00 * pegRatio + h01 * 1.0 + h10 * m0 + h11 * m1;
-            const dh = (6*t2 - 6*tRatio)*pegRatio + (-6*t2 + 6*tRatio)*1.0 + (3*t2 - 4*tRatio + 1)*m0 + (3*t2 - 2*tRatio)*m1;
-            currentSpeed = Math.max(0, (dh * totalDelta) / (span2 * (duration / 1000)));
-          }
-          wheelRotation = startRotation + totalDelta * easeP;
+        } else {
+          // Serbest Semi-implicit Euler yaylanması
+          flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
+          flapperDeflection += flapperSpringVel * dt;
+        }
 
-          const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
-          const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
-          const tensionWindow = 0.06 + effD * 0.10;
+        // 2. AÇISAL HIZ DİFERANSİYEL ENTEGRASYONU
+        if (!isRecoilPhase) {
+          const decel = Math.min(50, alphaC + beta * currentOmega + pegResistanceTorque);
+          currentOmega = Math.max(0, currentOmega - decel * dt);
+          wheelRotation += currentOmega * dt;
 
-          if (progress >= pPeg - tensionWindow && progress < pPeg) {
-            const tensionProgress = (progress - (pPeg - tensionWindow)) / tensionWindow;
-            flapperDeflection = -maxFlapperDeflection * tensionProgress - Math.sin(now * (0.04 + effD * 0.03)) * flapperTremorAmp;
-            flapperSpringVel = 0;
-          } else if (phaseInSlice < pegContactSpan) {
-            const pushFraction = phaseInSlice / pegContactSpan;
-            flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
-            if (curIdx !== lastPegIdx) {
-              lastPegIdx = curIdx;
-              const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentSpeed * 28) + (Math.random() * 20 - 10)));
-              playTick(dynFreq);
-              flapperSpringVel = 120;
-            }
-          } else {
-            flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
-            flapperDeflection += flapperSpringVel * dt;
-            if (flapperDeflection > 5.0) {
-              flapperDeflection = 5.0;
-              flapperSpringVel = -flapperSpringVel * 0.25;
-            }
-            if (Math.abs(flapperDeflection) < 0.08 && Math.abs(flapperSpringVel) < 1.0) {
-              flapperDeflection = 0;
-              flapperSpringVel = 0;
-            }
+          // Recoil modu: Yem diliminde hız sıfırlandığında pimin geri tepmesi başlar
+          if (isRecoilActive && currentOmega <= 0.08 && (fakeStopRotation - wheelRotation) <= 0.18) {
+            isRecoilPhase = true;
+            recoilStartTime = now;
+            currentOmega = 0;
+            wheelRotation = fakeStopRotation; // Yem pimi zirvesi
           }
         } else {
           // ==========================================
-          // %0 STANDART DOĞAL FİZİKSEL SÖNÜM (FAKEOUT YOK)
-          // COULOMB (KURU SÜRTÜNME) + VİSKOZ FRENLEME İNTEGRALİ
+          // RECOIL AŞAMASI: PİM GERİLİMİNDEN ASIL KAZANANA GERİ YAYLANMA
           // ==========================================
-          const u = progress;
-          const oneMinusU = Math.max(0, 1 - u);
-          const easeP = (1 - Math.pow(oneMinusU, 3.8)) * (1 - 0.24 * u) + (1 - Math.pow(oneMinusU, 2.0)) * (0.24 * u);
-          const du = Math.max(0, 3.8 * Math.pow(oneMinusU, 2.8) * (1 - 0.24 * u) + 2.0 * oneMinusU * (0.24 * u));
-          const durSec = Math.max(0.1, duration / 1000);
-          currentSpeed = Math.max(0, (totalDelta / durSec) * du);
-          wheelRotation = startRotation + totalDelta * easeP;
+          const elapsedRecoil = (now - recoilStartTime) / 1000;
+          const recoilDur = 0.65;
+          const u = Math.min(elapsedRecoil / recoilDur, 1);
 
-          const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
-          const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
-          if (phaseInSlice < pegContactSpan) {
-            const pushFraction = phaseInSlice / pegContactSpan;
-            flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
-            if (curIdx !== lastPegIdx) {
-              lastPegIdx = curIdx;
-              const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentSpeed * 28) + (Math.random() * 20 - 10)));
-              playTick(dynFreq);
-              flapperSpringVel = 120;
-            }
-          } else {
-            flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
-            flapperDeflection += flapperSpringVel * dt;
-            if (flapperDeflection > 5.0) {
-              flapperDeflection = 5.0;
-              flapperSpringVel = -flapperSpringVel * 0.25;
-            }
-            if (Math.abs(flapperDeflection) < 0.08 && Math.abs(flapperSpringVel) < 1.0) {
-              flapperDeflection = 0;
-              flapperSpringVel = 0;
-            }
+          // Pimin depoladığı yay enerjisiyle arkadaki kazanana pürüzsüz geri oturma
+          const easeBack = 0.5 * (1 - Math.cos(u * Math.PI));
+          wheelRotation = fakeStopRotation - (fakeStopRotation - finalRotation) * easeBack;
+          currentSpeed = Math.sin(u * Math.PI) * 1.5;
+
+          if (u > 0.40 && !recoilTickPlayed) {
+            recoilTickPlayed = true;
+            playTick(540); // Geri sekme tok klik sesi
+            flapperDeflection = 12.0; // İbre ters yöne esner
           }
-        }
 
-        // isRecoilActive modunda pStop öncesi genel tırnak fiziği
-        if (isRecoilActive && progress < pStop - 0.05) {
-          const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
-          const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
-          if (phaseInSlice < pegContactSpan) {
-            const pushFraction = phaseInSlice / pegContactSpan;
-            flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
-            if (curIdx !== lastPegIdx) {
-              lastPegIdx = curIdx;
-              const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentSpeed * 28) + (Math.random() * 20 - 10)));
-              playTick(dynFreq);
-              flapperSpringVel = 120;
-            }
-          } else {
-            flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
-            flapperDeflection += flapperSpringVel * dt;
-            if (flapperDeflection > 5.0) {
-              flapperDeflection = 5.0;
-              flapperSpringVel = -flapperSpringVel * 0.25;
-            }
-            if (Math.abs(flapperDeflection) < 0.08 && Math.abs(flapperSpringVel) < 1.0) {
-              flapperDeflection = 0;
-              flapperSpringVel = 0;
-            }
+          if (u >= 1.0) {
+            currentOmega = 0;
           }
         }
 
@@ -1418,10 +1331,19 @@
 
         drawWheel(-1, currentSpeed);
 
-        if (progress < 1) {
+        // Kalan mesafe ve durma şartı kontrolü
+        const remainingToGoal = isRecoilActive 
+          ? (isRecoilPhase ? Math.abs(finalRotation - wheelRotation) : (fakeStopRotation - wheelRotation))
+          : (finalRotation - wheelRotation);
+
+        const isFinished = isRecoilActive 
+          ? (isRecoilPhase && (now - recoilStartTime) / 1000 >= 0.65)
+          : (currentOmega <= 0.05 || remainingToGoal <= 0.02);
+
+        if (!isFinished) {
           requestAnimationFrame(animLoop);
         } else {
-          // Süre bittiğinde kesin tam hedef merkezine pürüzsüzce otur ve kazananı vurgula
+          // Süre değil FİZİK bittiğinde kesin tam hedef merkezine pürüzsüzce kilitlen
           isPlaying = false;
           wheelRotation = finalRotation;
           if (pointerEl) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
@@ -1433,7 +1355,7 @@
 
           const winnerName = names[targetIndex];
           setTimeout(() => {
-            finishGame(winnerName, targetName !== null, '3D Çarkıfelek');
+            finishGame(winnerName, targetName !== null, '3D Çarkıfelek (Diferansiyel Fizik)');
           }, 450);
         }
       }
