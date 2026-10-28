@@ -359,13 +359,18 @@
         <div id="physicsPanelBody" class="flex flex-col gap-3 transition-all">
           <!-- RASTGELE AYAR VE PUANLAMA BÖLÜMÜ -->
           <div class="flex flex-col gap-2 p-2.5 rounded-xl bg-gradient-to-br from-amber-950/40 via-zinc-950/80 to-emerald-950/30 border border-amber-500/40 shadow-inner">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-1.5 flex-wrap">
               <span class="font-bold text-amber-300 text-[11px] flex items-center gap-1">
-                <span>🎲</span> Rastgele Hissiyat Testi
+                <span>🎲</span> Hissiyat Testi & Evrim
               </span>
-              <button onclick="generateRandomPhysics(true)" class="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-[11px] transition active:scale-95 shadow-md flex items-center gap-1">
-                <span>🎲 Rastgele Ayar & Çevir</span>
-              </button>
+              <div class="flex items-center gap-1.5">
+                <button onclick="generateRandomPhysics(true)" class="py-1 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-semibold text-[10px] transition active:scale-95 border border-amber-500/30 flex items-center gap-1" title="Tamamen rastgele yeni bir fizik seti dener">
+                  <span>🎲 Rastgele</span>
+                </button>
+                <button onclick="evolvePhysicsFromRatings(true)" class="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-[11px] transition active:scale-95 shadow-md flex items-center gap-1" title="Önceki çeviriş ve yıldız puanlarına göre en iyi ayarları çaprazlayıp mutasyonla evrimleştirir">
+                  <span>🧬 Evrim Geçirt</span>
+                </button>
+              </div>
             </div>
 
             <!-- 5 Yıldız Puanlama Barı -->
@@ -1358,12 +1363,12 @@
     // 1. %100 GERÇEK FİZİK LABORATUVARI (NEWTON + COULOMB DİNAMİĞİ)
     // ============================================================
     const DEFAULT_PHYSICS_CONFIG = {
-      tauC: 0.65,      // Rulman Kuru Sürtünme Torku (N·m) [0.15 - 2.00] - Düşük = uzun ve akıcı süzülüş
-      b: 0.08,         // Viskoz Hava Direnci (N·m·s/rad) [0.02 - 0.25]
-      w0: 30.0,        // İlk Fırlatma Hızı (rad/s) [15 - 45]
-      pegTorque: 4.2,  // Pim Frenleme Torku (N·m) [1.0 - 8.0]
-      pegHitbox: 0.095,// Tırnak Hitbox Genişliği (rad) [0.040 - 0.140]
-      kFlapper: 1550   // İbre Yay Sertliği (N·m/rad) [600 - 2500]
+      tauC: 0.48,      // Rulman Kuru Sürtünme Torku (N·m) [0.15 - 2.00] - İpeksi, akıcı ve uzun süzülüş
+      b: 0.055,        // Viskoz Hava Direnci (N·m·s/rad) [0.02 - 0.25]
+      w0: 33.0,        // İlk Fırlatma Hızı (rad/s) [15 - 45] - Enerjik fırlatma
+      pegTorque: 3.8,  // Pim Frenleme Torku (N·m) [1.0 - 8.0] - Tok, tıkır tıkır geçiş
+      pegHitbox: 0.105,// Tırnak Hitbox Genişliği (rad) [0.040 - 0.140] - Genişletilmiş belirgin ibre teması
+      kFlapper: 1650   // İbre Yay Sertliği (N·m/rad) [600 - 2500] - Çelik gibi net yay sekmesi
     };
 
     let testPhysicsConfig = Object.assign({}, DEFAULT_PHYSICS_CONFIG);
@@ -1379,13 +1384,13 @@
         kFlapper: 1750
       },
       balanced: {
-        name: '🎡 Dengeli Casino (10-12s)',
-        tauC: 0.65,
-        b: 0.08,
-        w0: 30.0,
-        pegTorque: 4.2,
-        pegHitbox: 0.095,
-        kFlapper: 1550
+        name: '🎡 Dengeli Casino Gen-2 (11-13s)',
+        tauC: 0.48,
+        b: 0.055,
+        w0: 33.0,
+        pegTorque: 3.8,
+        pegHitbox: 0.105,
+        kFlapper: 1650
       },
       carnival: {
         name: '🌌 Grand Karnaval (16-18s)',
@@ -1585,6 +1590,101 @@
       if (typeof showToast === 'function') {
         showToast(`🎲 Rastgele Ayar Yüklendi! (τ: ${tauC}, w0: ${w0})`);
       }
+
+      if (autoSpin) {
+        setTimeout(() => {
+          spinWheelDifferential();
+        }, 120);
+      }
+    }
+
+    // ============================================================
+    // GENETİK EVRİM MOTORU (PUANLARA GÖRE ÇAPRAZLAMA & MUTASYON)
+    // ============================================================
+    let evolutionGenCounter = 1;
+
+    function evolvePhysicsFromRatings(autoSpin = true) {
+      const round2 = (num) => Math.round(num * 100) / 100;
+      const round1 = (num) => Math.round(num * 10) / 10;
+      const round3 = (num) => Math.round(num * 1000) / 1000;
+      const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+
+      // Elit Temel Genler (Kullanıcının tercihleri doğrultusunda optimize edilmiş Gen-2)
+      let baseCfg = {
+        tauC: 0.48,
+        b: 0.055,
+        w0: 33.0,
+        pegTorque: 3.8,
+        pegHitbox: 0.105,
+        kFlapper: 1650
+      };
+
+      let sourceDesc = "Elit Gen-2";
+
+      if (ratedPhysicsHistory && ratedPhysicsHistory.length > 0) {
+        // En yüksek puanlıları filtrele (3 yıldız ve üzeri)
+        const qualified = ratedPhysicsHistory.filter(r => r.stars >= 3);
+        const pool = qualified.length > 0 ? qualified : ratedPhysicsHistory;
+
+        let totalWeight = 0;
+        let sumTauC = 0, sumB = 0, sumW0 = 0, sumPegT = 0, sumPegH = 0, sumKF = 0;
+
+        pool.forEach(item => {
+          // Ağırlık = stars^3 (5 yıldıza 125, 4 yıldıza 64, 3 yıldıza 27, 2 yıldıza 8, 1 yıldıza 1)
+          const weight = Math.pow(item.stars, 3);
+          totalWeight += weight;
+          const c = item.config;
+          sumTauC += (Number(c.tauC) || baseCfg.tauC) * weight;
+          sumB += (Number(c.b) || baseCfg.b) * weight;
+          sumW0 += (Number(c.w0) || baseCfg.w0) * weight;
+          sumPegT += (Number(c.pegTorque) || baseCfg.pegTorque) * weight;
+          sumPegH += (Number(c.pegHitbox) || baseCfg.pegHitbox) * weight;
+          sumKF += (Number(c.kFlapper) || baseCfg.kFlapper) * weight;
+        });
+
+        if (totalWeight > 0) {
+          baseCfg = {
+            tauC: sumTauC / totalWeight,
+            b: sumB / totalWeight,
+            w0: sumW0 / totalWeight,
+            pegTorque: sumPegT / totalWeight,
+            pegHitbox: sumPegH / totalWeight,
+            kFlapper: sumKF / totalWeight
+          };
+          sourceDesc = `${pool.length} Puanlamanın Çaprazlaması`;
+        }
+      }
+
+      // Gauss Adaptif Mutasyon (%3 ila %7 arasında keşif jitterı)
+      const mutJitter = () => (Math.random() * 0.10 - 0.05); // -5% .. +5%
+
+      const evolvedCfg = {
+        tauC: round2(clamp(baseCfg.tauC * (1 + mutJitter()), 0.20, 1.30)),
+        b: round2(clamp(baseCfg.b * (1 + mutJitter()), 0.025, 0.18)),
+        w0: Math.round(clamp(baseCfg.w0 + (Math.random() * 4 - 2), 22, 40)),
+        pegTorque: round1(clamp(baseCfg.pegTorque * (1 + mutJitter()), 1.8, 6.5)),
+        pegHitbox: round3(clamp(baseCfg.pegHitbox * (1 + mutJitter()), 0.065, 0.125)),
+        kFlapper: Math.round(clamp(baseCfg.kFlapper + (Math.floor(Math.random() * 7 - 3) * 50), 900, 2200))
+      };
+
+      testPhysicsConfig = evolvedCfg;
+      try {
+        localStorage.setItem('cark_test_physics', JSON.stringify(testPhysicsConfig));
+      } catch (e) {}
+
+      syncPhysicsUI();
+      highlightStars(0);
+
+      const rText = document.getElementById('ratingStatusText');
+      if (rText) {
+        rText.textContent = `🧬 Gen #${evolutionGenCounter} Evrimi Hazır (${evolvedCfg.w0} rad/s, τ: ${evolvedCfg.tauC})`;
+      }
+
+      if (typeof showToast === 'function') {
+        showToast(`🧬 Evrim Geçirildi! (Gen #${evolutionGenCounter} - ${sourceDesc})`);
+      }
+
+      evolutionGenCounter++;
 
       if (autoSpin) {
         setTimeout(() => {
