@@ -203,6 +203,10 @@
       transition: all 0.65s cubic-bezier(0.2, 0.85, 0.32, 1.2);
       touch-action: manipulation;
     }
+    .card-item:hover:not(.card-gathered):not(.card-selected-reveal) {
+      transform: translateY(-8px) scale(1.04) rotateX(6deg);
+      box-shadow: 0 14px 28px rgba(0,0,0,0.7), 0 0 18px rgba(245, 158, 11, 0.45);
+    }
     .card-face {
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
@@ -223,6 +227,11 @@
       transform: scale(1.3) translateY(-25px) rotateY(0deg) !important;
       z-index: 50 !important;
       box-shadow: 0 0 35px rgba(245, 158, 11, 0.8), 0 25px 40px rgba(0,0,0,0.9) !important;
+      animation: cardPulse 1.2s ease-in-out infinite alternate;
+    }
+    @keyframes cardPulse {
+      0% { filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.6)); }
+      100% { filter: drop-shadow(0 0 32px rgba(254, 240, 138, 0.95)); }
     }
 
     /* Kol Çekme Animasyonu */
@@ -1267,15 +1276,16 @@
             const du = (0.5 * Math.PI * Math.sin(u * Math.PI)) / (1.0 - pHoverEnd);
             currentSpeed = Math.max(0, ((fakeStopRotation - finalRotation) / (duration / 1000)) * du);
 
-            // Geri dönerken sınır pimini ters yönde aşarken ibre sağa (+10°) esner
+            // Geri dönerken sınır pimini ters yönde aşarken ibre sağa (+12°) esner
             if (u > 0.35 && u < 0.70) {
               flapperDeflection = 12.0 * Math.sin(((u - 0.35) / 0.35) * Math.PI);
               if (!recoilTickPlayed && u > 0.50) {
                 recoilTickPlayed = true;
-                playTick(580); // Pimi geriye aşma tok klik sesi
+                playTick(540); // Pimi geriye aşma tok tok sesi
               }
             } else {
-              flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+              // Semi-implicit Euler yay sönümleyici (Symplectic Euler - dt jank ve aşırı titreşim kalkanı)
+              flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
               flapperDeflection += flapperSpringVel * dt;
             }
           }
@@ -1320,11 +1330,12 @@
             flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
             if (curIdx !== lastPegIdx) {
               lastPegIdx = curIdx;
-              playTick(720 + Math.random() * 80);
+              const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentSpeed * 28) + (Math.random() * 20 - 10)));
+              playTick(dynFreq);
               flapperSpringVel = 120;
             }
           } else {
-            flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+            flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
             flapperDeflection += flapperSpringVel * dt;
             if (flapperDeflection > 5.0) {
               flapperDeflection = 5.0;
@@ -1351,11 +1362,12 @@
             flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
             if (curIdx !== lastPegIdx) {
               lastPegIdx = curIdx;
-              playTick(720 + Math.random() * 80);
+              const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentSpeed * 28) + (Math.random() * 20 - 10)));
+              playTick(dynFreq);
               flapperSpringVel = 120;
             }
           } else {
-            flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+            flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
             flapperDeflection += flapperSpringVel * dt;
             if (flapperDeflection > 5.0) {
               flapperDeflection = 5.0;
@@ -1377,11 +1389,12 @@
             flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
             if (curIdx !== lastPegIdx) {
               lastPegIdx = curIdx;
-              playTick(720 + Math.random() * 80);
+              const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentSpeed * 28) + (Math.random() * 20 - 10)));
+              playTick(dynFreq);
               flapperSpringVel = 120;
             }
           } else {
-            flapperSpringVel += -420 * flapperDeflection * dt - 26 * flapperSpringVel * dt;
+            flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
             flapperDeflection += flapperSpringVel * dt;
             if (flapperDeflection > 5.0) {
               flapperDeflection = 5.0;
@@ -1637,7 +1650,8 @@
           // DOPAMİN: Son makara (idx === 2) yüksek dopaminde önce 1 hücre yukarıda (sahte hedefte) durur!
           const fakeY = (idx === 2 && isHighDopamine) ? (finalY + CELL_HEIGHT) : finalY;
 
-          cfg.col.style.transition = `transform ${cfg.duration}ms cubic-bezier(0.22, 0.61, 0.36, 1.06)`;
+          // MEKANİK SLOT YAYLANMASI (Overshoot & Spring Settling): Çelik mandal yaylanması hissi
+          cfg.col.style.transition = `transform ${cfg.duration}ms cubic-bezier(0.18, 0.89, 0.32, 1.25)`;
           cfg.col.style.transform = `translateY(${fakeY}px)`;
 
           setTimeout(() => {
@@ -1651,10 +1665,10 @@
 
               if (isHighDopamine) {
                 // SON SANİYEDE DÜŞÜŞ (NUDGE DROP - GERÇEK MEKANİK MANDAL):
-                // Mekanik mandal duraksaması (360ms) ardından 320ms yerçekimi düşüşü ve %8 kontrollü sekme
+                // Mekanik mandal duraksaması ardından yerçekimi düşüşü ve yaylı mikro sekme
                 if (meter) meter.textContent = `AZ DAHA: ${fakeTarget}?!`;
                 setTimeout(() => {
-                  cfg.col.style.transition = 'transform 0.32s cubic-bezier(0.25, 1, 0.5, 1.10)';
+                  cfg.col.style.transition = 'transform 0.34s cubic-bezier(0.20, 1.15, 0.45, 1.20)';
                   cfg.col.style.transform = `translateY(${finalY}px)`;
                   playReelStopSound();
                   playIvoryBallClick(1100, 0.3);
@@ -1662,7 +1676,7 @@
                   // Makara 3'ün orta sıraya (Row 1) oturmasını bekle, ardından kutlamayı başlat
                   setTimeout(() => {
                     finalizeSlotWin(target, targetName, meter);
-                  }, 340);
+                  }, 360);
                 }, nudgeHoldTime);
               } else {
                 finalizeSlotWin(target, targetName, meter);
@@ -2349,7 +2363,7 @@
           isPlaying = false;
           rouletteWinningIndex = targetIndex;
           rouletteAngle = finalWheelAngle;
-          ballAngle = targetPocketAngle;
+          ballAngle = currentBallAngle; // C^0 Sürekliliği: Tam durma anındaki bağıl açı, sıfır sıçrama
           drawRoulette(rPocketCenter, 0, targetIndex, [], []);
           playIvoryBallClick(620, 0.25);
           playDollySound();

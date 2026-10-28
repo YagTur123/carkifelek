@@ -902,6 +902,7 @@
           currentDuration = parseFloat(e.target.value);
           saveStorage();
           updateSliderUI();
+          if (navigator.vibrate) navigator.vibrate(8);
           sendRemote({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
         });
       }
@@ -911,6 +912,7 @@
           currentDopamine = parseInt(e.target.value);
           saveStorage();
           updateSliderUI();
+          if (navigator.vibrate) navigator.vibrate(10);
           sendRemote({ type: 'set_settings', duration: currentDuration, dopamine: currentDopamine });
         });
       }
@@ -921,7 +923,7 @@
       const now = Date.now();
       if (now - lastTriggerTime < 800) return;
       lastTriggerTime = now;
-      vibrate();
+      if (navigator.vibrate) navigator.vibrate([25, 35, 30]);
 
       if (!isConnected) {
         showToast('⚠️ Masaya bağlı değilsiniz! Oda Kodunu girip Bağlan\'a basın.');
