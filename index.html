@@ -1080,8 +1080,8 @@
 
       // 2. 3D Evrensel Sabit Küre Aydınlatması & Derinlik Gradyanı (Specular & Vignette)
       const sphereGrad = wheelCtx.createRadialGradient(cx - r * 0.28, cy - r * 0.35, r * 0.05, cx, cy, r);
-      sphereGrad.addColorStop(0, 'rgba(255, 255, 255, 0.20)');
-      sphereGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.04)');
+      sphereGrad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
+      sphereGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.02)');
       sphereGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.06)');
       sphereGrad.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
       wheelCtx.save();
@@ -1089,13 +1089,6 @@
       wheelCtx.arc(cx, cy, r, 0, 2 * Math.PI);
       wheelCtx.fillStyle = sphereGrad;
       wheelCtx.fill();
-
-      // Hızlı Dönüş Dinamik Bulanıklığı (Motion Sheen)
-      if (speed > 0.008) {
-        const blurAlpha = Math.min(0.24, speed * 25);
-        wheelCtx.fillStyle = `rgba(255, 255, 255, ${blurAlpha.toFixed(2)})`;
-        wheelCtx.fill();
-      }
       wheelCtx.restore();
     }
 
