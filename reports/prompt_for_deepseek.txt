@@ -1,0 +1,39 @@
+Sen kıdemli bir mekanik fizikçi ve oyun dinamiği uzmanısın.
+16 dilimli bir 3D casino çarkıfeleği üzerinde tam diferansiyel hareket denklemleri (Newton-Euler, Coulomb kuru sürtünme tanh regülarizasyonu, viskoz hava direnci, yay-sönümleyici ibre torku) ile 10.000 defa Monte Carlo simülasyonu çalıştırıldı.
+
+Simülasyon Özeti:
+- Toplam Çevirme: 10.000
+- 5 Yıldızlı (Elit): 700 adet (%7.0)
+- 4 Yıldızlı (Çok İyi): 2.450 adet (%24.5)
+- 3 Yıldızlı (Orta): 3.520 adet (%35.2)
+- 1-2 Yıldızlı (Düşük/Elendi): 3.330 adet (%33.3)
+
+Tüm 10.000 Çevirmenin Ortalaması:
+- Rulman Sürtünmesi (tauC): 0.72 N·m
+- Viskoz Hava Direnci (b): 0.09 N·m·s/rad
+- Başlangıç Hızı (w0): 31.0 rad/s
+- Pim Frenleme Torku: 4.0 N·m
+- Tırnak Hitbox: 0.092 rad
+- Yay Sertliği: 1500 N·m/rad
+- Ortalama Süre: 9.8s, Ortalama Tur: 13.5, Ortalama Skor: 61.4/100
+
+SADECE 5 Yıldızlı Elit Çevirmelerin Ağırlıklı Ortalaması (Kullanıcının İstediği Optimum Model):
+- Rulman Sürtünmesi (tauC): 0.68 N·m
+- Viskoz Hava Direnci (b): 0.10 N·m·s/rad
+- Başlangıç Hızı (w0): 23.9 rad/s
+- Pim Frenleme Torku: 3.8 N·m
+- Tırnak Hitbox: 0.097 rad
+- Yay Sertliği: 1516 N·m/rad
+- İdeal Süre: 11.0s, İdeal Tur: 17.1 tur, Ortalama Skor: 94.1/100
+
+En İyi 1. Aday (Skor 100/100):
+- tauC: 0.78 N·m, b: 0.07 N·m·s, w0: 22.0 rad/s, pegTorque: 2.5 N·m, pegHitbox: 0.094 rad, kFlapper: 1123, Süre: 12.0s, Tur: 17.9
+
+Lütfen bu 10.000 çevirmenin sonuçlarını, puanlama gerekçelerini ve fiziksel analizini içeren detaylı, profesyonel bir rapor hazırla.
+Raporda şu 4 ana başlık olsun:
+1. YÖNETİCİ ÖZETİ VE HİSSİYAT METRİKLERİ (Neden 11-12 saniye ve 17 tur insan psikolojisinde zirve gerilim yaratır?)
+2. KUVVET VE TORK DENGESİ ANALİZİ (Rulman sürtünmesi tauC ile viskoz direnç b'nin optimum oranı neden ~6.8 - 7.5 civarındadır? Yüksek hızda hava direnci, durma anında kuru sürtünmenin rolü)
+3. TIRNAK HİTBOX VE YAY DİNAMİĞİ (İbrenin takılma torku 3.8 N·m ve yay sertliği 1516 N·m neden mikro-titreşim (chatter) üretmeden tok bir mekanik ses ve ritim verir?)
+4. 10.000 ÇEVİRMENİN NİHAİ EVRİM KARARI VE TAVSİYELER (Kullanıcıya sunulacak nihai master fizik profili).
+
+Doğal, akıcı, bilimsel ve son derece etkileyici bir Türkçe ile yaz.
