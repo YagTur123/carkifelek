@@ -314,7 +314,7 @@
             <div class="w-4 h-4 rounded-full bg-gradient-to-tr from-red-950 via-red-600 to-amber-200 absolute top-1 left-1/2 -translate-x-1/2 border border-amber-300 shadow-md"></div>
           </div>
         </div>
-        <canvas id="wheelCanvas" class="rounded-full cursor-pointer block mx-auto"></canvas>
+        <canvas id="wheelCanvas" class="rounded-full cursor-grab active:cursor-grabbing block mx-auto touch-none select-none"></canvas>
         <button id="centerSpinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-950 border-4 border-amber-500 flex flex-col items-center justify-center z-20 transition active:scale-95 hover:border-amber-400 shadow-2xl">
           <span class="text-amber-400 text-xs md:text-sm font-black uppercase tracking-widest font-serif">ÇEVİR</span>
         </button>
@@ -1151,8 +1151,9 @@
     }
 
     // --- GELİŞMİŞ ANALİTİK FİZİK & DOPAMİN NEAR-MISS MOTORU İLE ÇARKIFELEK ---
-    function spinWheel(targetName = null, fakeTargetName = null) {
+    function spinWheel(targetName = null, fakeTargetName = null, flickSpeed = null) {
       if (isPlaying || !names.length) return;
+      flickSpeed = (typeof flickSpeed === 'number' && Number.isFinite(flickSpeed)) ? flickSpeed : null;
 
       // KULLANICI KURALI: 0'DAN TAM RASTGELE SHUFFLE!
       // Tüm liste 0'dan Fisher-Yates ile karıştırılır, Kazanan ve Yem yan yana yerleştirilir!
@@ -1173,8 +1174,10 @@
       // KULLANICI KURALI: Kazanan, Yem'in hemen arkasında yer alır.
       const fakeTargetIndex = (targetIndex - 1 + N) % N;
 
-      // Kumandadan gelen süre ve sürekli (analog) dopamin seviyesi ölçeklemesi
-      const duration = Math.max(4500, spinDuration * 1000);
+      // Kumandadan gelen süre veya el/fareyle fırlatma şiddetine göre dinamik süre ve tur hesabı
+      const duration = flickSpeed 
+        ? Math.max(3800, Math.min(8500, Math.abs(flickSpeed) * 240))
+        : Math.max(4500, spinDuration * 1000);
       const dNorm = Math.max(0, Math.min(100, dopamineLevel)) / 100;
       const isDopamineActive = ((dNorm >= 0.12) || (fakeTargetName !== null)) && (N > 1);
       const effD = (fakeTargetName !== null) ? Math.max(0.60, dNorm) : dNorm;
@@ -1187,8 +1190,10 @@
       let deltaAngle = targetModulo - currentModulo;
       if (deltaAngle <= 0.1) deltaAngle += 2 * Math.PI;
 
-      // Süreye göre dengeli tur sayısı (aşırı hızlı fırıldak yerine asil ve okunaklı dönüş)
-      const baseTurns = Math.max(3, Math.floor((duration / 1000) * 0.85));
+      // Süreye ve fırlatma hızına göre dengeli tur sayısı (Inertia & Momentum)
+      const baseTurns = flickSpeed 
+        ? Math.max(2, Math.min(8, Math.round(Math.abs(flickSpeed) * 0.22)))
+        : Math.max(3, Math.floor((duration / 1000) * 0.85));
       const totalDelta = baseTurns * (2 * Math.PI) + deltaAngle;
       const startRotation = wheelRotation;
       const finalRotation = startRotation + totalDelta;
@@ -3039,10 +3044,147 @@
       }
     }
 
-    // Çark ve Rulet çanağına doğrudan dokunulduğunda da oyunu tetikle
-    wheelCanvas?.addEventListener('click', () => {
-      if (!isPlaying) triggerGame(pendingTarget, pendingFakeTarget);
+    // ============================================================
+    // ÇARK İNTERAKTİF DOKUNMATİK SÜRÜKLEME VE SAVURMA (TOUCH FLICK & DRAG)
+    // CrazyTim / spin-wheel tarzı gerçek açısal momentum ve interaktif dokunma fiziği
+    // ============================================================
+    let isWheelDragging = false;
+    let dragStartPointerAngle = 0;
+    let dragStartWheelAngle = 0;
+    let dragMovedAngle = 0;
+    let dragVelocityHistory = [];
+    let lastDragPegIdx = -1;
+
+    function getWheelCenter() {
+      if (!wheelCanvas) return { cx: 0, cy: 0, radius: 0 };
+      const rect = wheelCanvas.getBoundingClientRect();
+      return {
+        cx: rect.left + rect.width / 2,
+        cy: rect.top + rect.height / 2,
+        radius: rect.width / 2
+      };
+    }
+
+    function snapWheelToNearestSlice() {
+      if (!names.length) return;
+      const N = names.length;
+      const arc = (2 * Math.PI) / N;
+      const POINTER = 1.5 * Math.PI;
+      const curRelative = ((POINTER - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const curIdx = Math.floor(curRelative / arc);
+      const targetCenter = (curIdx + 0.5) * arc;
+      const targetRot = POINTER - targetCenter;
+      let diff = (targetRot - wheelRotation) % (2 * Math.PI);
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+
+      const start = wheelRotation;
+      const target = start + diff;
+      const startTime = performance.now();
+      const dur = 260;
+
+      function snapAnim(now) {
+        const p = Math.min((now - startTime) / dur, 1);
+        const ease = 1 - Math.pow(1 - p, 3.2);
+        wheelRotation = start + (target - start) * ease;
+        drawWheel(curIdx, 0);
+        if (p < 1) requestAnimationFrame(snapAnim);
+      }
+      requestAnimationFrame(snapAnim);
+    }
+
+    wheelCanvas?.addEventListener('pointerdown', (e) => {
+      if (isPlaying || activeGameMode !== 'wheel' || !names.length) return;
+      const { cx, cy, radius } = getWheelCenter();
+      const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+      if (dist > radius || dist < 24) return; // Çarkın dışındaysa veya merkeze çok yakınsa
+
+      isWheelDragging = true;
+      dragStartPointerAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
+      dragStartWheelAngle = wheelRotation;
+      dragMovedAngle = 0;
+      dragVelocityHistory = [{ angle: dragStartPointerAngle, time: performance.now() }];
+      const N = names.length, arc = (2 * Math.PI) / N;
+      lastDragPegIdx = Math.floor(((1.5 * Math.PI - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc);
+
+      try { wheelCanvas.setPointerCapture(e.pointerId); } catch (_) {}
     });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isWheelDragging || activeGameMode !== 'wheel' || !names.length) return;
+      const { cx, cy } = getWheelCenter();
+      const currentAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
+
+      let delta = currentAngle - dragStartPointerAngle;
+      while (delta > Math.PI) delta -= 2 * Math.PI;
+      while (delta < -Math.PI) delta += 2 * Math.PI;
+
+      dragMovedAngle += Math.abs(delta);
+      wheelRotation = dragStartWheelAngle + delta;
+      dragStartWheelAngle = wheelRotation;
+      dragStartPointerAngle = currentAngle;
+
+      // Canlı tırnak sesi ve ibre hareketi
+      const N = names.length, arc = (2 * Math.PI) / N;
+      const curIdx = Math.floor(((1.5 * Math.PI - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc);
+      if (curIdx !== lastDragPegIdx) {
+        lastDragPegIdx = curIdx;
+        playTick(660 + Math.random() * 80);
+        const pointerEl = document.getElementById('pointerEl');
+        if (pointerEl) {
+          pointerEl.style.transform = `translateX(-50%) rotate(${delta > 0 ? -14 : 14}deg)`;
+          setTimeout(() => {
+            if (pointerEl && !isPlaying) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
+          }, 65);
+        }
+      }
+
+      drawWheel(-1, 0);
+
+      const now = performance.now();
+      dragVelocityHistory.push({ angle: currentAngle, time: now });
+      while (dragVelocityHistory.length > 1 && (now - dragVelocityHistory[0].time) > 120) {
+        dragVelocityHistory.shift();
+      }
+    });
+
+    function finishWheelDrag(e) {
+      if (!isWheelDragging) return;
+      isWheelDragging = false;
+      try { wheelCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+
+      const now = performance.now();
+      const recent = dragVelocityHistory.filter(s => (now - s.time) <= 100);
+
+      let angularVel = 0;
+      if (recent.length >= 2) {
+        const first = recent[0];
+        const last = recent[recent.length - 1];
+        const dt = (last.time - first.time) / 1000;
+        if (dt > 0.012) {
+          let da = last.angle - first.angle;
+          while (da > Math.PI) da -= 2 * Math.PI;
+          while (da < -Math.PI) da += 2 * Math.PI;
+          angularVel = da / dt;
+        }
+      }
+
+      // Eğer yeterli savurma hızı varsa (Flick):
+      if (Math.abs(angularVel) >= 2.2) {
+        spinWheel(pendingTarget, pendingFakeTarget, Math.abs(angularVel));
+      } else if (dragMovedAngle < 0.12) {
+        // Neredeyse hiç hareket etmemişse: buton tıklaması gibi çevir
+        triggerGame(pendingTarget, pendingFakeTarget);
+      } else {
+        // Hafifçe döndürülüp bırakıldıysa: en yakın dilime yumuşakça otur
+        snapWheelToNearestSlice();
+      }
+    }
+
+    window.addEventListener('pointerup', finishWheelDrag);
+    window.addEventListener('pointercancel', finishWheelDrag);
+
+    // Rulet çanağına dokunulduğunda oyunu tetikle
     rouletteCanvas?.addEventListener('click', () => {
       if (!isPlaying) triggerGame(pendingTarget, pendingFakeTarget);
     });
