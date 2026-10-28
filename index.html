@@ -1515,7 +1515,8 @@
         if (pegDist < pegRadiusAngle) {
           inContact = true;
           const penetration = Math.max(0, Math.min(1, (pegRadiusAngle - pegDist) / pegRadiusAngle));
-          pegTorque = -pegTorqueMag * Math.sin(penetration * Math.PI) * Math.sign(simOmega || 1);
+          // Tanh regülarize temas torku: Sıfır hız etrafında chatter (işaret zıplaması) kesinlikle oluşmaz
+          pegTorque = -pegTorqueMag * Math.sin(penetration * Math.PI) * Math.tanh(simOmega / 0.04);
         }
 
         const fric = tauC * Math.tanh(simOmega / 0.03) + b * simOmega;
@@ -1533,7 +1534,7 @@
           const step = runSimStep(simTh, simOm);
           simTh = step.nextTheta;
           simOm = step.nextOmega;
-          if (Math.abs(simOm) < 0.008 && !step.inContact) {
+          if (Math.abs(simOm) < 0.015) {
             const finalRel = ((POINTER_ANGLE - simTh) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
             const winner = Math.floor(finalRel / arc);
             const offset = (finalRel % arc) / arc;
@@ -1623,7 +1624,8 @@
             const penetration = Math.max(0, Math.min(1, (pegRadiusAngle - pegDist) / pegRadiusAngle));
             // İbre fiziksel temas kuvvetiyle daha belirgin ve tok bükülür (~20.6 derece)
             flapper = -penetration * 0.36;
-            pegTorque = -pegTorqueMag * Math.sin(penetration * Math.PI) * Math.sign(omega || 1);
+            // Tanh regülarize temas torku: Sıfır hız etrafında chatter (işaret zıplaması) kesinlikle oluşmaz
+            pegTorque = -pegTorqueMag * Math.sin(penetration * Math.PI) * Math.tanh(omega / 0.04);
           } else {
             // İbre serbest salınımda sönümlü harmonik osilatör
             const flapperAcc = (-kFlapper * flapper - cFlapper * flapperV);
@@ -1645,10 +1647,12 @@
           omega += alpha * h;
           wheelRotation += omega * h;
 
-          // %100 Saf Fiziksel Durma Şartı (Sıfır Snap, Enerji Tamamen Sıfırlanır)
-          if (Math.abs(omega) < 0.008 && !contact) {
-            omega = 0;
+          // %100 Doğal ve Kesin Durma Şartı (Sıfır Titreşim, Sıfır Takılma)
+          if (Math.abs(omega) < 0.015) {
             quietSettleTime += h;
+            if (quietSettleTime > 0.025) {
+              omega = 0;
+            }
           } else {
             quietSettleTime = 0;
           }
@@ -1667,8 +1671,9 @@
 
         drawWheel(-1, Math.abs(omega));
 
-        // Tam 100 ms (0.10s) boyunca fiziksel durgunluk sağlandığında tamamla (Hz bağımsız)
-        if (quietSettleTime < 0.10) {
+        // Tam 100 ms (0.10s) boyunca fiziksel durgunluk sağlandığında veya emniyet süresinde bitir
+        const isSettleComplete = (quietSettleTime >= 0.10) || (elapsedSec > 20 && Math.abs(omega) < 0.04);
+        if (!isSettleComplete) {
           requestAnimationFrame(animLoop);
         } else {
           isPlaying = false;
