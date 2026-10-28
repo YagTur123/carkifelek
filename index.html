@@ -2207,8 +2207,8 @@
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
 
-        // Çark Dönüşü (Monotonik Azalan Sönüm)
-        const wheelEase = 1 - Math.pow(1 - progress, 2.5);
+        // Çark Dönüşü (Monotonik Azalan Sönüm - Pürüzsüz duruş)
+        const wheelEase = 1 - Math.pow(1 - progress, 2.9);
         rouletteAngle = startWheelAngle + totalWheelTurns * wheelEase;
 
         // Top Açısal Hızı & Bağıl Çark Kilitlenmesi (DeepSeek Kesintisiz C^0 Fizik Sürekliliği)
@@ -2223,9 +2223,9 @@
             trackEase = Math.max(0, Math.min(1, trackEase - swirl));
           }
           currentBallAngle = startBallAngle - totalTrackTurns * trackEase;
-        } else if (progress < 0.92) {
+        } else if (progress < 0.88) {
           // Cebe iniş: Çarkla birlikte ileri dönüş + sahte cepten asıl cebe perde atlama
-          const pSub = (progress - pDrop) / (0.92 - pDrop);
+          const pSub = (progress - pDrop) / Math.max(0.01, 0.88 - pDrop);
           let currentRel;
           if (isHighDopamine) {
             const hopEase = 1 - Math.pow(1 - pSub, 2.0);
@@ -2236,8 +2236,13 @@
           }
           currentBallAngle = rouletteAngle + currentRel + wrapOffset;
         } else {
-          // Cebe kilitlenme: Çarkla %100 senkron dönüş (bağıl hız = 0, sıfır kayma)
-          currentBallAngle = rouletteAngle + targetRel + wrapOffset;
+          // AŞAMA 5: CEBİN İÇİNDE YUVALANMA & PÜRÜZSÜZ SÖNÜM (SIFIR ANİ DURMA)
+          const pSettle = (progress - 0.88) / 0.12;
+          const settleDecay = Math.pow(Math.max(0, 1 - pSettle), 1.8);
+          // Cep duvarlarına mikro çarpma ve titreşerek oturma salınımı
+          const pocketJitter = Math.sin(pSettle * Math.PI * 4) * settleDecay * (arc * 0.14);
+          const currentRel = targetRel + pocketJitter;
+          currentBallAngle = rouletteAngle + currentRel + wrapOffset;
         }
 
         // --- ÇOK AŞAMALI FİZİK: DÜŞÜŞ, KENARA ÇARPMA, VE DOPAMİN FAKEOUT SEKME SİMÜLASYONU ---
@@ -2298,9 +2303,9 @@
           ballDist = baseDist;
           ballZ = baseZ;
 
-        } else if (progress >= 0.76 && progress < 0.92) {
+        } else if (progress >= 0.76 && progress < 0.88) {
           // AŞAMA 4: Ceplere İniş & Pirinç Perdeler Arasında Gerçek Sekerek İlerleme
-          const pSub = (progress - 0.76) / 0.16;
+          const pSub = (progress - 0.76) / 0.12;
           const hops = Math.floor(3 + effD * 4);
           const hopPhase = pSub * hops * Math.PI;
           const decay = Math.pow(1 - pSub, 1.4);
@@ -2328,13 +2333,13 @@
           }
 
         } else {
-          // AŞAMA 5: CEBE PÜRÜZSÜZ YERLEŞME (SIFIR TELEPORT - %100 KESİNTİSİZ FİZİK)
-          const pSub = (progress - 0.92) / 0.08;
-          const settleDecay = 1 - pSub;
-          ballDist = rPocketCenter + settleDecay * 1.5 * Math.sin(pSub * Math.PI * 3);
-          ballZ = Math.max(0, settleDecay * 0.06);
+          // AŞAMA 5: CEBE PÜRÜZSÜZ YERLEŞME & CEP İÇİ TİTREŞİMLİ SÖNÜM (SIFIR ANİ DURMA)
+          const pSettle = (progress - 0.88) / 0.12;
+          const settleDecay = Math.pow(Math.max(0, 1 - pSettle), 1.8);
+          ballDist = rPocketCenter + settleDecay * 2.2 * Math.sin(pSettle * Math.PI * 3);
+          ballZ = Math.max(0, settleDecay * 0.10 * Math.abs(Math.sin(pSettle * Math.PI * 4)));
 
-          if (!fakeoutTriggered && pSub > 0.3) {
+          if (!fakeoutTriggered && pSettle > 0.45) {
             fakeoutTriggered = true;
             playIvoryBallClick(1600, 0.28);
             const fakeCell = document.getElementById(`rouletteCell_${fakeTargetIndex}`);
