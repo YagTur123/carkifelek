@@ -2934,6 +2934,9 @@
 
         mqttClient.on('error', () => {
           currentBrokerIdx++;
+          try { if (mqttClient) mqttClient.end(true); } catch (e) {}
+          mqttClient = null;
+          setTimeout(initLobbyBroadcast, 2500);
         });
       } catch (e) {}
     }

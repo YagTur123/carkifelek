@@ -113,7 +113,7 @@
       </div>
 
       <!-- BÜYÜK TETİKLEME BUTONU -->
-      <button id="triggerSpinBtn" disabled class="w-full py-4 px-4 rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-98 disabled:opacity-30 disabled:pointer-events-none text-black font-black text-sm tracking-wider transition shadow-lg uppercase">
+      <button id="triggerSpinBtn" class="w-full py-4 px-4 rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-98 opacity-60 text-black font-black text-sm tracking-wider transition shadow-lg uppercase cursor-pointer">
         <span id="triggerBtnText">ÇARKI UZAKTAN ÇEVİR</span>
       </button>
       <div class="text-[10px] text-center text-zinc-500 -mt-1 font-medium">🎲 Her çevirişte liste 0'dan karıştırılır, Hedef & Yem yan yana yerleştirilir.</div>
@@ -303,7 +303,7 @@
       if (conn && conn.open) {
         try { conn.send(msg); sent = true; } catch (e) {}
       }
-      let targetRoom = (document.getElementById('roomIdInput').value.trim() || localStorage.getItem('cark_last_room') || '');
+      let targetRoom = (activeTargetRoom || document.getElementById('roomIdInput').value.trim() || localStorage.getItem('cark_last_room') || '');
       if (/^\d{4,5}$/.test(targetRoom)) targetRoom = 'cark-' + targetRoom;
       if (targetRoom && mqttClient && mqttClient.connected) {
         try {
@@ -378,6 +378,18 @@
       syncInterval = setInterval(ping, 1000);
     }
 
+    let mqttFailoverTimer = null;
+    function reconnectMqttNextBroker() {
+      if (mqttFailoverTimer) return;
+      mqttFailoverTimer = setTimeout(() => {
+        mqttFailoverTimer = null;
+        currentBrokerIdx++;
+        try { if (mqttClient) mqttClient.end(true); } catch (e) {}
+        mqttClient = null;
+        initLobbyDiscovery();
+      }, 2000);
+    }
+
     // --- Güvenli MQTT Lobi Keşfi & Çift Kanallı İletişim ---
     function initLobbyDiscovery() {
       try {
@@ -409,6 +421,10 @@
               if (data.roomId && data.lastSeen) {
                 discoveredRooms.set(data.roomId, data);
                 renderActiveRoomsList();
+                if (!isConnected && !activeTargetRoom && (!document.getElementById('roomIdInput').value.trim() || document.getElementById('roomIdInput').value.trim() === data.roomId)) {
+                  document.getElementById('roomIdInput').value = data.roomId;
+                  initConnection();
+                }
               }
             } else if (topic.startsWith('cark_state_')) {
               const data = JSON.parse(message.toString());
@@ -418,15 +434,16 @@
                 if (syncInterval) clearInterval(syncInterval);
                 const roomName = activeTargetRoom || document.getElementById('roomIdInput').value.trim() || topic.replace('cark_state_', '');
                 setConnectionStatus('connected', 'Bağlandı (' + roomName + ')');
-                document.getElementById('triggerSpinBtn').disabled = false;
+                updateTriggerBtnState();
                 showToast('Masaya bağlandı!');
               }
             }
           } catch (e) {}
         });
 
-        mqttClient.on('error', () => {
-          currentBrokerIdx++;
+        mqttClient.on('error', (err) => {
+          console.warn('MQTT Bağlantı Hatası:', err);
+          reconnectMqttNextBroker();
         });
 
         setInterval(() => {
@@ -768,6 +785,21 @@
       }
     });
 
+    function updateTriggerBtnState() {
+      const btn = document.getElementById('triggerSpinBtn');
+      if (!btn) return;
+      if (isGameRunning) {
+        btn.classList.add('opacity-60', 'pointer-events-none');
+        btn.classList.remove('opacity-100');
+      } else if (isConnected) {
+        btn.classList.remove('opacity-60', 'pointer-events-none');
+        btn.classList.add('opacity-100');
+      } else {
+        btn.classList.add('opacity-60');
+        btn.classList.remove('opacity-100', 'pointer-events-none');
+      }
+    }
+
     function setConnectionStatus(status, text) {
       const badge = document.getElementById('connBadge');
       const dot = document.getElementById('connDot');
@@ -784,29 +816,29 @@
         badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700';
         dot.className = 'w-1.5 h-1.5 rounded-full bg-zinc-500';
       }
+      updateTriggerBtnState();
     }
 
     function setSpinningState(spinning) {
       isGameRunning = spinning;
-      const btn = document.getElementById('triggerSpinBtn');
       const text = document.getElementById('triggerBtnText');
 
       if (spinTimeout) clearTimeout(spinTimeout);
 
       if (spinning) {
-        btn.disabled = true;
+        updateTriggerBtnState();
         text.textContent = 'OYUN ÇALIŞIYOR...';
         const dur = (typeof currentDuration === 'number' && Number.isFinite(currentDuration) && currentDuration > 0) ? currentDuration : 5;
         const maxWait = Math.max(9000, dur * 1000 + 3500);
         spinTimeout = setTimeout(() => {
           if (isGameRunning) {
             isGameRunning = false;
-            btn.disabled = !isConnected;
+            updateTriggerBtnState();
             updateTriggerBtnText();
           }
         }, maxWait);
       } else {
-        btn.disabled = !isConnected;
+        updateTriggerBtnState();
         updateTriggerBtnText();
       }
     }
@@ -887,15 +919,34 @@
     let lastTriggerTime = 0;
     document.getElementById('triggerSpinBtn').addEventListener('click', () => {
       const now = Date.now();
-      if (now - lastTriggerTime < 1000) return;
-      if (!isConnected || isGameRunning) return;
+      if (now - lastTriggerTime < 800) return;
+      lastTriggerTime = now;
+      vibrate();
+
+      if (!isConnected) {
+        showToast('⚠️ Masaya bağlı değilsiniz! Oda Kodunu girip Bağlan\'a basın.');
+        const input = document.getElementById('roomIdInput');
+        if (input) {
+          input.focus();
+          input.classList.add('ring-2', 'ring-amber-500');
+          setTimeout(() => input.classList.remove('ring-2', 'ring-amber-500'), 2000);
+        }
+        return;
+      }
+
+      if (isGameRunning) {
+        showToast('⏳ Oyun şu an dönüyor, lütfen bekleyin!');
+        return;
+      }
+
       if (!names || names.length === 0) {
         showToast('Liste boş! Lütfen en az 1 katılımcı ekleyin.');
         return;
       }
-      lastTriggerTime = now;
-      setSpinningState(true);
-      vibrate();
+
+      const btnText = document.getElementById('triggerBtnText');
+      if (btnText) btnText.textContent = 'KOMUT GÖNDERİLİYOR...';
+
       sendRemote({
         type: 'spin',
         target: selectedTarget,
@@ -904,11 +955,16 @@
         duration: currentDuration,
         dopamine: currentDopamine
       });
-      let toastMsg = 'Rastgele tetiklendi';
+
+      let toastMsg = 'Komut iletildi';
       if (selectedTarget && selectedFakeTarget) toastMsg = `👑 ${selectedTarget} (Yem: 🎭 ${selectedFakeTarget})`;
       else if (selectedTarget) toastMsg = `👑 Hedef: ${selectedTarget}`;
       else if (selectedFakeTarget) toastMsg = `🎭 Yem: ${selectedFakeTarget} (Rastgele Kazanan)`;
       showToast(toastMsg);
+
+      setTimeout(() => {
+        if (!isGameRunning) updateTriggerBtnText();
+      }, 1500);
     });
 
     document.getElementById('shuffleListBtn')?.addEventListener('click', () => {
@@ -1030,7 +1086,7 @@
       const roomParam = urlParams.get('room') || localStorage.getItem('cark_last_room');
       if (roomParam) {
         document.getElementById('roomIdInput').value = roomParam;
-        if (urlParams.get('room')) setTimeout(initConnection, 300);
+        setTimeout(initConnection, 400);
       }
     }
 
