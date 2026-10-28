@@ -357,6 +357,47 @@
         </div>
 
         <div id="physicsPanelBody" class="flex flex-col gap-3 transition-all">
+          <!-- RASTGELE AYAR VE PUANLAMA BÖLÜMÜ -->
+          <div class="flex flex-col gap-2 p-2.5 rounded-xl bg-gradient-to-br from-amber-950/40 via-zinc-950/80 to-emerald-950/30 border border-amber-500/40 shadow-inner">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-amber-300 text-[11px] flex items-center gap-1">
+                <span>🎲</span> Rastgele Hissiyat Testi
+              </span>
+              <button onclick="generateRandomPhysics(true)" class="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-[11px] transition active:scale-95 shadow-md flex items-center gap-1">
+                <span>🎲 Rastgele Ayar & Çevir</span>
+              </button>
+            </div>
+
+            <!-- 5 Yıldız Puanlama Barı -->
+            <div id="physicsRatingBox" class="flex flex-col items-center gap-1 bg-zinc-900/90 p-2 rounded-lg border border-zinc-800">
+              <div class="flex items-center justify-between w-full text-[10px]">
+                <span class="text-zinc-300 font-medium">Bu Ayarı Puanla:</span>
+                <span id="ratingStatusText" class="text-amber-400 font-mono">Dönüş bitince puanla</span>
+              </div>
+              <div class="flex items-center justify-center gap-2 py-0.5" id="starRatingGroup">
+                <button type="button" onclick="rateCurrentPhysics(1)" class="text-2xl hover:scale-125 transition active:scale-95 text-zinc-600 hover:text-amber-400" title="1 Yıldız (Çok Kötü)">★</button>
+                <button type="button" onclick="rateCurrentPhysics(2)" class="text-2xl hover:scale-125 transition active:scale-95 text-zinc-600 hover:text-amber-400" title="2 Yıldız (Kötü)">★</button>
+                <button type="button" onclick="rateCurrentPhysics(3)" class="text-2xl hover:scale-125 transition active:scale-95 text-zinc-600 hover:text-amber-400" title="3 Yıldız (Orta)">★</button>
+                <button type="button" onclick="rateCurrentPhysics(4)" class="text-2xl hover:scale-125 transition active:scale-95 text-zinc-600 hover:text-amber-400" title="4 Yıldız (Çok İyi)">★</button>
+                <button type="button" onclick="rateCurrentPhysics(5)" class="text-2xl hover:scale-125 transition active:scale-95 text-zinc-600 hover:text-amber-400" title="5 Yıldız (Mükemmel!)">★</button>
+              </div>
+            </div>
+
+            <!-- Puanlanan Ayarlar Geçmişi / Liderler -->
+            <div class="flex flex-col gap-1.5 mt-0.5">
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-zinc-400 font-medium flex items-center gap-1">
+                  <span>🏆</span> Puanlanan Ayarlarım (<span id="ratedCountBadge">0</span>)
+                </span>
+                <button onclick="copyBestRatedPhysics()" id="btnCopyBest" class="hidden text-amber-400 hover:text-amber-300 underline text-[10px]">
+                  📋 En İyisini Kopyala
+                </button>
+              </div>
+              <div id="ratedPhysicsList" class="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1 text-[10px]">
+                <div class="text-zinc-500 italic text-center py-1">Henüz puanlanan ayar yok. "Rastgele Ayar" ile dene!</div>
+              </div>
+            </div>
+          </div>
           <!-- Hazır Presets -->
           <div class="flex flex-col gap-1.5">
             <span class="text-[11px] font-semibold text-zinc-300">Hazır Hissiyat Presetleri:</span>
@@ -1022,6 +1063,7 @@
           physPanel.classList.remove('hidden');
           physPanel.classList.add('flex');
           if (typeof syncPhysicsUI === 'function') syncPhysicsUI();
+          if (typeof renderRatedPhysicsUI === 'function') renderRatedPhysicsUI();
         } else {
           physPanel.classList.add('hidden');
           physPanel.classList.remove('flex');
@@ -1367,6 +1409,9 @@
         console.warn('Physics config load warning:', e);
       }
       syncPhysicsUI();
+      try {
+        if (typeof loadRatedPhysicsHistory === 'function') loadRatedPhysicsHistory();
+      } catch (e) {}
     }
 
     function syncPhysicsUI() {
@@ -1472,6 +1517,206 @@
       if (elOm) elOm.textContent = (Math.abs(omegaVal)).toFixed(1) + ' rad/s';
       if (elTi) elTi.textContent = (Math.max(0, timeVal)).toFixed(1) + ' s';
       if (elRo) elRo.textContent = (Math.max(0, rotVal)).toFixed(1) + ' tur';
+    }
+
+    // ============================================================
+    // RASTGELE FİZİK ÜRETİMİ VE PUANLAMA MOTORU
+    // ============================================================
+    let lastSpinStats = { time: 0, rotations: 0 };
+    let ratedPhysicsHistory = [];
+
+    function loadRatedPhysicsHistory() {
+      try {
+        const saved = localStorage.getItem('cark_physics_ratings');
+        if (saved) {
+          ratedPhysicsHistory = JSON.parse(saved);
+        }
+      } catch (e) {
+        ratedPhysicsHistory = [];
+      }
+      renderRatedPhysicsUI();
+    }
+
+    function saveRatedPhysicsHistory() {
+      try {
+        localStorage.setItem('cark_physics_ratings', JSON.stringify(ratedPhysicsHistory));
+      } catch (e) {}
+      renderRatedPhysicsUI();
+    }
+
+    // Dengeli ama çeşitli rastgele parametre üretici
+    function generateRandomPhysics(autoSpin = true) {
+      const round2 = (num) => Math.round(num * 100) / 100;
+      const round1 = (num) => Math.round(num * 10) / 10;
+      const round3 = (num) => Math.round(num * 1000) / 1000;
+
+      // tauC: 0.25 - 1.20 (0.05 adımlarla)
+      const tauC = round2(0.25 + Math.floor(Math.random() * 20) * 0.05);
+      // b: 0.03 - 0.15 (0.01 adımlarla)
+      const b = round2(0.03 + Math.floor(Math.random() * 13) * 0.01);
+      // w0: 22 - 38 rad/s (1 rad/s adımlarla)
+      const w0 = Math.floor(22 + Math.random() * 17);
+      // pegTorque: 2.0 - 6.5 (0.2 adımlarla)
+      const pegTorque = round1(2.0 + Math.floor(Math.random() * 23) * 0.2);
+      // pegHitbox: 0.065 - 0.120 (0.005 adımlarla)
+      const pegHitbox = round3(0.065 + Math.floor(Math.random() * 12) * 0.005);
+      // kFlapper: 1000 - 2100 (50 adımlarla)
+      const kFlapper = Math.floor(1000 + Math.floor(Math.random() * 23) * 50);
+
+      testPhysicsConfig = {
+        tauC,
+        b,
+        w0,
+        pegTorque,
+        pegHitbox,
+        kFlapper
+      };
+
+      try {
+        localStorage.setItem('cark_test_physics', JSON.stringify(testPhysicsConfig));
+      } catch (e) {}
+
+      syncPhysicsUI();
+      highlightStars(0);
+
+      const rText = document.getElementById('ratingStatusText');
+      if (rText) rText.textContent = `🎲 Yeni Ayar Hazır! (${w0} rad/s, τ: ${tauC})`;
+
+      if (typeof showToast === 'function') {
+        showToast(`🎲 Rastgele Ayar Yüklendi! (τ: ${tauC}, w0: ${w0})`);
+      }
+
+      if (autoSpin) {
+        setTimeout(() => {
+          spinWheelDifferential();
+        }, 120);
+      }
+    }
+
+    function highlightStars(count) {
+      const group = document.getElementById('starRatingGroup');
+      if (!group) return;
+      const buttons = group.querySelectorAll('button');
+      buttons.forEach((btn, idx) => {
+        if (idx < count) {
+          btn.classList.add('text-amber-400');
+          btn.classList.remove('text-zinc-600');
+        } else {
+          btn.classList.remove('text-amber-400');
+          btn.classList.add('text-zinc-600');
+        }
+      });
+    }
+
+    function rateCurrentPhysics(stars) {
+      stars = Math.max(1, Math.min(5, parseInt(stars, 10)));
+      highlightStars(stars);
+
+      const record = {
+        id: 'cfg_' + Date.now(),
+        stars: stars,
+        config: Object.assign({}, testPhysicsConfig),
+        time: lastSpinStats.time || 0,
+        rotations: lastSpinStats.rotations || 0,
+        date: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+      };
+
+      ratedPhysicsHistory.unshift(record);
+      if (ratedPhysicsHistory.length > 20) ratedPhysicsHistory.pop();
+      saveRatedPhysicsHistory();
+
+      const starLabels = ['', 'Kötü', 'Fena Değil', 'İyi', 'Çok İyi', 'Efsane / Mükemmel!'];
+      const rText = document.getElementById('ratingStatusText');
+      if (rText) rText.textContent = `⭐ ${stars}/5 (${starLabels[stars]}) Kaydedildi!`;
+
+      if (typeof showToast === 'function') {
+        showToast(`⭐ ${stars} Yıldız Puanın Kaydedildi!`);
+      }
+    }
+
+    function renderRatedPhysicsUI() {
+      const container = document.getElementById('ratedPhysicsList');
+      const badge = document.getElementById('ratedCountBadge');
+      const copyBestBtn = document.getElementById('btnCopyBest');
+      if (!container) return;
+
+      if (badge) badge.textContent = ratedPhysicsHistory.length;
+      if (copyBestBtn) {
+        if (ratedPhysicsHistory.length > 0) copyBestBtn.classList.remove('hidden');
+        else copyBestBtn.classList.add('hidden');
+      }
+
+      if (!ratedPhysicsHistory.length) {
+        container.innerHTML = '<div class="text-zinc-500 italic text-center py-1">Henüz puanlanan ayar yok. "Rastgele Ayar" ile dene!</div>';
+        return;
+      }
+
+      // Yıldız puanına göre azalan sırala
+      const sorted = [...ratedPhysicsHistory].sort((a, b) => b.stars - a.stars);
+
+      let html = '';
+      sorted.forEach((item) => {
+        const starsStr = '★'.repeat(item.stars) + '☆'.repeat(5 - item.stars);
+        const isTop = item.stars === 5;
+        const cfg = item.config;
+        html += `
+          <div class="flex items-center justify-between p-1.5 rounded-lg ${isTop ? 'bg-amber-950/40 border border-amber-500/30' : 'bg-zinc-950/50 border border-zinc-800'}">
+            <div class="flex flex-col">
+              <span class="font-bold ${isTop ? 'text-amber-300' : 'text-zinc-300'} text-[11px] flex items-center gap-1">
+                <span class="text-amber-400">${starsStr}</span>
+                <span class="text-[9px] text-zinc-400">(${item.time > 0 ? item.time + 's, ' + item.rotations + ' tur' : 'Ayarlı'})</span>
+              </span>
+              <span class="text-[9px] text-zinc-400 font-mono">
+                τ:${cfg.tauC} | b:${cfg.b} | ω₀:${cfg.w0} | tork:${cfg.pegTorque}
+              </span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="loadRatedPhysics('${item.id}')" class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-emerald-400 font-medium text-[9px] border border-zinc-700 transition" title="Bu Ayarı Çarka Yükle">
+                Yükle
+              </button>
+              <button onclick="copyRatedPhysics('${item.id}')" class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[9px] border border-zinc-700 transition" title="Kopyala">
+                📋
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function loadRatedPhysics(id) {
+      const item = ratedPhysicsHistory.find(x => x.id === id);
+      if (!item) return;
+      testPhysicsConfig = Object.assign({}, item.config);
+      try {
+        localStorage.setItem('cark_test_physics', JSON.stringify(testPhysicsConfig));
+      } catch (e) {}
+      syncPhysicsUI();
+      highlightStars(item.stars);
+      if (typeof showToast === 'function') {
+        showToast(`⭐ ${item.stars} Yıldızlı Ayar Çarka Yüklendi!`);
+      }
+    }
+
+    function copyRatedPhysics(id) {
+      const item = ratedPhysicsHistory.find(x => x.id === id);
+      if (!item) return;
+      const c = item.config;
+      const text = `🏆 Beğendiğim Fizik Ayarı (${item.stars}/5 Yıldız):\n- Rulman (tauC): ${c.tauC}\n- Hava Direnci (b): ${c.b}\n- Hız (w0): ${c.w0}\n- Pim Torku: ${c.pegTorque}\n- Tırnak Hitbox: ${c.pegHitbox}\n- Yay Sertliği: ${c.kFlapper}\nJSON: ${JSON.stringify(c)}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          if (typeof showToast === 'function') showToast('📋 Puanladığın ayar panoya kopyalandı!');
+        }).catch(() => prompt('Ayar:', text));
+      } else {
+        prompt('Ayar:', text);
+      }
+    }
+
+    function copyBestRatedPhysics() {
+      if (!ratedPhysicsHistory.length) return;
+      const best = [...ratedPhysicsHistory].sort((a, b) => b.stars - a.stars)[0];
+      copyRatedPhysics(best.id);
     }
 
     // ============================================================
@@ -1678,6 +1923,17 @@
         } else {
           isPlaying = false;
           updatePhysicsTelemetry(0, elapsedSec, totalRotations);
+
+          // Puanlama için son dönüş istatistiklerini kaydet
+          lastSpinStats = {
+            time: parseFloat(elapsedSec.toFixed(1)),
+            rotations: parseFloat(totalRotations.toFixed(1))
+          };
+          const rText = document.getElementById('ratingStatusText');
+          if (rText) {
+            rText.textContent = `Durdun (${lastSpinStats.time}s, ${lastSpinStats.rotations} tur) — Puanla! ⭐`;
+          }
+
           if (pointerEl) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
           if (wheelStageEl) {
             wheelStageEl.classList.remove('wheel-spinning-cam');
