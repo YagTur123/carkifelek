@@ -199,11 +199,15 @@
     /* 3D Kart Animasyonları */
     .card-item {
       transform-style: preserve-3d;
+      -webkit-transform-style: preserve-3d;
       transition: all 0.65s cubic-bezier(0.2, 0.85, 0.32, 1.2);
+      touch-action: manipulation;
     }
     .card-face {
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
     }
     .card-back {
       transform: rotateY(180deg);
@@ -602,8 +606,12 @@
       }
     }
 
+    let lastTickTime = 0;
     function playTick(freq = 700) {
       if (!soundEnabled) return;
+      const now = performance.now();
+      if (now - lastTickTime < 24) return; // Limiter: ses patlaması ve clipping koruması
+      lastTickTime = now;
       initAudio();
       if (!audioCtx) return;
       if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
@@ -1159,7 +1167,7 @@
       // Kumandadan gelen süre ve sürekli (analog) dopamin seviyesi ölçeklemesi
       const duration = Math.max(4500, spinDuration * 1000);
       const dNorm = Math.max(0, Math.min(100, dopamineLevel)) / 100;
-      const isDopamineActive = (dNorm >= 0.12) || (fakeTargetName !== null);
+      const isDopamineActive = ((dNorm >= 0.12) || (fakeTargetName !== null)) && (N > 1);
       const effD = (fakeTargetName !== null) ? Math.max(0.60, dNorm) : dNorm;
 
       // Hedeflenen dilimin tam merkezinin tepe ibresiyle (POINTER_ANGLE) çakışması için gereken açı
@@ -1180,7 +1188,7 @@
       // %0 - %11: Standart doğal fiziksel sönüm
       // %12 - %79: Near-miss gerilimi & pimde ağır çekim sürünme
       // %80 - %100: KULLANICI KURALI: Çark ileri dönerken YEMDE DURACAK, Yemden yavaş yavaş geriye dönüp gerçek kazanana inecek!
-      const isRecoilActive = (effD >= 0.80);
+      const isRecoilActive = (effD >= 0.80) && (N > 1);
 
       // Normal Dopamin (12-79%) parametreleri
       const pegRatio = (totalDelta - 0.5 * arc) / totalDelta;
@@ -2130,7 +2138,7 @@
 
       const duration = Math.max(4000, spinDuration * 1000);
       const dNorm = Math.max(0, Math.min(100, dopamineLevel)) / 100;
-      const isHighDopamine = (dNorm >= 0.15) || (fakeTargetName !== null);
+      const isHighDopamine = ((dNorm >= 0.15) || (fakeTargetName !== null)) && (N > 1);
       const effD = (fakeTargetName !== null) ? Math.max(0.60, dNorm) : dNorm;
       const startTime = performance.now();
       let fakeoutTriggered = false;
@@ -2544,6 +2552,7 @@
       if (isPlaying) return;
       if (target) pendingTarget = target;
       pendingFakeTarget = null; // KARTLARDA FAKE YOK
+      broadcast({ type: 'spin_start' });
       if (cardsState === 'closed_ready') {
         const randIdx = Math.floor(Math.random() * names.length);
         revealCard(randIdx);
