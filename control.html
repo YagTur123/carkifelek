@@ -62,11 +62,12 @@
         </div>
       </div>
 
-      <!-- 4 Klasik Oyun Seçici (Geniş ve Ferah) -->
+      <!-- 5 Oyun Seçici (Klasik + 🧪 Test Çarkı) -->
       <div class="flex flex-col gap-1">
         <span class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Aktif Oyun Modu</span>
-        <div class="grid grid-cols-4 gap-1.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800 text-xs">
-          <button onclick="changeGameMode('wheel')" id="btnCtrlWheel" class="py-2 rounded bg-amber-500 text-black font-bold text-center transition">Çark</button>
+        <div class="grid grid-cols-5 gap-1 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800 text-[11px]">
+          <button onclick="changeGameMode('wheel')" id="btnCtrlWheel" class="py-2 rounded bg-amber-500 text-black font-bold text-center transition shadow">Çark</button>
+          <button onclick="changeGameMode('testWheel')" id="btnCtrlTestWheel" class="py-2 rounded text-emerald-400 hover:text-white text-center transition border border-emerald-500/30">🧪 Test</button>
           <button onclick="changeGameMode('slot')" id="btnCtrlSlot" class="py-2 rounded text-zinc-400 hover:text-white text-center transition">Slot</button>
           <button onclick="changeGameMode('roulette')" id="btnCtrlRoulette" class="py-2 rounded text-zinc-400 hover:text-white text-center transition">Rulet</button>
           <button onclick="changeGameMode('cards')" id="btnCtrlCards" class="py-2 rounded text-zinc-400 hover:text-white text-center transition">Kartlar</button>
@@ -314,25 +315,32 @@
       return sent;
     }
 
-    function changeGameMode(mode) {
+    function changeGameMode(mode, broadcastSync = true) {
       currentGameMode = mode;
-      const modes = ['wheel', 'slot', 'roulette', 'cards'];
+      const modes = ['wheel', 'testWheel', 'slot', 'roulette', 'cards'];
       modes.forEach(m => {
         const btn = document.getElementById('btnCtrl' + m.charAt(0).toUpperCase() + m.slice(1));
         if (btn) {
-          btn.className = (m === mode) 
-            ? 'py-2 rounded bg-amber-500 text-black font-bold text-center transition' 
-            : 'py-2 rounded text-zinc-400 hover:text-white text-center transition';
+          if (m === mode) {
+            btn.className = (m === 'testWheel')
+              ? 'py-2 rounded bg-emerald-500 text-black font-bold text-center transition shadow'
+              : 'py-2 rounded bg-amber-500 text-black font-bold text-center transition shadow';
+          } else {
+            btn.className = (m === 'testWheel')
+              ? 'py-2 rounded text-emerald-400 hover:text-white text-center transition border border-emerald-500/30'
+              : 'py-2 rounded text-zinc-400 hover:text-white text-center transition';
+          }
         }
       });
 
       updateTriggerBtnText();
-      sendRemote({ type: 'set_game_mode', mode: mode });
+      if (broadcastSync) sendRemote({ type: 'set_game_mode', mode: mode });
     }
 
     function updateTriggerBtnText() {
       const textMap = {
         wheel: 'ÇARKI UZAKTAN ÇEVİR',
+        testWheel: '🧪 TEST ÇARKINI ÇEVİR',
         slot: 'SLOT KOLUNU ÇEK (SPIN)',
         roulette: 'RULET TOPUNU AT',
         cards: 'KARTLARI DAĞIT VE AÇ'
@@ -660,7 +668,7 @@
         if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
         if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
         updateTargetUI();
-        if (data.gameMode) changeGameMode(data.gameMode);
+        if (data.gameMode) changeGameMode(data.gameMode, false);
         saveStorage(); renderGrid(); renderHistoryUI(); setSpinningState(data.isSpinning);
       } else if (data.type === 'sync_names') {
         if (data.names && data.names.length) {
@@ -691,7 +699,7 @@
         updateTargetUI();
         renderGrid(document.getElementById('searchInput').value);
       } else if (data.type === 'game_mode_changed') {
-        changeGameMode(data.mode);
+        changeGameMode(data.mode, false);
       }
     }
 

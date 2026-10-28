@@ -256,9 +256,10 @@
       </div>
     </div>
 
-    <!-- 4 Klasik Oyun Seçici Menü -->
-    <div class="flex items-center bg-zinc-900 border border-zinc-800 p-1 rounded-xl gap-1 text-xs shadow-inner">
+    <!-- Oyun Seçici Menü -->
+    <div class="flex items-center bg-zinc-900 border border-zinc-800 p-1 rounded-xl gap-1 text-xs shadow-inner overflow-x-auto max-w-full">
       <button onclick="setGameMode('wheel')" id="btnModeWheel" class="px-3.5 py-1.5 rounded-lg bg-amber-500 text-black font-bold whitespace-nowrap transition shadow">Çarkıfelek</button>
+      <button onclick="setGameMode('testWheel')" id="btnModeTestWheel" class="px-3.5 py-1.5 rounded-lg text-emerald-400 hover:text-white whitespace-nowrap transition border border-emerald-500/30">🧪 Test Çarkı</button>
       <button onclick="setGameMode('slot')" id="btnModeSlot" class="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white whitespace-nowrap transition">Vegas Slot</button>
       <button onclick="setGameMode('roulette')" id="btnModeRoulette" class="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white whitespace-nowrap transition">3D Rulet</button>
       <button onclick="setGameMode('cards')" id="btnModeCards" class="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white whitespace-nowrap transition">Kart Masası</button>
@@ -579,6 +580,7 @@
     let currentWinner = null;
     let round = 1;
     let activeGameMode = 'wheel';
+    const isWheelMode = (m = activeGameMode) => m === 'wheel' || m === 'testWheel';
     let isPlaying = false;
     let pendingTarget = null;
     let pendingFakeTarget = null;
@@ -836,17 +838,26 @@
       activeGameMode = mode;
       document.querySelectorAll('.game-view').forEach(el => el.classList.add('hidden'));
 
-      ['wheel', 'slot', 'roulette', 'cards'].forEach(m => {
+      ['wheel', 'testWheel', 'slot', 'roulette', 'cards'].forEach(m => {
         const btn = document.getElementById('btnMode' + m.charAt(0).toUpperCase() + m.slice(1));
         if (btn) {
-          btn.className = (m === mode) 
-            ? 'px-3.5 py-1.5 rounded-lg bg-amber-500 text-black font-bold whitespace-nowrap transition shadow'
-            : 'px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white whitespace-nowrap transition';
+          if (m === mode) {
+            btn.className = (m === 'testWheel')
+              ? 'px-3.5 py-1.5 rounded-lg bg-emerald-500 text-black font-bold whitespace-nowrap transition shadow'
+              : 'px-3.5 py-1.5 rounded-lg bg-amber-500 text-black font-bold whitespace-nowrap transition shadow';
+          } else {
+            btn.className = (m === 'testWheel')
+              ? 'px-3.5 py-1.5 rounded-lg text-emerald-400 hover:text-white whitespace-nowrap transition border border-emerald-500/30'
+              : 'px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white whitespace-nowrap transition';
+          }
         }
       });
 
       const titles = {
-        wheel: '3D Casino Çarkı', slot: '3D Vegas Slots', roulette: '3D Rulet Masası',
+        wheel: '3D Casino Çarkı (Klasik)',
+        testWheel: '3D Diferansiyel Çark (🧪 Test Fiziği)',
+        slot: '3D Vegas Slots',
+        roulette: '3D Rulet Masası',
         cards: '3D Gizemli Kart Masası'
       };
       document.getElementById('gameTitleDisplay').textContent = titles[mode] || 'Şans Oyunu';
@@ -856,10 +867,11 @@
       const rouletteBadge = document.getElementById('rouletteStatusBadge');
       if (rouletteBadge) rouletteBadge.textContent = 'Krupiye: Çark çevrilmeye hazır';
 
-      const viewEl = document.getElementById('game' + mode.charAt(0).toUpperCase() + mode.slice(1) + 'View');
+      const actualViewKey = (mode === 'testWheel') ? 'Wheel' : (mode.charAt(0).toUpperCase() + mode.slice(1));
+      const viewEl = document.getElementById('game' + actualViewKey + 'View');
       if (viewEl) viewEl.classList.remove('hidden');
 
-      if (mode === 'wheel') resizeWheelCanvas();
+      if (mode === 'wheel' || mode === 'testWheel') resizeWheelCanvas();
       else if (mode === 'slot') initSlotDisplay();
       else if (mode === 'roulette') resizeRouletteCanvas();
       else if (mode === 'cards') renderFullCardsShowcase();
@@ -1135,7 +1147,7 @@
       broadcast({ type: 'sync_names', names: names });
 
       // Aktif mod görselini anında yenile
-      if (activeGameMode === 'wheel') drawWheel();
+      if (isWheelMode()) drawWheel();
       else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
       else if (activeGameMode === 'slot') initSlotDisplay();
       else if (activeGameMode === 'cards') renderFullCardsShowcase();
@@ -1143,8 +1155,10 @@
       return { target, fake };
     }
 
-    // --- GELİŞMİŞ ANALİTİK FİZİK & DOPAMİN NEAR-MISS MOTORU İLE ÇARKIFELEK ---
-    function spinWheel(targetName = null, fakeTargetName = null, flickSpeed = null) {
+    // ============================================================
+    // 1. DİFERANSİYEL BALİSTİK TEST ÇARKI (🧪 TEST SEKMEDE ÇALIŞIR)
+    // ============================================================
+    function spinWheelDifferential(targetName = null, fakeTargetName = null, flickSpeed = null) {
       if (isPlaying || !names.length) return;
       flickSpeed = (typeof flickSpeed === 'number' && Number.isFinite(flickSpeed)) ? flickSpeed : null;
 
@@ -1355,12 +1369,179 @@
 
           const winnerName = names[targetIndex];
           setTimeout(() => {
-            finishGame(winnerName, targetName !== null, '3D Çarkıfelek (Diferansiyel Fizik)');
+            finishGame(winnerName, targetName !== null, '3D Çarkıfelek (Diferansiyel Test)');
           }, 450);
         }
       }
 
       requestAnimationFrame(animLoop);
+    }
+
+    // ============================================================
+    // 2. KLASİK ÇARKIFELEK (ORİJİNAL ZAMAN ÇİZGİSİ MOTORU)
+    // ============================================================
+    function spinWheelClassic(targetName = null, fakeTargetName = null, flickSpeed = null) {
+      if (isPlaying || !names.length) return;
+      flickSpeed = (typeof flickSpeed === 'number' && Number.isFinite(flickSpeed)) ? flickSpeed : null;
+
+      const pair = smartShuffleNames(targetName, fakeTargetName);
+      const actualTarget = pair ? pair.target : (targetName || names[0]);
+      const actualFake = pair ? pair.fake : fakeTargetName;
+
+      isPlaying = true;
+      broadcast({ type: 'spin_start' });
+
+      const N = names.length, arc = (2 * Math.PI) / N;
+      const POINTER_ANGLE = 1.5 * Math.PI;
+
+      let targetIndex = names.findIndex(n => trNormalize(n) === trNormalize(actualTarget));
+      if (targetIndex === -1) targetIndex = 0;
+
+      const duration = flickSpeed 
+        ? Math.max(3800, Math.min(8500, Math.abs(flickSpeed) * 240))
+        : Math.max(4500, spinDuration * 1000);
+      const dNorm = Math.max(0, Math.min(100, dopamineLevel)) / 100;
+      const effD = (fakeTargetName !== null) ? Math.max(0.60, dNorm) : dNorm;
+
+      const targetCenterAngle = (targetIndex + 0.5) * arc;
+      const targetModulo = ((POINTER_ANGLE - targetCenterAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const currentModulo = (wheelRotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+
+      let deltaAngle = targetModulo - currentModulo;
+      if (deltaAngle <= 0.1) deltaAngle += 2 * Math.PI;
+
+      const baseTurns = flickSpeed 
+        ? Math.max(2, Math.min(8, Math.round(Math.abs(flickSpeed) * 0.22)))
+        : Math.max(3, Math.floor((duration / 1000) * 0.85));
+      const totalDelta = baseTurns * (2 * Math.PI) + deltaAngle;
+      const startRotation = wheelRotation;
+      const finalRotation = startRotation + totalDelta;
+
+      const isRecoilActive = (effD >= 0.80) && (N > 1);
+      const recoilSpan = Math.min(arc * 0.45, 0.24);
+      const fakeStopRotation = finalRotation + recoilSpan;
+      const pStop = 0.74;
+      const pHoverEnd = 0.81;
+      let recoilTickPlayed = false;
+
+      const pegContactSpan = arc > 0 ? Math.min(0.24, 0.085 / arc) : 0.24;
+
+      const startTime = performance.now();
+      const pointerEl = document.getElementById('pointerEl');
+      const wheelStageEl = document.getElementById('wheel3DStage');
+      if (wheelStageEl) {
+        wheelStageEl.classList.remove('wheel-zoom-winner');
+        wheelStageEl.classList.add('wheel-spinning-cam');
+      }
+      let lastPegIdx = -1;
+      let flapperDeflection = 0;
+      let flapperSpringVel = 0;
+      let lastFrameTime = startTime;
+
+      function animLoopClassic(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        let dt = (now - lastFrameTime) / 1000;
+        lastFrameTime = now;
+        if (dt > 0.05) dt = 0.016;
+
+        let currentSpeed = 0;
+
+        if (isRecoilActive) {
+          if (progress <= pStop) {
+            const u = progress / pStop;
+            const ease = 1 - Math.pow(1 - u, 3.4);
+            wheelRotation = startRotation + (fakeStopRotation - startRotation) * ease;
+            const du = (3.4 * Math.pow(1 - u, 2.4)) / pStop;
+            currentSpeed = Math.max(0, ((fakeStopRotation - startRotation) / (duration / 1000)) * du);
+            if (progress >= pStop - 0.05) flapperDeflection *= 0.85;
+          } else if (progress <= pHoverEnd) {
+            const u = (progress - pStop) / (pHoverEnd - pStop);
+            const tremor = Math.sin(u * Math.PI * 2) * 0.006 * arc;
+            wheelRotation = fakeStopRotation + tremor;
+            currentSpeed = 0.001;
+            flapperDeflection = Math.sin(now * 0.04) * 0.8;
+          } else {
+            const u = (progress - pHoverEnd) / (1.0 - pHoverEnd);
+            const ease = 0.5 * (1 - Math.cos(u * Math.PI));
+            wheelRotation = fakeStopRotation - (fakeStopRotation - finalRotation) * ease;
+            const du = (0.5 * Math.PI * Math.sin(u * Math.PI)) / (1.0 - pHoverEnd);
+            currentSpeed = Math.max(0, ((fakeStopRotation - finalRotation) / (duration / 1000)) * du);
+
+            if (u > 0.35 && u < 0.70) {
+              flapperDeflection = 12.0 * Math.sin(((u - 0.35) / 0.35) * Math.PI);
+              if (!recoilTickPlayed && u > 0.50) {
+                recoilTickPlayed = true;
+                playTick(540);
+              }
+            } else {
+              flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
+              flapperDeflection += flapperSpringVel * dt;
+            }
+          }
+        } else {
+          const u = progress;
+          const oneMinusU = Math.max(0, 1 - u);
+          const easeP = (1 - Math.pow(oneMinusU, 3.8)) * (1 - 0.24 * u) + (1 - Math.pow(oneMinusU, 2.0)) * (0.24 * u);
+          const du = Math.max(0, 3.8 * Math.pow(oneMinusU, 2.8) * (1 - 0.24 * u) + 2.0 * oneMinusU * (0.24 * u));
+          const durSec = Math.max(0.1, duration / 1000);
+          currentSpeed = Math.max(0, (totalDelta / durSec) * du);
+          wheelRotation = startRotation + totalDelta * easeP;
+        }
+
+        const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
+        const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
+        if (phaseInSlice < pegContactSpan) {
+          const pushFraction = phaseInSlice / pegContactSpan;
+          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
+          if (curIdx !== lastPegIdx) {
+            lastPegIdx = curIdx;
+            const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentSpeed * 28) + (Math.random() * 20 - 10)));
+            playTick(dynFreq);
+            flapperSpringVel = 120;
+          }
+        } else if (!isRecoilActive || progress <= pStop || progress > pHoverEnd) {
+          flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
+          flapperDeflection += flapperSpringVel * dt;
+        }
+
+        if (pointerEl) {
+          pointerEl.style.transform = `translateX(-50%) rotate(${flapperDeflection.toFixed(2)}deg)`;
+        }
+
+        drawWheel(-1, currentSpeed);
+
+        if (progress < 1) {
+          requestAnimationFrame(animLoopClassic);
+        } else {
+          isPlaying = false;
+          wheelRotation = finalRotation;
+          if (pointerEl) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
+          if (wheelStageEl) {
+            wheelStageEl.classList.remove('wheel-spinning-cam');
+            wheelStageEl.classList.add('wheel-zoom-winner');
+          }
+          drawWheel(targetIndex, 0);
+
+          const winnerName = names[targetIndex];
+          setTimeout(() => {
+            finishGame(winnerName, targetName !== null, '3D Çarkıfelek (Klasik)');
+          }, 450);
+        }
+      }
+
+      requestAnimationFrame(animLoopClassic);
+    }
+
+    // ============================================================
+    // 3. ÇARK YÖNLENDİRİCİSİ (AKTİF SEKMEDEKİ MOTORU ÇALIŞTIRIR)
+    // ============================================================
+    function spinWheel(targetName = null, fakeTargetName = null, flickSpeed = null) {
+      if (activeGameMode === 'testWheel') {
+        spinWheelDifferential(targetName, fakeTargetName, flickSpeed);
+      } else {
+        spinWheelClassic(targetName, fakeTargetName, flickSpeed);
+      }
     }
 
     // --- 2. 3D RETRO VEGAS SLOT (3X3 MATRİS, ÇAPRAZ SOS ÇİZGİSİ & NUDGE DROP) ---
@@ -2525,7 +2706,7 @@
       }
       pendingTarget = target;
       pendingFakeTarget = fakeTarget;
-      if (activeGameMode === 'wheel') spinWheel(target, fakeTarget);
+      if (isWheelMode()) spinWheel(target, fakeTarget);
       else if (activeGameMode === 'slot') spinSlot(target, fakeTarget);
       else if (activeGameMode === 'roulette') spinRoulette(target, fakeTarget);
       else if (activeGameMode === 'cards') {
@@ -2617,7 +2798,7 @@
           }
         }
         const sMode = localStorage.getItem('cark_game_mode');
-        if (sMode && ['wheel', 'slot', 'roulette', 'cards'].includes(sMode)) {
+        if (sMode && ['wheel', 'testWheel', 'slot', 'roulette', 'cards'].includes(sMode)) {
           activeGameMode = sMode;
         }
       } catch (e) {}
@@ -2636,7 +2817,7 @@
 
     function closeModal() {
       document.getElementById('winnerModal').classList.add('opacity-0', 'pointer-events-none');
-      if (activeGameMode === 'wheel') {
+      if (isWheelMode()) {
         const stageEl = document.getElementById('wheel3DStage');
         if (stageEl) stageEl.classList.remove('wheel-spinning-cam', 'wheel-zoom-winner');
         drawWheel(-1, 0);
@@ -2660,7 +2841,7 @@
         names = names.filter(n => n !== currentWinner);
         saveStorage();
         updateRoundUI();
-        if (activeGameMode === 'wheel') drawWheel();
+        if (isWheelMode()) drawWheel();
         else if (activeGameMode === 'cards') renderFullCardsShowcase();
         else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
         else if (activeGameMode === 'slot') initSlotDisplay();
@@ -2800,7 +2981,7 @@
           names = data.names;
           saveStorage();
           updateRoundUI();
-          if (activeGameMode === 'wheel') drawWheel();
+          if (isWheelMode()) drawWheel();
           else if (activeGameMode === 'cards') renderFullCardsShowcase();
           else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
           else if (activeGameMode === 'slot') initSlotDisplay();
@@ -2844,7 +3025,7 @@
         if (names.length === 0) names = ["Ahmet", "Ayşe", "Mehmet"];
         saveStorage();
         updateRoundUI();
-        if (activeGameMode === 'wheel') drawWheel();
+        if (isWheelMode()) drawWheel();
         else if (activeGameMode === 'cards') renderFullCardsShowcase();
         else if (activeGameMode === 'roulette') { drawRoulette(); renderRouletteTable(); }
         else if (activeGameMode === 'slot') initSlotDisplay();
@@ -3026,7 +3207,7 @@
     }
 
     wheelCanvas?.addEventListener('pointerdown', (e) => {
-      if (isPlaying || activeGameMode !== 'wheel' || !names.length) return;
+      if (isPlaying || !isWheelMode() || !names.length) return;
       const { cx, cy, radius } = getWheelCenter();
       const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
       if (dist > radius || dist < 24) return; // Çarkın dışındaysa veya merkeze çok yakınsa
@@ -3043,7 +3224,7 @@
     });
 
     window.addEventListener('pointermove', (e) => {
-      if (!isWheelDragging || activeGameMode !== 'wheel' || !names.length) return;
+      if (!isWheelDragging || !isWheelMode() || !names.length) return;
       const { cx, cy } = getWheelCenter();
       const currentAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
 
@@ -3122,7 +3303,7 @@
     });
 
     window.addEventListener('resize', () => {
-      if (activeGameMode === 'wheel') resizeWheelCanvas();
+      if (isWheelMode()) resizeWheelCanvas();
       else if (activeGameMode === 'roulette') resizeRouletteCanvas();
     });
 
@@ -3139,7 +3320,7 @@
     function initApp() {
       try { loadStorage(); } catch (e) {}
       try {
-        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        if (isWheelMode()) resizeWheelCanvas();
         else if (activeGameMode === 'roulette') resizeRouletteCanvas();
       } catch (e) {}
       try { setGameMode(activeGameMode, false); } catch (e) {}
@@ -3148,19 +3329,19 @@
 
       // Ekran boyutunu ve canvas çizimini açılışta hemen garantile
       requestAnimationFrame(() => {
-        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        if (isWheelMode()) resizeWheelCanvas();
         else if (activeGameMode === 'roulette') resizeRouletteCanvas();
       });
       setTimeout(() => {
-        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        if (isWheelMode()) resizeWheelCanvas();
         else if (activeGameMode === 'roulette') resizeRouletteCanvas();
       }, 80);
       setTimeout(() => {
-        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        if (isWheelMode()) resizeWheelCanvas();
         else if (activeGameMode === 'roulette') resizeRouletteCanvas();
       }, 300);
       setTimeout(() => {
-        if (activeGameMode === 'wheel') resizeWheelCanvas();
+        if (isWheelMode()) resizeWheelCanvas();
         else if (activeGameMode === 'roulette') resizeRouletteCanvas();
       }, 800);
     }
