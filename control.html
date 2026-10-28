@@ -271,7 +271,12 @@
         if (storedNames) names = JSON.parse(storedNames);
         else names = [...DEFAULT_NAMES];
         const storedHist = localStorage.getItem('cark_history');
-        if (storedHist) history = JSON.parse(storedHist);
+        if (storedHist) {
+          try {
+            const parsedH = JSON.parse(storedHist);
+            history = Array.isArray(parsedH) ? parsedH.slice(0, 100) : [];
+          } catch (_) { history = []; }
+        }
 
         const sDur = localStorage.getItem('cark_duration');
         if (sDur) currentDuration = parseFloat(sDur);
@@ -285,6 +290,7 @@
 
     function saveStorage() {
       try {
+        if (Array.isArray(history) && history.length > 100) history = history.slice(0, 100);
         localStorage.setItem('cark_names', JSON.stringify(names));
         localStorage.setItem('cark_history', JSON.stringify(history));
         localStorage.setItem('cark_duration', currentDuration.toString());
@@ -518,8 +524,8 @@
       }
 
       filtered.forEach(name => {
-        const isTarget = (selectedTarget === name);
-        const isFake = (selectedFakeTarget === name);
+        const isTarget = !!(selectedTarget && trNormalize(selectedTarget) === trNormalize(name));
+        const isFake = !!(selectedFakeTarget && trNormalize(selectedFakeTarget) === trNormalize(name));
 
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -545,19 +551,19 @@
           vibrate();
           if (currentAssignMode === 'target') {
             // Asıl hedef seçimi
-            if (selectedTarget === name) {
+            if (selectedTarget && trNormalize(selectedTarget) === trNormalize(name)) {
               selectedTarget = null;
             } else {
               selectedTarget = name;
-              if (selectedFakeTarget === name) selectedFakeTarget = null;
+              if (selectedFakeTarget && trNormalize(selectedFakeTarget) === trNormalize(name)) selectedFakeTarget = null;
             }
           } else {
             // Yem / Troll hedef seçimi
-            if (selectedFakeTarget === name) {
+            if (selectedFakeTarget && trNormalize(selectedFakeTarget) === trNormalize(name)) {
               selectedFakeTarget = null;
             } else {
               selectedFakeTarget = name;
-              if (selectedTarget === name) selectedTarget = null;
+              if (selectedTarget && trNormalize(selectedTarget) === trNormalize(name)) selectedTarget = null;
             }
           }
 
@@ -632,7 +638,7 @@
       }
 
       if (data.type === 'init') {
-        if (data.history) history = data.history;
+        if (data.history && Array.isArray(data.history)) history = data.history.slice(0, 100);
         if (data.names && data.names.length) names = data.names;
         if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
         if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
@@ -655,7 +661,7 @@
         lastWinner = data.winner;
         document.getElementById('lastWinnerCard').classList.remove('hidden');
         document.getElementById('lastWinnerName').textContent = lastWinner;
-        if (data.history) history = data.history;
+        if (data.history && Array.isArray(data.history)) history = data.history.slice(0, 100);
         saveStorage(); renderHistoryUI();
 
         if (document.getElementById('autoRemoveToggle').checked) {
@@ -790,13 +796,15 @@
       if (spinning) {
         btn.disabled = true;
         text.textContent = 'OYUN ÇALIŞIYOR...';
+        const dur = (typeof currentDuration === 'number' && Number.isFinite(currentDuration) && currentDuration > 0) ? currentDuration : 5;
+        const maxWait = Math.max(9000, dur * 1000 + 3500);
         spinTimeout = setTimeout(() => {
           if (isGameRunning) {
             isGameRunning = false;
             btn.disabled = !isConnected;
             updateTriggerBtnText();
           }
-        }, 8500);
+        }, maxWait);
       } else {
         btn.disabled = !isConnected;
         updateTriggerBtnText();
@@ -881,7 +889,12 @@
       const now = Date.now();
       if (now - lastTriggerTime < 1000) return;
       if (!isConnected || isGameRunning) return;
+      if (!names || names.length === 0) {
+        showToast('Liste boş! Lütfen en az 1 katılımcı ekleyin.');
+        return;
+      }
       lastTriggerTime = now;
+      setSpinningState(true);
       vibrate();
       sendRemote({
         type: 'spin',
@@ -982,6 +995,9 @@
       const parsed = textarea.value.split('\n').map(n => n.trim()).filter(n => n.length > 0 && n.length < 30);
       if (!parsed.length) { showToast('En az 1 geçerli isim girin'); return; }
       names = parsed;
+      if (selectedTarget && !names.some(n => trNormalize(n) === trNormalize(selectedTarget))) selectedTarget = null;
+      if (selectedFakeTarget && !names.some(n => trNormalize(n) === trNormalize(selectedFakeTarget))) selectedFakeTarget = null;
+      updateTargetUI();
       saveStorage();
       renderGrid(document.getElementById('searchInput').value);
       closeEditor();
