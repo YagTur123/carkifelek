@@ -855,7 +855,7 @@
 
       const titles = {
         wheel: '3D Casino Çarkı (Klasik)',
-        testWheel: '3D Diferansiyel Çark (🧪 Test Fiziği)',
+        testWheel: '3D Test Çarkı (🧪 %100 Gerçek Fizik)',
         slot: '3D Vegas Slots',
         roulette: '3D Rulet Masası',
         cards: '3D Gizemli Kart Masası'
@@ -1156,14 +1156,13 @@
     }
 
     // ============================================================
-    // 1. DİFERANSİYEL BALİSTİK TEST ÇARKI (🧪 TEST SEKMEDE ÇALIŞIR)
+    // 1. %100 GERÇEK FİZİK TEST ÇARKI (FORWARD IVP DYNAMICS + INVERSE PRE-ROLL)
     // ============================================================
     function spinWheelDifferential(targetName = null, fakeTargetName = null, flickSpeed = null) {
       if (isPlaying || !names.length) return;
-      flickSpeed = (typeof flickSpeed === 'number' && Number.isFinite(flickSpeed)) ? flickSpeed : null;
+      const validFlick = (typeof flickSpeed === 'number' && Number.isFinite(flickSpeed)) ? Math.abs(flickSpeed) : null;
 
-      // KULLANICI KURALI: 0'DAN TAM RASTGELE SHUFFLE!
-      // Tüm liste 0'dan Fisher-Yates ile karıştırılır, Kazanan ve Yem yan yana yerleştirilir!
+      // Tüm liste Fisher-Yates ile karıştırılır, Kazanan ve Yem yan yana yerleştirilir
       const pair = smartShuffleNames(targetName, fakeTargetName);
       const actualTarget = pair ? pair.target : (targetName || names[0]);
       const actualFake = pair ? pair.fake : fakeTargetName;
@@ -1171,205 +1170,189 @@
       isPlaying = true;
       broadcast({ type: 'spin_start' });
 
-      const N = names.length, arc = (2 * Math.PI) / N;
+      const N = names.length;
+      const arc = (2 * Math.PI) / N;
       const POINTER_ANGLE = 1.5 * Math.PI; // 270 derece (tam tepe ibresi)
 
       let targetIndex = names.findIndex(n => trNormalize(n) === trNormalize(actualTarget));
       if (targetIndex === -1) targetIndex = 0;
 
-      // Çark saat yönünde dönerken hedeften hemen sonra gelen komşu dilim: fakeTargetIndex
-      // KULLANICI KURALI: Kazanan, Yem'in hemen arkasında yer alır.
-      const fakeTargetIndex = (targetIndex - 1 + N) % N;
+      // Sabit Fizik Parametreleri (Newton + Coulomb Kuru Sürtünme + Viskoz Hava Direnci + Yay-Sönümleyici)
+      const h = 1 / 240;             // 240Hz sabit zaman adımı (Fixed Substep Integrator)
+      const I_wheel = 1.0;           // Çark eylemsizlik momenti (kg·m²)
+      const tauC = 1.62;             // Coulomb kuru sürtünme torku (N·m)
+      const b = 0.22;                // Viskoz sürtünme katsayısı (N·m·s/rad)
+      const kFlapper = 1400;         // İbre yay sertliği (N·m/rad)
+      const cFlapper = 32;           // İbre yay sönümleme katsayısı
+      const pegRadiusAngle = Math.min(0.065, arc * 0.22); // Pim temas açısı (rad)
 
-      // Kumandadan gelen süre veya el/fareyle fırlatma şiddetine göre dinamik süre ve tur hesabı
-      const duration = flickSpeed 
-        ? Math.max(3800, Math.min(8500, Math.abs(flickSpeed) * 240))
-        : Math.max(4500, spinDuration * 1000);
-      const dNorm = Math.max(0, Math.min(100, dopamineLevel)) / 100;
-      const isDopamineActive = ((dNorm >= 0.12) || (fakeTargetName !== null)) && (N > 1);
-      const effD = (fakeTargetName !== null) ? Math.max(0.60, dNorm) : dNorm;
+      const startTheta = wheelRotation;
 
-      // Hedeflenen dilimin tam merkezinin tepe ibresiyle (POINTER_ANGLE) çakışması için gereken açı
-      const targetCenterAngle = (targetIndex + 0.5) * arc;
-      const targetModulo = ((POINTER_ANGLE - targetCenterAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-      const currentModulo = (wheelRotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      // Deterministik İleri Simülasyon Adımı (Pre-roll analitik shooting çözücüsü için)
+      function runSimStep(simTheta, simOmega) {
+        const curRel = ((POINTER_ANGLE - simTheta) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const pegDist = curRel % arc;
+        let pegTorque = 0;
+        let inContact = false;
 
-      let deltaAngle = targetModulo - currentModulo;
-      if (deltaAngle <= 0.1) deltaAngle += 2 * Math.PI;
+        if (pegDist < pegRadiusAngle) {
+          inContact = true;
+          const penetration = Math.max(0, Math.min(1, (pegRadiusAngle - pegDist) / pegRadiusAngle));
+          pegTorque = -4.2 * Math.sin(penetration * Math.PI) * Math.sign(simOmega || 1);
+        }
 
-      // Süreye ve fırlatma hızına göre dengeli tur sayısı (Inertia & Momentum)
-      const baseTurns = flickSpeed 
-        ? Math.max(2, Math.min(8, Math.round(Math.abs(flickSpeed) * 0.22)))
-        : Math.max(3, Math.floor((duration / 1000) * 0.85));
-      const totalDelta = baseTurns * (2 * Math.PI) + deltaAngle;
-      const startRotation = wheelRotation;
-      const finalRotation = startRotation + totalDelta;
+        const fric = tauC * Math.tanh(simOmega / 0.03) + b * simOmega;
+        const alpha = (-fric + pegTorque) / I_wheel;
+        const nextOmega = simOmega + alpha * h;
+        const nextTheta = simTheta + nextOmega * h;
 
-      // DOPAMİN DİNAMİĞİ (%0 ile %100 ARASI KESİNTİSİZ ANALOG ÖLÇEKLEME):
-      // %0 - %11: Standart doğal fiziksel sönüm
-      // %12 - %79: Near-miss gerilimi & pimde ağır çekim sürünme
-      // %80 - %100: KULLANICI KURALI: Çark ileri dönerken YEMDE DURACAK, Yemden yavaş yavaş geriye dönüp gerçek kazanana inecek!
-      const isRecoilActive = (effD >= 0.80) && (N > 1);
-
-      // Normal Dopamin (12-79%) parametreleri
-      const pegRatio = (totalDelta - 0.5 * arc) / totalDelta;
-      const pPeg = 0.88 - effD * 0.24; 
-      const span2 = 1.0 - pPeg;
-      const crawlC = 0.080 - effD * 0.070;
-      const a = 2.4 + effD * 1.2;
-      const vPeg = (pegRatio * crawlC) / pPeg;
-      const m0 = vPeg * span2;
-      const m1 = 0; // Kazanan dilim merkezine sıfır hızla pürüzsüzce oturur
-      let hasOvercomePeg = false;
-
-      // %80-100 Recoil & Yemde Durma, Yemden Yavaş Yavaş Kazanana İnme Parametreleri
-      // FİZİK DÜZELTMESİ: Çeyrek tur geriye dönme yerine tırnak pimi gerilim yaylanması (maksimum 13.5°)
-      const recoilSpan = Math.min(arc * 0.45, 0.24); // Gerçekçi tırnak elastik gerilim açısı
-      const fakeStopRotation = finalRotation + recoilSpan; // Yem diliminin güvenli gerilim açısı
-      const pStop = 0.74; // Yem dilimi pimine varış ve gerilim zamanı
-      const pHoverEnd = 0.81; // Pimin üstünde takılıp gerilme süresi (0.74-0.81 arası mekanik kilitlenme)
-      let recoilTickPlayed = false;
-
-      // Sabit fiziksel tırnak temas genişliği (N=2'de aşırı bükülmeyi önler, daima ~4.8° temas boyu)
-      const pegContactSpan = arc > 0 ? Math.min(0.24, 0.085 / arc) : 0.24;
-
-      // İbre (flapper) gerilim ve titreme şiddeti: %0'da normal, %100'de kalp krizi seviyesi
-      const maxFlapperDeflection = 14.0 + effD * 12.0; // 14° ile 26° arası bükülme
-      const flapperTremorAmp = 0.8 + effD * 2.4;
-      const flapperSnapVel = 120 + effD * 90; // Pimi aşınca fırlama ivmesi
-
-      // ============================================================
-      // 1. AŞAMA: BALİSTİK İLK HIZ & DİFERANSİYEL SÜRTÜNME MOTORU
-      // ============================================================
-      const alphaC = 1.68; // Kuru rulman sürtünmesi (rad/s^2)
-      const beta = 0.25;   // Viskoz hava direnci katsayısı (1/s)
-
-      // Balistik İlk Hız (Kapalı Formül: Hedef Δθ açısına ve T süresine tam ulaştıran analitik ω0)
-      function calcInitialOmega(delta, tSec) {
-        const T = Math.max(2.5, tSec);
-        const u = beta * T;
-        const D = Math.max(0.001, 1 - Math.exp(-u));
-        const w0 = (beta * delta + alphaC * T) / D - (alphaC / beta);
-        return Math.max(4.0, Number.isFinite(w0) ? w0 : 15.0);
+        return { nextTheta, nextOmega, inContact };
       }
 
-      const activeTargetDelta = isRecoilActive ? (fakeStopRotation - startRotation) : totalDelta;
-      const targetTimeSec = duration / 1000;
-      let currentOmega = Math.min(80, Math.max(4.0, calcInitialOmega(activeTargetDelta, targetTimeSec)));
-      let isRecoilPhase = false;
-      let recoilStartTime = 0;
+      function evaluateW0(wCand) {
+        let simTh = startTheta;
+        let simOm = wCand;
+        for (let s = 0; s < 3200; s++) {
+          const step = runSimStep(simTh, simOm);
+          simTh = step.nextTheta;
+          simOm = step.nextOmega;
+          if (Math.abs(simOm) < 0.008 && !step.inContact) {
+            const finalRel = ((POINTER_ANGLE - simTh) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+            const winner = Math.floor(finalRel / arc);
+            const offset = (finalRel % arc) / arc;
+            return { winner, offset, finalTh: simTh };
+          }
+        }
+        return null;
+      }
 
-      const startTime = performance.now();
+      // BAŞLANGIÇ AÇISAL HIZI BELİRLEME (w0):
+      let chosenW0 = 22.0;
+
+      if (targetName !== null) {
+        // HEDEF SEÇİLMİŞSE: Simülasyon başlamadan önce 10-15 ms içinde hedef dilime
+        // tam oturacak egzakt w0 ilk hızı çözülür. (Yem varsa pim sınırına yakın near-miss hedeflenir)
+        let bestCandidate = null;
+        let minDiff = 999;
+        const targetOffsetGoal = (fakeTargetName !== null) ? 0.32 : 0.50;
+        const baseSearch = validFlick ? Math.max(14.0, Math.min(32.0, validFlick * 1.8 + 12)) : 20.0;
+        const searchStart = performance.now();
+
+        for (let dw = 0; dw <= 7.0; dw += 0.03) {
+          if (performance.now() - searchStart > 25) break; // Ana thread kilitlenme koruması (maks 25ms)
+          const res = evaluateW0(baseSearch + dw);
+          if (res && res.winner === targetIndex) {
+            const diff = Math.abs(res.offset - targetOffsetGoal);
+            if (diff < minDiff) {
+              minDiff = diff;
+              bestCandidate = baseSearch + dw;
+              if (diff < 0.06) break;
+            }
+          }
+        }
+        chosenW0 = bestCandidate !== null ? bestCandidate : baseSearch;
+      } else {
+        // HEDEF YOKSA: Başlangıç hızı tamamen serbesttir; kazananı %100 saf fizik belirler
+        chosenW0 = validFlick 
+          ? Math.max(12.0, Math.min(35.0, validFlick * 1.9 + 14))
+          : (18.5 + Math.random() * 8.0);
+      }
+
+      // --- CANLI İLERİ FİZİK DÖNGÜSÜ (SIFIR SNAP, SIFIR TWEEN, SIFIR HİLE) ---
+      let omega = chosenW0;
+      let flapper = 0;
+      let flapperV = 0;
+      let lastContact = false;
+      let quietSettleTime = 0;
+
       const pointerEl = document.getElementById('pointerEl');
       const wheelStageEl = document.getElementById('wheel3DStage');
       if (wheelStageEl) {
         wheelStageEl.classList.remove('wheel-zoom-winner');
         wheelStageEl.classList.add('wheel-spinning-cam');
       }
-      let lastPegIdx = -1;
-      let flapperDeflection = 0;
-      let flapperSpringVel = 0;
-      let lastFrameTime = startTime;
+
+      let lastFrameTime = performance.now();
+      let accumulator = 0;
 
       function animLoop(now) {
-        let dt = (now - lastFrameTime) / 1000;
+        let frameDt = (now - lastFrameTime) / 1000;
         lastFrameTime = now;
-        if (dt > 0.04) dt = 0.016;
+        if (frameDt > 0.08) frameDt = 0.016; // Arka plan sekme lag koruması
+        accumulator += frameDt;
 
-        let currentSpeed = currentOmega;
+        // Sabit zaman adımlı (Fixed-dt) substep integrasyonu
+        while (accumulator >= h) {
+          accumulator -= h;
 
-        // Tırnak açısı ve konumu
-        const curRelative = ((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-        const curIdx = Math.floor(curRelative / arc) % N;
-        const phaseInSlice = (curRelative % arc) / arc;
+          const curRel = ((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+          const pegDist = curRel % arc;
+          let pegTorque = 0;
+          let contact = false;
 
-        // 1. DİFERANSİYEL İBRE VE TIRNAK DİRENCİ ETKİLEŞİMİ
-        let pegResistanceTorque = 0;
-        if (phaseInSlice < pegContactSpan) {
-          const pushFraction = phaseInSlice / pegContactSpan;
-          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * maxFlapperDeflection;
-          pegResistanceTorque = (0.45 + effD * 0.35) * Math.sin(pushFraction * Math.PI); // Pimin çarka tork freni
+          if (pegDist < pegRadiusAngle) {
+            contact = true;
+            const penetration = Math.max(0, Math.min(1, (pegRadiusAngle - pegDist) / pegRadiusAngle));
+            // İbre fiziksel temas kuvvetiyle bükülür
+            flapper = -penetration * 0.28; // ~16 derece bükülme
+            pegTorque = -4.2 * Math.sin(penetration * Math.PI) * Math.sign(omega || 1);
+          } else {
+            // İbre serbest salınımda sönümlü harmonik osilatör
+            const flapperAcc = (-kFlapper * flapper - cFlapper * flapperV);
+            flapperV += flapperAcc * h;
+            flapper += flapperV * h;
+          }
 
-          if (curIdx !== lastPegIdx) {
-            lastPegIdx = curIdx;
-            const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentOmega * 28) + (Math.random() * 20 - 10)));
+          // Pimden kurtulma anında mekanik 'tick' sesi
+          if (lastContact && !contact && Math.abs(omega) > 0.05) {
+            flapperV = 18.0; // Yay boşalması fırlama hızı
+            const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(Math.abs(omega) * 26) + (Math.random() * 20 - 10)));
             playTick(dynFreq);
-            flapperSpringVel = flapperSnapVel;
           }
-        } else {
-          // Serbest Semi-implicit Euler yaylanması
-          flapperSpringVel += (-460 * flapperDeflection - 28 * flapperSpringVel) * dt;
-          flapperDeflection += flapperSpringVel * dt;
-        }
+          lastContact = contact;
 
-        // 2. AÇISAL HIZ DİFERANSİYEL ENTEGRASYONU
-        if (!isRecoilPhase) {
-          const decel = Math.min(50, alphaC + beta * currentOmega + pegResistanceTorque);
-          currentOmega = Math.max(0, currentOmega - decel * dt);
-          wheelRotation += currentOmega * dt;
+          // Çark dinamik denklemi: I·α = -τ_c·tanh(ω/0.03) - b·ω + τ_peg
+          const fric = tauC * Math.tanh(omega / 0.03) + b * omega;
+          const alpha = (-fric + pegTorque) / I_wheel;
+          omega += alpha * h;
+          wheelRotation += omega * h;
 
-          // Recoil modu: Yem diliminde hız sıfırlandığında pimin geri tepmesi başlar
-          if (isRecoilActive && currentOmega <= 0.08 && (fakeStopRotation - wheelRotation) <= 0.18) {
-            isRecoilPhase = true;
-            recoilStartTime = now;
-            currentOmega = 0;
-            wheelRotation = fakeStopRotation; // Yem pimi zirvesi
-          }
-        } else {
-          // ==========================================
-          // RECOIL AŞAMASI: PİM GERİLİMİNDEN ASIL KAZANANA GERİ YAYLANMA
-          // ==========================================
-          const elapsedRecoil = (now - recoilStartTime) / 1000;
-          const recoilDur = 0.65;
-          const u = Math.min(elapsedRecoil / recoilDur, 1);
-
-          // Pimin depoladığı yay enerjisiyle arkadaki kazanana pürüzsüz geri oturma
-          const easeBack = 0.5 * (1 - Math.cos(u * Math.PI));
-          wheelRotation = fakeStopRotation - (fakeStopRotation - finalRotation) * easeBack;
-          currentSpeed = Math.sin(u * Math.PI) * 1.5;
-
-          if (u > 0.40 && !recoilTickPlayed) {
-            recoilTickPlayed = true;
-            playTick(540); // Geri sekme tok klik sesi
-            flapperDeflection = 12.0; // İbre ters yöne esner
-          }
-
-          if (u >= 1.0) {
-            currentOmega = 0;
+          // %100 Saf Fiziksel Durma Şartı (Sıfır Snap, Enerji Tamamen Sıfırlanır)
+          if (Math.abs(omega) < 0.008 && !contact) {
+            omega = 0;
+            quietSettleTime += h;
+          } else {
+            quietSettleTime = 0;
           }
         }
 
+        // İbre açısını DOM'a yansıt
         if (pointerEl) {
-          pointerEl.style.transform = `translateX(-50%) rotate(${flapperDeflection.toFixed(2)}deg)`;
+          const flapperDeg = (flapper * 180 / Math.PI).toFixed(2);
+          pointerEl.style.transform = `translateX(-50%) rotate(${flapperDeg}deg)`;
         }
 
-        drawWheel(-1, currentSpeed);
+        drawWheel(-1, Math.abs(omega));
 
-        // Kalan mesafe ve durma şartı kontrolü
-        const remainingToGoal = isRecoilActive 
-          ? (isRecoilPhase ? Math.abs(finalRotation - wheelRotation) : (fakeStopRotation - wheelRotation))
-          : (finalRotation - wheelRotation);
-
-        const isFinished = isRecoilActive 
-          ? (isRecoilPhase && (now - recoilStartTime) / 1000 >= 0.65)
-          : (currentOmega <= 0.05 || remainingToGoal <= 0.02);
-
-        if (!isFinished) {
+        // Tam 100 ms (0.10s) boyunca fiziksel durgunluk sağlandığında tamamla (Hz bağımsız)
+        if (quietSettleTime < 0.10) {
           requestAnimationFrame(animLoop);
         } else {
-          // Süre değil FİZİK bittiğinde kesin tam hedef merkezine pürüzsüzce kilitlen
           isPlaying = false;
-          wheelRotation = finalRotation;
           if (pointerEl) pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
           if (wheelStageEl) {
             wheelStageEl.classList.remove('wheel-spinning-cam');
             wheelStageEl.classList.add('wheel-zoom-winner');
           }
-          drawWheel(targetIndex, 0);
 
-          const winnerName = names[targetIndex];
+          // Kazananı SADECE FİZİK belirler: İbrenin durduğu yerdeki dilim
+          const finalRel = ((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+          const finalWinnerIdx = Math.floor(finalRel / arc) % N;
+          drawWheel(finalWinnerIdx, 0);
+
+          const winnerName = names[finalWinnerIdx] || names[0];
           setTimeout(() => {
-            finishGame(winnerName, targetName !== null, '3D Çarkıfelek (Diferansiyel Test)');
+            finishGame(winnerName, targetName !== null, '3D Çarkıfelek (%100 Gerçek Fizik)');
           }, 450);
         }
       }
