@@ -1177,11 +1177,11 @@
       // Sabit Fizik Parametreleri (Newton + Coulomb Kuru Sürtünme + Viskoz Hava Direnci + Yay-Sönümleyici)
       const h = 1 / 240;             // 240Hz sabit zaman adımı (Fixed Substep Integrator)
       const I_wheel = 1.0;           // Çark eylemsizlik momenti (kg·m²)
-      const tauC = 1.62;             // Coulomb kuru sürtünme torku (N·m)
-      const b = 0.22;                // Viskoz sürtünme katsayısı (N·m·s/rad)
-      const kFlapper = 1400;         // İbre yay sertliği (N·m/rad)
-      const cFlapper = 32;           // İbre yay sönümleme katsayısı
-      const pegRadiusAngle = Math.min(0.065, arc * 0.22); // Pim temas açısı (rad)
+      const tauC = 1.48;             // Rulman kuru sürtünme torku (N·m - daha tok ve doğal yavaşlama)
+      const b = 0.18;                // Viskoz sürtünme katsayısı (N·m·s/rad - daha güçlü dönme momenti)
+      const kFlapper = 1550;         // İbre yay sertliği (N·m/rad - daha tok tırnak tepkisi)
+      const cFlapper = 36;           // İbre yay sönümleme katsayısı
+      const pegRadiusAngle = Math.min(0.092, arc * 0.28); // Genişletilmiş tırnak/pim hitbox temas açısı (rad)
 
       const startTheta = wheelRotation;
 
@@ -1195,7 +1195,7 @@
         if (pegDist < pegRadiusAngle) {
           inContact = true;
           const penetration = Math.max(0, Math.min(1, (pegRadiusAngle - pegDist) / pegRadiusAngle));
-          pegTorque = -4.2 * Math.sin(penetration * Math.PI) * Math.sign(simOmega || 1);
+          pegTorque = -5.2 * Math.sin(penetration * Math.PI) * Math.sign(simOmega || 1);
         }
 
         const fric = tauC * Math.tanh(simOmega / 0.03) + b * simOmega;
@@ -1209,7 +1209,7 @@
       function evaluateW0(wCand) {
         let simTh = startTheta;
         let simOm = wCand;
-        for (let s = 0; s < 3200; s++) {
+        for (let s = 0; s < 3400; s++) {
           const step = runSimStep(simTh, simOm);
           simTh = step.nextTheta;
           simOm = step.nextOmega;
@@ -1228,7 +1228,7 @@
 
       if (targetIndex !== -1) {
         // HEDEF SEÇİLMİŞSE: Analitik kapalı form ile hedef mesafesi (Δθ) ve tur sayısı üzerinden
-        // yaklaşık w0 tahmini yapılır, ardından ±2.2 rad/s aralığında <3ms içinde egzakt hız kilitlenir.
+        // yaklaşık w0 tahmini yapılır, ardından ±2.6 rad/s aralığında <3ms içinde egzakt hız kilitlenir.
         const targetCenterAngle = (targetIndex + 0.5) * arc;
         const targetModulo = ((POINTER_ANGLE - targetCenterAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
         const currentModulo = (startTheta % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
@@ -1245,7 +1245,7 @@
         let minDiff = 999;
         const targetOffsetGoal = (fakeTargetName !== null) ? 0.35 : 0.50;
 
-        for (let dw = -2.4; dw <= 2.4; dw += 0.03) {
+        for (let dw = -2.6; dw <= 2.6; dw += 0.03) {
           const res = evaluateW0(w0Guess + dw);
           if (res && res.winner === targetIndex) {
             const diff = Math.abs(res.offset - targetOffsetGoal);
@@ -1299,9 +1299,9 @@
           if (pegDist < pegRadiusAngle) {
             contact = true;
             const penetration = Math.max(0, Math.min(1, (pegRadiusAngle - pegDist) / pegRadiusAngle));
-            // İbre fiziksel temas kuvvetiyle bükülür
-            flapper = -penetration * 0.28; // ~16 derece bükülme
-            pegTorque = -4.2 * Math.sin(penetration * Math.PI) * Math.sign(omega || 1);
+            // İbre fiziksel temas kuvvetiyle daha belirgin ve tok bükülür (~20.6 derece)
+            flapper = -penetration * 0.36;
+            pegTorque = -5.2 * Math.sin(penetration * Math.PI) * Math.sign(omega || 1);
           } else {
             // İbre serbest salınımda sönümlü harmonik osilatör
             const flapperAcc = (-kFlapper * flapper - cFlapper * flapperV);
@@ -1309,10 +1309,10 @@
             flapper += flapperV * h;
           }
 
-          // Pimden kurtulma anında mekanik 'tick' sesi
+          // Pimden kurtulma anında mekanik 'tick' sesi ve tok geri sekme
           if (lastContact && !contact && Math.abs(omega) > 0.05) {
-            flapperV = 18.0; // Yay boşalması fırlama hızı
-            const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(Math.abs(omega) * 26) + (Math.random() * 20 - 10)));
+            flapperV = 22.0; // Yay boşalması güçlü fırlama hızı
+            const dynFreq = Math.min(1050, Math.max(460, 500 + Math.floor(Math.abs(omega) * 28) + (Math.random() * 20 - 10)));
             playTick(dynFreq);
           }
           lastContact = contact;
@@ -1413,7 +1413,7 @@
       const pHoverEnd = 0.81;
       let recoilTickPlayed = false;
 
-      const pegContactSpan = arc > 0 ? Math.min(0.24, 0.085 / arc) : 0.24;
+      const pegContactSpan = arc > 0 ? Math.min(0.28, 0.11 / arc) : 0.28;
 
       const startTime = performance.now();
       const pointerEl = document.getElementById('pointerEl');
@@ -1482,7 +1482,7 @@
         const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
         if (phaseInSlice < pegContactSpan) {
           const pushFraction = phaseInSlice / pegContactSpan;
-          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
+          flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 23;
           if (curIdx !== lastPegIdx) {
             lastPegIdx = curIdx;
             const dynFreq = Math.min(1050, Math.max(480, 520 + Math.floor(currentSpeed * 28) + (Math.random() * 20 - 10)));
