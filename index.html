@@ -1216,12 +1216,15 @@
       let hasOvercomePeg = false;
 
       // %80-100 Recoil & Yemde Durma, Yemden Yavaş Yavaş Kazanana İnme Parametreleri
-      // DEEPSEEK ANALİZİ: N=2 ve N=35 uç durumlarında tolerans bütçesini aşmayan dinamik açı tavanı
-      const recoilSpan = (N <= 3) ? Math.min(arc * 0.70, Math.PI / 4.5) : Math.min(arc * 0.85, 0.42);
+      // FİZİK DÜZELTMESİ: Çeyrek tur geriye dönme yerine tırnak pimi gerilim yaylanması (maksimum 13.5°)
+      const recoilSpan = Math.min(arc * 0.45, 0.24); // Gerçekçi tırnak elastik gerilim açısı
       const fakeStopRotation = finalRotation + recoilSpan; // Yem diliminin güvenli gerilim açısı
-      const pStop = 0.70; // Yem dilimine varış ve durma zamanı
-      const pHoverEnd = 0.82; // Yem üstünde durup beklemenin bitiş zamanı (0.70-0.82 arası tam duruş)
+      const pStop = 0.74; // Yem dilimi pimine varış ve gerilim zamanı
+      const pHoverEnd = 0.81; // Pimin üstünde takılıp gerilme süresi (0.74-0.81 arası mekanik kilitlenme)
       let recoilTickPlayed = false;
+
+      // Sabit fiziksel tırnak temas genişliği (N=2'de aşırı bükülmeyi önler, daima ~4.8° temas boyu)
+      const pegContactSpan = arc > 0 ? Math.min(0.24, 0.085 / arc) : 0.24;
 
       // İbre (flapper) gerilim ve titreme şiddeti: %0'da normal, %100'de kalp krizi seviyesi
       const maxFlapperDeflection = 14.0 + effD * 12.0; // 14° ile 26° arası bükülme
@@ -1330,8 +1333,8 @@
             const tensionProgress = (progress - (pPeg - tensionWindow)) / tensionWindow;
             flapperDeflection = -maxFlapperDeflection * tensionProgress - Math.sin(now * (0.04 + effD * 0.03)) * flapperTremorAmp;
             flapperSpringVel = 0;
-          } else if (phaseInSlice < 0.24) {
-            const pushFraction = phaseInSlice / 0.24;
+          } else if (phaseInSlice < pegContactSpan) {
+            const pushFraction = phaseInSlice / pegContactSpan;
             flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
             if (curIdx !== lastPegIdx) {
               lastPegIdx = curIdx;
@@ -1354,16 +1357,20 @@
         } else {
           // ==========================================
           // %0 STANDART DOĞAL FİZİKSEL SÖNÜM (FAKEOUT YOK)
+          // COULOMB (KURU SÜRTÜNME) + VİSKOZ FRENLEME İNTEGRALİ
           // ==========================================
-          const pExp = 4.2;
-          const easeP = 1 - Math.pow(1 - progress, pExp);
-          currentSpeed = (totalDelta / duration) * (pExp * Math.pow(Math.max(0, 1 - progress), pExp - 1));
+          const u = progress;
+          const oneMinusU = Math.max(0, 1 - u);
+          const easeP = (1 - Math.pow(oneMinusU, 3.8)) * (1 - 0.24 * u) + (1 - Math.pow(oneMinusU, 2.0)) * (0.24 * u);
+          const du = Math.max(0, 3.8 * Math.pow(oneMinusU, 2.8) * (1 - 0.24 * u) + 2.0 * oneMinusU * (0.24 * u));
+          const durSec = Math.max(0.1, duration / 1000);
+          currentSpeed = Math.max(0, (totalDelta / durSec) * du);
           wheelRotation = startRotation + totalDelta * easeP;
 
           const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
           const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
-          if (phaseInSlice < 0.24) {
-            const pushFraction = phaseInSlice / 0.24;
+          if (phaseInSlice < pegContactSpan) {
+            const pushFraction = phaseInSlice / pegContactSpan;
             flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
             if (curIdx !== lastPegIdx) {
               lastPegIdx = curIdx;
@@ -1389,8 +1396,8 @@
         if (isRecoilActive && progress < pStop - 0.05) {
           const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
           const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
-          if (phaseInSlice < 0.24) {
-            const pushFraction = phaseInSlice / 0.24;
+          if (phaseInSlice < pegContactSpan) {
+            const pushFraction = phaseInSlice / pegContactSpan;
             flapperDeflection = -Math.sin(pushFraction * Math.PI * 0.5) * 20;
             if (curIdx !== lastPegIdx) {
               lastPegIdx = curIdx;
@@ -2215,8 +2222,13 @@
         let currentBallAngle;
         if (progress < pDrop) {
           // Serbest parkur: Ters yönde azalan açısal hızla dönüş
+          // FİZİK DÜZELTMESİ: Açısal momentum korunumu (L = m*v*r = sabit => yarıçap daraldıkça açısal hız girdabı)
           const pNorm = progress / pDrop;
-          const trackEase = 1 - Math.pow(1 - pNorm, 2.0);
+          let trackEase = 1 - Math.pow(1 - pNorm, 2.0);
+          if (pNorm > 0.62) {
+            const swirl = Math.sin(((pNorm - 0.62) / 0.38) * Math.PI) * 0.036;
+            trackEase = Math.max(0, Math.min(1, trackEase - swirl));
+          }
           currentBallAngle = startBallAngle - totalTrackTurns * trackEase;
         } else if (progress < 0.92) {
           // Cebe iniş: Çarkla birlikte ileri dönüş + sahte cepten asıl cebe perde atlama
