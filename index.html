@@ -1162,11 +1162,6 @@
       if (isPlaying || !names.length) return;
       const validFlick = (typeof flickSpeed === 'number' && Number.isFinite(flickSpeed)) ? Math.abs(flickSpeed) : null;
 
-      // Tüm liste Fisher-Yates ile karıştırılır, Kazanan ve Yem yan yana yerleştirilir
-      const pair = smartShuffleNames(targetName, fakeTargetName);
-      const actualTarget = pair ? pair.target : (targetName || names[0]);
-      const actualFake = pair ? pair.fake : fakeTargetName;
-
       isPlaying = true;
       broadcast({ type: 'spin_start' });
 
@@ -1174,8 +1169,10 @@
       const arc = (2 * Math.PI) / N;
       const POINTER_ANGLE = 1.5 * Math.PI; // 270 derece (tam tepe ibresi)
 
-      let targetIndex = names.findIndex(n => trNormalize(n) === trNormalize(actualTarget));
-      if (targetIndex === -1) targetIndex = 0;
+      let targetIndex = -1;
+      if (targetName) {
+        targetIndex = names.findIndex(n => trNormalize(n) === trNormalize(targetName));
+      }
 
       // Sabit Fizik Parametreleri (Newton + Coulomb Kuru Sürtünme + Viskoz Hava Direnci + Yay-Sönümleyici)
       const h = 1 / 240;             // 240Hz sabit zaman adımı (Fixed Substep Integrator)
@@ -1229,28 +1226,37 @@
       // BAŞLANGIÇ AÇISAL HIZI BELİRLEME (w0):
       let chosenW0 = 22.0;
 
-      if (targetName !== null) {
-        // HEDEF SEÇİLMİŞSE: Simülasyon başlamadan önce 10-15 ms içinde hedef dilime
-        // tam oturacak egzakt w0 ilk hızı çözülür. (Yem varsa pim sınırına yakın near-miss hedeflenir)
+      if (targetIndex !== -1) {
+        // HEDEF SEÇİLMİŞSE: Analitik kapalı form ile hedef mesafesi (Δθ) ve tur sayısı üzerinden
+        // yaklaşık w0 tahmini yapılır, ardından ±2.2 rad/s aralığında <3ms içinde egzakt hız kilitlenir.
+        const targetCenterAngle = (targetIndex + 0.5) * arc;
+        const targetModulo = ((POINTER_ANGLE - targetCenterAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const currentModulo = (startTheta % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        let deltaAngle = targetModulo - currentModulo;
+        if (deltaAngle <= 0.1) deltaAngle += 2 * Math.PI;
+
+        const baseTurns = validFlick 
+          ? Math.max(3, Math.min(8, Math.round(validFlick * 0.22))) 
+          : Math.max(4, Math.floor(spinDuration * 0.85));
+        const totalDelta = baseTurns * (2 * Math.PI) + deltaAngle;
+        const w0Guess = Math.sqrt(2 * totalDelta * (tauC + b * 10));
+
         let bestCandidate = null;
         let minDiff = 999;
-        const targetOffsetGoal = (fakeTargetName !== null) ? 0.32 : 0.50;
-        const baseSearch = validFlick ? Math.max(14.0, Math.min(32.0, validFlick * 1.8 + 12)) : 20.0;
-        const searchStart = performance.now();
+        const targetOffsetGoal = (fakeTargetName !== null) ? 0.35 : 0.50;
 
-        for (let dw = 0; dw <= 7.0; dw += 0.03) {
-          if (performance.now() - searchStart > 25) break; // Ana thread kilitlenme koruması (maks 25ms)
-          const res = evaluateW0(baseSearch + dw);
+        for (let dw = -2.4; dw <= 2.4; dw += 0.03) {
+          const res = evaluateW0(w0Guess + dw);
           if (res && res.winner === targetIndex) {
             const diff = Math.abs(res.offset - targetOffsetGoal);
             if (diff < minDiff) {
               minDiff = diff;
-              bestCandidate = baseSearch + dw;
-              if (diff < 0.06) break;
+              bestCandidate = w0Guess + dw;
+              if (diff < 0.05) break;
             }
           }
         }
-        chosenW0 = bestCandidate !== null ? bestCandidate : baseSearch;
+        chosenW0 = bestCandidate !== null ? bestCandidate : w0Guess;
       } else {
         // HEDEF YOKSA: Başlangıç hızı tamamen serbesttir; kazananı %100 saf fizik belirler
         chosenW0 = validFlick 
