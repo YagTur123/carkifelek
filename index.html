@@ -1360,8 +1360,8 @@
           }
         }
 
-        // isRecoilActive modunda pStrike öncesi genel tırnak fiziği
-        if (isRecoilActive && progress < pStrike - 0.08) {
+        // isRecoilActive modunda pStop öncesi genel tırnak fiziği
+        if (isRecoilActive && progress < pStop - 0.05) {
           const curIdx = Math.floor(((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / arc) % N;
           const phaseInSlice = (((POINTER_ANGLE - wheelRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) % arc) / arc;
           if (phaseInSlice < 0.24) {
